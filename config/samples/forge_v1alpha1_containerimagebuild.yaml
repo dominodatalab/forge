@@ -1,0 +1,7 @@
+apiVersion: forge.dominodatalab.com/v1alpha1
+kind: ContainerImageBuild
+metadata:
+  name: containerimagebuild-sample
+spec:
+  # Add fields here
+  foo: bar

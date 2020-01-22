@@ -1,3 +1,7 @@
 domain: dominodatalab.com
 repo: github.com/dominodatalab/forge
+resources:
+- group: forge
+  kind: ContainerImageBuild
+  version: v1alpha1
 version: "2"
