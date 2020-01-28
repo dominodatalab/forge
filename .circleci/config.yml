@@ -1,0 +1,24 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.13
+    environment:
+      KUBEBUILDER_VERSION: 2.2.0
+    steps:
+      - checkout
+      - run:
+          name: Install kubebuilder
+          command: |
+            os=$(go env GOOS)
+            arch=$(go env GOARCH)
+            curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
+            sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
+            echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+      - run:
+          name: Run unit tests
+          command: make test
+      - run:
+          name: Build controller binary
+          command: make manager
