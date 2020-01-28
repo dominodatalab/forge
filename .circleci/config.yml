@@ -27,3 +27,12 @@ jobs:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /go/pkg/mod
+
+  e2e_test:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - run:
+          name: Install Kubernetes
+          command: curl -sfL https://get.k3s.io | sh -
