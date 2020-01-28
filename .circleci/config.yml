@@ -18,14 +18,17 @@ jobs:
             echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
       - restore_cache:
           keys:
-            - v1-pkg-cache
+            - go-mod-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Install go module dependencies
+          command: go mod download
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
       - run:
           name: Run unit tests
           command: make test
       - run:
           name: Build controller binary
           command: make manager
-      - save_cache:
-          key: v1-pkg-cache
-          paths:
-            - /go/pkg
