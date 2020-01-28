@@ -16,9 +16,16 @@ jobs:
             curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
             sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
             echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+      - restore_cache:
+          keys:
+            - v1-pkg-cache
       - run:
           name: Run unit tests
           command: make test
       - run:
           name: Build controller binary
           command: make manager
+      - save_cache:
+          key: v1-pkg-cache
+          paths:
+            - /go/pkg
