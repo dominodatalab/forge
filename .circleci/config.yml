@@ -36,3 +36,11 @@ jobs:
       - run:
           name: Install Kubernetes
           command: curl -sfL https://get.k3s.io | sh -
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build
+      - e2e_test
+#      - publish
