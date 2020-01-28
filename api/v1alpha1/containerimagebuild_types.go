@@ -23,13 +23,26 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// BuildMetadata encapsulates the information required to perform a container image build.
+type BuildMetadata struct {
+	// kubebuilder:validation:Pattern=.+:.+
+
+	// The name used to build the image in the following format: <registry>/<image>:<tag>.
+	// The image will be pushed to the registry at the end of a successful build.
+	ImageURL string `json:"imageURL"`
+
+	// +kubebuilder:validation:MinItems=1
+
+	// The commands used to assemble an image, see https://docs.docker.com/engine/reference/builder/.
+	Commands []string `json:"commands"`
+}
+
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
 type ContainerImageBuildSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ContainerImageBuild. Edit ContainerImageBuild_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Build BuildMetadata `json:"build"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
@@ -39,6 +52,7 @@ type ContainerImageBuildStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=cib
 
 // ContainerImageBuild is the Schema for the containerimagebuilds API
 type ContainerImageBuild struct {

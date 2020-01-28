@@ -3,5 +3,10 @@ kind: ContainerImageBuild
 metadata:
   name: containerimagebuild-sample
 spec:
-  # Add fields here
-  foo: bar
+  build:
+    # Add registry details here
+    imageURL: <registry-url>/<image>:<tag>
+    commands:
+      - "FROM python:3.8"
+      - apt-get update && apt-get install -y curl
+      - echo 'all done'
