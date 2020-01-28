@@ -9,7 +9,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install kubebuilder
+          name: Install Kubebuilder
           command: |
             os=$(go env GOOS)
             arch=$(go env GOARCH)
@@ -18,15 +18,13 @@ jobs:
             echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
       - restore_cache:
           keys:
-            - go-mod-v1-{{ checksum "go.sum" }}
+            - go-modules-v1-{{ checksum "go.sum" }}
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
-          name: Install go modules
-          command: go mod download
+          name: Build Docker image
+          command: make docker-build
       - save_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
+          key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /go/pkg/mod
-      - setup_remote_docker
-      - run:
-          name: Build docker image
-          command: make docker-build
