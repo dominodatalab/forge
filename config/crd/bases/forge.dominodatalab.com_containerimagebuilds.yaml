@@ -51,6 +51,7 @@ spec:
                   description: 'The name used to build the image in the following
                     format: <registry>/<image>:<tag>. The image will be pushed to
                     the registry at the end of a successful build.'
+                  pattern: .+:.+
                   type: string
               required:
               - commands

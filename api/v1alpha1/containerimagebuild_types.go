@@ -25,7 +25,7 @@ import (
 
 // BuildMetadata encapsulates the information required to perform a container image build.
 type BuildMetadata struct {
-	// +kubebuilder:validation:Pattern=.+:.+
+	// +kubebuilder:validation:Pattern=".+:.+"
 
 	// The name used to build the image in the following format: <registry>/<image>:<tag>.
 	// The image will be pushed to the registry at the end of a successful build.
