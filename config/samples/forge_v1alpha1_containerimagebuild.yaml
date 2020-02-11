@@ -5,7 +5,7 @@ metadata:
 spec:
   build:
     # Add registry details here
-    imageURL: quay.io/domino/sha:zaam
+    imageURL: quay.io/domino/build
     commands:
       - FROM debian
       - RUN apt-get update && apt-get install -y curl
