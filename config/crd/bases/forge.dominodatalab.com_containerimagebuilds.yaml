@@ -62,6 +62,15 @@ spec:
           type: object
         status:
           description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
+          properties:
+            completedAt:
+              format: date-time
+              type: string
+            errorMessage:
+              type: string
+            startedAt:
+              format: date-time
+              type: string
           type: object
       type: object
   version: v1alpha1

@@ -5,8 +5,9 @@ metadata:
 spec:
   build:
     # Add registry details here
-    imageURL: <registry-url>/<image>:<tag>
+    imageURL: quay.io/domino/sha:zaam
     commands:
-      - "FROM python:3.8"
-      - apt-get update && apt-get install -y curl
-      - echo 'all done'
+      - FROM debian
+      - RUN apt-get update && apt-get install -y curl
+      - RUN echo 'all done'
+      - CMD ["/bin/bash"]

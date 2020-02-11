@@ -49,6 +49,10 @@ type ContainerImageBuildSpec struct {
 type ContainerImageBuildStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	StartedAt    *metav1.Time `json:"startedAt,omitempty"`
+	CompletedAt  *metav1.Time `json:"completedAt,omitempty"`
+	ErrorMessage string       `json:"errorMessage,omitempty"`
 }
 
 // +kubebuilder:object:root=true
