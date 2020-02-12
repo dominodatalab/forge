@@ -19,44 +19,68 @@ import (
 	"github.com/dominodatalab/forge/api/v1alpha1"
 )
 
-type Builder struct{}
+type Builder struct {
+	Timeout        time.Duration
+	buildkitClient *client.Client
+}
 
-func NewRuncBuilder() *Builder {
-	return &Builder{}
+func NewRuncBuilder(host string, port int) (*Builder, error) {
+	bkClient, err := client.New(context.TODO(), fmt.Sprintf("tcp://%s:%d", host, port))
+	if err != nil {
+		return nil, err
+	}
+
+	builder := Builder{
+		Timeout:        300 * time.Second,
+		buildkitClient: bkClient,
+	}
+	return &builder, nil
 }
 
 func (b *Builder) Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSpec) (string, error) {
-	// buildkit daemon input parameters
-	host := "192.168.64.74"
-	port := "30138"
+	solveOpt, teardown, err := prepareBuildContext(spec)
+	if err != nil {
+		return "", err
+	}
+	defer teardown()
 
-	// initialize client
-	ctx, cancel := context.WithTimeout(ctx, 300*time.Second)
+	image := fmt.Sprintf("%s/%s", spec.Build.PushRegistry, spec.Build.ImageName)
+	solveOpt.Exports = []client.ExportEntry{
+		{
+			Type: "image",
+			Attrs: map[string]string{
+				"name": image,
+				//"push": "true", // TODO add this when ready to push
+			},
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, b.Timeout)
 	defer cancel()
-
-	buildkitClient, err := client.New(ctx, fmt.Sprintf("tcp://%s:%s", host, port))
-	if err != nil {
-		return "", nil
-	}
-
-	contextDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		return "", err
-	}
-	defer func() { os.RemoveAll(contextDir) }()
-
-	solveOpt, err := prepareBuildContext(contextDir, spec)
-	if err != nil {
-		return "", err
-	}
 
 	ch := make(chan *client.SolveStatus)
 	eg, _ := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		_, err := buildkitClient.Solve(ctx, nil, *solveOpt, ch)
-		return err
+		var digest string
+
+		resp, err := b.buildkitClient.Solve(ctx, nil, *solveOpt, ch)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range resp.ExporterResponse {
+			if k == "containerimage.digest" {
+				digest = v
+			}
+		}
+
+		if !strings.ContainsAny(spec.Build.ImageName, ":@") {
+			image = fmt.Sprintf("%s@%s", image, digest)
+		}
+		return nil
 	})
+
 	eg.Go(func() error {
 		cff, err := console.ConsoleFromFile(os.Stderr)
 		if err != nil {
@@ -64,24 +88,28 @@ func (b *Builder) Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSp
 		}
 		return progressui.DisplaySolveStatus(ctx, "", cff, os.Stdout, ch)
 	})
+
 	if err := eg.Wait(); err != nil {
 		return "", err
 	}
-
-	return "", nil
+	return image, nil
 }
 
-func prepareBuildContext(contextDir string, spec v1alpha1.ContainerImageBuildSpec) (*client.SolveOpt, error) {
+func prepareBuildContext(spec v1alpha1.ContainerImageBuildSpec) (*client.SolveOpt, func(), error) {
+	contextDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return nil, nil, err
+	}
+	teardown := func() { os.RemoveAll(contextDir) }
+
 	dockerfile := filepath.Join(contextDir, "Dockerfile")
 	contents := []byte(strings.Join(spec.Build.Commands, "\n"))
-
 	if err := ioutil.WriteFile(dockerfile, contents, 0644); err != nil {
-		return nil, err
+		teardown()
+		return nil, nil, err
 	}
 
-	attachable := []session.Attachable{authprovider.NewDockerAuthProvider(os.Stderr)}
-
-	return &client.SolveOpt{
+	solveOpt := client.SolveOpt{
 		Frontend: "dockerfile.v0",
 		FrontendAttrs: map[string]string{
 			"filename": filepath.Base(dockerfile),
@@ -90,14 +118,7 @@ func prepareBuildContext(contextDir string, spec v1alpha1.ContainerImageBuildSpe
 			"context":    contextDir,
 			"dockerfile": contextDir,
 		},
-		Session: attachable,
-		//Exports: []client.ExportEntry{
-		//	{
-		//		Type: "image",
-		//		Attrs: map[string]string{
-		//			"name": spec.Build.ImageURL,
-		//		},
-		//	},
-		//},
-	}, nil
+		Session: []session.Attachable{authprovider.NewDockerAuthProvider(os.Stderr)},
+	}
+	return &solveOpt, teardown, nil
 }

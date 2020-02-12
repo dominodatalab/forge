@@ -17,6 +17,8 @@ spec:
     - cib
     singular: containerimagebuild
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: ContainerImageBuild is the Schema for the containerimagebuilds
@@ -47,15 +49,19 @@ spec:
                     type: string
                   minItems: 1
                   type: array
-                imageURL:
-                  description: 'The name used to build the image in the following
-                    format: <registry>/<image>:<tag>. The image will be pushed to
-                    the registry at the end of a successful build.'
-                  pattern: .+:.+
+                imageName:
+                  description: The name used to build an image.
+                  minLength: 1
+                  type: string
+                pushRegistry:
+                  description: The registry where an image should be pushed at the
+                    end of a successful build.
+                  minLength: 1
                   type: string
               required:
               - commands
-              - imageURL
+              - imageName
+              - pushRegistry
               type: object
           required:
           - build
@@ -68,8 +74,12 @@ spec:
               type: string
             errorMessage:
               type: string
+            imageURL:
+              type: string
             startedAt:
               format: date-time
+              type: string
+            state:
               type: string
           type: object
       type: object

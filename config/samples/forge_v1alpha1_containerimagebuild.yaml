@@ -4,8 +4,8 @@ metadata:
   name: containerimagebuild-sample
 spec:
   build:
-    # Add registry details here
-    imageURL: quay.io/domino/build
+    pushRegistry: docker-registry:5000
+    imageName: domino/env-build
     commands:
       - FROM debian
       - RUN apt-get update && apt-get install -y curl

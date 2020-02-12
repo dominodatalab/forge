@@ -16,24 +16,31 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type BuildState string
+
+const (
+	Building  BuildState = "Building"
+	Completed BuildState = "Completed"
+	Failed    BuildState = "Failed"
+)
+
 // BuildMetadata encapsulates the information required to perform a container image build.
 type BuildMetadata struct {
-	// +kubebuilder:validation:Pattern=".+:.+"
+	// The registry where an image should be pushed at the end of a successful build.
+	// +kubebuilder:validation:MinLength=1
+	PushRegistry string `json:"pushRegistry"`
 
-	// The name used to build the image in the following format: <registry>/<image>:<tag>.
-	// The image will be pushed to the registry at the end of a successful build.
-	ImageURL string `json:"imageURL"`
-
-	// +kubebuilder:validation:MinItems=1
+	// The name used to build an image.
+	// +kubebuilder:validation:MinLength=1
+	ImageName string `json:"imageName"`
 
 	// The commands used to assemble an image, see https://docs.docker.com/engine/reference/builder/.
+	// +kubebuilder:validation:MinItems=1
 	Commands []string `json:"commands"`
 }
 
@@ -50,13 +57,16 @@ type ContainerImageBuildStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	StartedAt    *metav1.Time `json:"startedAt,omitempty"`
-	CompletedAt  *metav1.Time `json:"completedAt,omitempty"`
-	ErrorMessage string       `json:"errorMessage,omitempty"`
+	State            BuildState   `json:"state,omitempty"`
+	ImageURL         string       `json:"imageURL,omitempty"`
+	ErrorMessage     string       `json:"errorMessage,omitempty"`
+	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
+	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=cib
+// +kubebuilder:subresource:status
 
 // ContainerImageBuild is the Schema for the containerimagebuilds API
 type ContainerImageBuild struct {

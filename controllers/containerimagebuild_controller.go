@@ -18,9 +18,10 @@ package controllers
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,33 +44,44 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	ctx := context.Background()
 	log := r.Log.WithValues("containerimagebuild", req.NamespacedName)
 
-	log.Info("fetching ContainerImageBuild resource")
-	var cim forgev1alpha1.ContainerImageBuild
+	log.Info("fetching resource")
+	cim := forgev1alpha1.ContainerImageBuild{}
 	if err := r.Get(ctx, req.NamespacedName, &cim); err != nil {
-		log.Error(err, "failed to get ContainerImageBuild resource")
+		log.Error(err, "failed to get resource")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if cim.Status.State != "" {
+		return ctrl.Result{}, nil
+	}
 
-	//log.Info("updating ....")
-	//cim.Status.StartedAt = &metav1.Time{Time: time.Now()}
-	//if err := r.Status().Update(ctx, &cim); err != nil {
-	//	log.Error(err, "unable to update status")
-	//	return ctrl.Result{}, err
-	//}
-	//log.Info("resource status synced")
+	cim.Status.State = forgev1alpha1.Building
+	cim.Status.BuildStartedAt = &metav1.Time{Time: time.Now()}
+	if err := r.Status().Update(ctx, &cim); err != nil {
+		log.Error(err, "unable to update status")
+		return ctrl.Result{}, err
+	}
 
-	//cim.Status.StartedAt = &metav1.Time{Time: time.Now()}
-	//if err := r.Status().Update(ctx, &cim); err != nil {
-	//	log.Error(err, "unable to update status")
-	//	return ctrl.Result{}, err
-	//}
+	// TODO move this into config settings
+	host := "192.168.64.74"
+	port := 30138
+	builder, err := runc.NewRuncBuilder(host, port)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	builder := runc.NewRuncBuilder()
-	out, err := builder.Build(ctx, cim.Spec)
+	image, err := builder.Build(ctx, cim.Spec)
 	if err != nil {
 		log.Error(err, "container build failed")
+		return ctrl.Result{}, err
 	}
-	fmt.Println(out)
+
+	cim.Status.ImageURL = image
+	cim.Status.State = forgev1alpha1.Completed
+	cim.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
+	if err := r.Status().Update(ctx, &cim); err != nil {
+		log.Error(err, "unable to update status")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
