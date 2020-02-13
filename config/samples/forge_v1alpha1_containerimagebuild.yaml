@@ -7,7 +7,7 @@ spec:
     pushRegistry: docker-registry:5000
     imageName: domino/env-build
     commands:
-      - FROM debian
-      - RUN apt-get update && apt-get install -y curl
+      - FROM python:3.7
+      - RUN pip install awscli
       - RUN echo 'all done'
       - CMD ["/bin/bash"]
