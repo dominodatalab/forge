@@ -3,9 +3,19 @@ package container
 import (
 	"context"
 
-	"github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/pkg/config"
+	"github.com/dominodatalab/forge/pkg/container/runc"
 )
 
 type RuntimeBuilder interface {
-	Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSpec) (string, error)
+	Build(ctx context.Context, opts config.BuildOptions) (string, error)
+}
+
+func NewBuilder() (RuntimeBuilder, error) {
+	hostURL, err := runc.EnsureBuildkitDaemon()
+	if err != nil {
+		return nil, err
+	}
+
+	return runc.NewRuncBuilder(hostURL)
 }

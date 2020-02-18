@@ -27,7 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
-	"github.com/dominodatalab/forge/pkg/container/runc"
+	"github.com/dominodatalab/forge/pkg/config"
+	"github.com/dominodatalab/forge/pkg/container"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
@@ -61,17 +62,9 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, err
 	}
 
-	// TODO move this into config settings
-	host := "192.168.64.74"
-	port := 30138
-	builder, err := runc.NewRuncBuilder(host, port)
+	image, err := r.dispatchContainerBuild(cim.Spec)
 	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	image, err := builder.Build(ctx, cim.Spec)
-	if err != nil {
-		log.Error(err, "container build failed")
+		log.Error(err, "container image build failed")
 		return ctrl.Result{}, err
 	}
 
@@ -90,4 +83,26 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&forgev1alpha1.ContainerImageBuild{}).
 		Complete(r)
+}
+
+func (r *ContainerImageBuildReconciler) dispatchContainerBuild(spec forgev1alpha1.ContainerImageBuildSpec) (string, error) {
+	opts := config.BuildOptions{
+		Image: config.Image{
+			Name:     spec.Build.ImageName,
+			Commands: spec.Build.Commands,
+		},
+		Registry: config.Registry{
+			ServerURL: spec.Build.PushRegistry,
+			Insecure:  true,
+		},
+	}
+
+	// NOTE should we move this into a constructor?
+	// 	doing so will mean that we need to choose a "single" builder for all builds
+	// 	but that's probably okay
+	containerBuilder, err := container.NewBuilder()
+	if err != nil {
+		return "", err
+	}
+	return containerBuilder.Build(context.TODO(), opts)
 }

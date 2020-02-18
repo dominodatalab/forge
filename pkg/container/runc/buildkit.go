@@ -16,35 +16,37 @@ import (
 	"github.com/moby/buildkit/util/progress/progressui"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/pkg/config"
 )
+
+const defaultBuildTimeout = 300 * time.Second
 
 type Builder struct {
 	Timeout        time.Duration
 	buildkitClient *client.Client
 }
 
-func NewRuncBuilder(host string, port int) (*Builder, error) {
-	bkClient, err := client.New(context.TODO(), fmt.Sprintf("tcp://%s:%d", host, port))
+func NewRuncBuilder(buildkitdAddr string) (*Builder, error) {
+	bkClient, err := client.New(context.TODO(), buildkitdAddr)
 	if err != nil {
 		return nil, err
 	}
 
 	builder := Builder{
-		Timeout:        300 * time.Second,
+		Timeout:        defaultBuildTimeout,
 		buildkitClient: bkClient,
 	}
 	return &builder, nil
 }
 
-func (b *Builder) Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSpec) (string, error) {
-	solveOpt, teardown, err := prepareBuildContext(spec)
+func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
+	solveOpt, teardown, err := prepareBuildContext(opts)
 	if err != nil {
 		return "", err
 	}
 	defer teardown()
 
-	image := fmt.Sprintf("%s/%s", spec.Build.PushRegistry, spec.Build.ImageName)
+	image := fmt.Sprintf("%s/%s", opts.Registry.ServerURL, opts.Image.Name)
 	solveOpt.Exports = []client.ExportEntry{
 		{
 			Type: "image",
@@ -75,7 +77,7 @@ func (b *Builder) Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSp
 			}
 		}
 
-		if !strings.ContainsAny(spec.Build.ImageName, ":@") {
+		if !strings.ContainsAny(opts.Image.Name, ":@") {
 			image = fmt.Sprintf("%s@%s", image, digest)
 		}
 		return nil
@@ -95,7 +97,7 @@ func (b *Builder) Build(ctx context.Context, spec v1alpha1.ContainerImageBuildSp
 	return image, nil
 }
 
-func prepareBuildContext(spec v1alpha1.ContainerImageBuildSpec) (*client.SolveOpt, func(), error) {
+func prepareBuildContext(opts config.BuildOptions) (*client.SolveOpt, func(), error) {
 	contextDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		return nil, nil, err
@@ -103,7 +105,7 @@ func prepareBuildContext(spec v1alpha1.ContainerImageBuildSpec) (*client.SolveOp
 	teardown := func() { os.RemoveAll(contextDir) }
 
 	dockerfile := filepath.Join(contextDir, "Dockerfile")
-	contents := []byte(strings.Join(spec.Build.Commands, "\n"))
+	contents := []byte(strings.Join(opts.Commands, "\n"))
 	if err := ioutil.WriteFile(dockerfile, contents, 0644); err != nil {
 		teardown()
 		return nil, nil, err
