@@ -42,6 +42,14 @@ type BuildMetadata struct {
 	// The commands used to assemble an image, see https://docs.docker.com/engine/reference/builder/.
 	// +kubebuilder:validation:MinItems=1
 	Commands []string `json:"commands"`
+
+	// TODO extra args to support
+	// 	- environment variables
+	// 	- build args????
+	// 	- imageBuildSizeLimit ?????? (used to prevent built images from being push to registry/ may not be relevant)
+	// 	- build cpu/memory restrictions
+	// 	- use cache directive
+	//
 }
 
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
@@ -65,7 +73,7 @@ type ContainerImageBuildStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=cib
+// +kubebuilder:resource:scope=Cluster,shortName=cib
 // +kubebuilder:subresource:status
 
 // ContainerImageBuild is the Schema for the containerimagebuilds API

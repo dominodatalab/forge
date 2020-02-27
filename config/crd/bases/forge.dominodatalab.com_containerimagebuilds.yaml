@@ -16,7 +16,7 @@ spec:
     shortNames:
     - cib
     singular: containerimagebuild
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   validation:
