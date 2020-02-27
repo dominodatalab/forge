@@ -65,6 +65,14 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	image, err := r.dispatchContainerBuild(cim.Spec)
 	if err != nil {
 		log.Error(err, "container image build failed")
+
+		cim.Status.State = forgev1alpha1.Failed
+		cim.Status.ErrorMessage = err.Error()
+		if err := r.Status().Update(ctx, &cim); err != nil {
+			log.Error(err, "unable to update status")
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, err
 	}
 
