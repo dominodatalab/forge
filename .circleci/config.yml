@@ -1,0 +1,35 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.14
+    environment:
+      KUBEBUILDER_VERSION: 2.2.0
+    steps:
+      - checkout
+      - run:
+          name: Install Kubebuilder
+          command: |
+            os=$(go env GOOS)
+            arch=$(go env GOARCH)
+            curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
+            sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
+            echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+      - restore_cache:
+          keys:
+            - go-modules-v1-{{ checksum "go.sum" }}
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: make docker-build
+      - save_cache:
+          key: go-modules-v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build
