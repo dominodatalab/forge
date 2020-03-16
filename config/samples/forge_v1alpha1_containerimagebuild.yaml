@@ -1,0 +1,8 @@
+apiVersion: forge.dominodatalab.com/v1alpha1
+kind: ContainerImageBuild
+metadata:
+  name: containerimagebuild-sample
+spec:
+  imageName: my-shiz
+  pushRegistry: my-registry.com
+  context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/trash-root.tgz
