@@ -19,10 +19,9 @@ jobs:
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
-      - setup_remote_docker
       - run:
-          name: Build Docker image
-          command: make docker-build
+          name: Run Unit Tests
+          command: make test
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:

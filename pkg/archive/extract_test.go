@@ -74,4 +74,12 @@ func TestFetchAndExtract(t *testing.T) {
 			os.RemoveAll(ext.RootDir)
 		})
 	}
+
+	t.Run("fetch-failure", func(t *testing.T) {
+		t.SkipNow()
+	})
+
+	t.Run("unsupported-format", func(t *testing.T) {
+		t.SkipNow()
+	})
 }
