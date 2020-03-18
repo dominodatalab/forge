@@ -25,6 +25,7 @@ type ContainerImageBuildReconciler struct {
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	Builder  container.RuntimeBuilder
 }
 
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds,verbs=get;list;watch;create;update;patch;delete
@@ -32,20 +33,20 @@ type ContainerImageBuildReconciler struct {
 
 func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("containerimagebuild", req.NamespacedName)
+	log := r.Log.WithValues("containerimagebuild", req.Name)
 
 	var result ctrl.Result
 	var build forgev1alpha1.ContainerImageBuild
 
 	// attempt to load resource by name and ignore not-found errors
 	if err := r.Get(ctx, req.NamespacedName, &build); err != nil {
-		log.Error(err, "unable to fetch ContainerImageBuild")
+		log.Error(err, "Unable to find resource")
 		return result, client.IgnoreNotFound(err)
 	}
 
 	// ignore resources that have been processed on start
 	if len(build.Status.State) != 0 {
-		log.Info("ignoring changes to ContainerImageBuild", "build", build)
+		log.Info("Skipping resource", "state", build.Status.State)
 		return result, nil
 	}
 
@@ -70,16 +71,9 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		InsecureRegistry: true,
 	}
 
-	// TODO: move this into initializer
-	builder, err := container.NewBuilder()
+	imageURL, err := r.Builder.Build(ctx, opts)
 	if err != nil {
-		log.Error(err, "cannot create container builder")
-		return result, err
-	}
-
-	imageURL, err := builder.Build(ctx, opts)
-	if err != nil {
-		log.Error(err, "image build process failed")
+		log.Error(err, "Build process failed")
 
 		build.Status.State = forgev1alpha1.Failed
 		build.Status.ErrorMessage = err.Error()
@@ -108,7 +102,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&forgev1alpha1.ContainerImageBuild{}).
-		WithEventFilter(predicate.Funcs{ // ignore update and delete events
+		WithEventFilter(predicate.Funcs{ // NOTE this ignores update/delete events
 			CreateFunc: func(event event.CreateEvent) bool {
 				return true
 			},
@@ -125,9 +119,9 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context, log logr.Logger, build *forgev1alpha1.ContainerImageBuild) error {
 	err := r.Status().Update(ctx, build)
 	if err != nil {
-		log.Error(err, "unable to update ContainerImageBuild.Status", "build", build)
+		log.Error(err, "Unable to update status")
 
-		msg := fmt.Sprintf("Forge was unable to update this resource: %v", err)
+		msg := fmt.Sprintf("Forge was unable to update this resource status: %v", err)
 		r.Recorder.Event(build, "Warning", "UpdateFailed", msg)
 	}
 

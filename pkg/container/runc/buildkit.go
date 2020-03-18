@@ -48,15 +48,15 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	}
 	imageURL := solveopt.Exports[0].Attrs["name"]
 
-	ctx, cancel := context.WithTimeout(ctx, b.timeout)
-	defer cancel()
-
-	ch := make(chan *client.SolveStatus)
-
 	cff, err := console.ConsoleFromFile(os.Stderr)
 	if err != nil {
 		return "", err
 	}
+
+	ch := make(chan *client.SolveStatus)
+
+	ctx, cancel := context.WithTimeout(ctx, b.timeout)
+	defer cancel()
 
 	eg, _ := errgroup.WithContext(ctx)
 	eg.Go(func() error {

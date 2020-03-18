@@ -4,13 +4,15 @@ import (
 	"flag"
 	"os"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
-	"github.com/dominodatalab/forge/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/controllers"
+	"github.com/dominodatalab/forge/pkg/container"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,23 +47,31 @@ func main() {
 		Port:               9443,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Unable to start manager")
+		os.Exit(1)
+	}
+
+	setupLog.Info("Initializing OCI builder")
+	builder, err := container.NewBuilder()
+	if err != nil {
+		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
 	}
 
 	if err = (&controllers.ContainerImageBuildReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
-		Scheme: mgr.GetScheme(),
+		Client:  mgr.GetClient(),
+		Log:     ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
+		Scheme:  mgr.GetScheme(),
+		Builder: builder,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ContainerImageBuild")
+		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
-	setupLog.Info("starting manager")
+	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Problem running manager")
 		os.Exit(1)
 	}
 }
