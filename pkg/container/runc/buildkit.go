@@ -52,8 +52,13 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	defer cancel()
 
 	ch := make(chan *client.SolveStatus)
-	eg, _ := errgroup.WithContext(ctx)
 
+	cff, err := console.ConsoleFromFile(os.Stderr)
+	if err != nil {
+		return "", err
+	}
+
+	eg, _ := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		var digest string
 
@@ -75,10 +80,6 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	})
 
 	eg.Go(func() error {
-		cff, err := console.ConsoleFromFile(os.Stderr)
-		if err != nil {
-			return err
-		}
 		return progressui.DisplaySolveStatus(ctx, "", cff, os.Stdout, ch)
 	})
 
