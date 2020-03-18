@@ -1,8 +1,14 @@
 apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
-  name: containerimagebuild-sample
+  name: example-build
 spec:
-  imageName: my-shiz
-  pushRegistry: my-registry.com
-  context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/trash-root.tgz
+  imageName: multi-stage-app
+  pushRegistry: docker-registry:5000
+  context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
+  noCache: true
+  labels:
+    dominodatalab.com/build-id: abc123
+    dominodatalab.com/environment-id: dev
+  buildArgs:
+    - port=5000
