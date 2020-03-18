@@ -23,10 +23,6 @@ type ContainerImageBuildSpec struct {
 	// Build context for the image. This can be a local path or url.
 	Context string `json:"context"`
 
-	// Name of the Dockerfile. Default is "CONTEXT_PATH/Dockerfile".
-	// +kubebuilder:validation:Optional
-	Dockerfile string `json:"dockerfile"`
-
 	// Image build arguments.
 	// +kubebuilder:validation:Optional
 	BuildArgs []string `json:"buildArgs"`

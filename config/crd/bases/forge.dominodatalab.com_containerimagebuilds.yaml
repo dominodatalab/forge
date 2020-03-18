@@ -54,9 +54,6 @@ spec:
               maximum: 100000
               minimum: 10000
               type: integer
-            dockerfile:
-              description: Name of the Dockerfile. Default is "CONTEXT_PATH/Dockerfile".
-              type: string
             imageName:
               description: Name used to build an image.
               minLength: 1
