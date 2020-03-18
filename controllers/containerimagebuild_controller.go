@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/client-go/tools/record"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/pkg/container"
@@ -37,14 +37,14 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	var result ctrl.Result
 	var build forgev1alpha1.ContainerImageBuild
 
-	// load resource by name and ignore not-found errors
+	// attempt to load resource by name and ignore not-found errors
 	if err := r.Get(ctx, req.NamespacedName, &build); err != nil {
 		log.Error(err, "unable to fetch ContainerImageBuild")
 		return result, client.IgnoreNotFound(err)
 	}
 
-	// ignore updates to resource after creation
-	if len(build.Status.State) > 0 {
+	// ignore resources that have been processed on start
+	if len(build.Status.State) != 0 {
 		log.Info("ignoring changes to ContainerImageBuild", "build", build)
 		return result, nil
 	}
@@ -86,13 +86,13 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 		if uErr := r.updateResourceStatus(ctx, log, &build); uErr != nil {
 			err = fmt.Errorf("multiple failures occurred: %w: followed by %v", err, uErr)
+			return result, err
 		}
 
-		// NOTE returning an error causing the reconcile loop to run again
-		return result, err
+		return result, nil
 	}
 
-	// mark resource status to indicate successful build
+	// mark resource status to indicate build was successful
 	build.Status.ImageURL = imageURL
 	build.Status.State = forgev1alpha1.Completed
 	build.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
@@ -107,7 +107,18 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&forgev1alpha1.ContainerImageBuild{}). // TODO examine WithEventFilter() to skip update later
+		For(&forgev1alpha1.ContainerImageBuild{}).
+		WithEventFilter(predicate.Funcs{ // ignore update and delete events
+			CreateFunc: func(event event.CreateEvent) bool {
+				return true
+			},
+			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
+				return false
+			},
+			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+				return false
+			},
+		}).
 		Complete(r)
 }
 
