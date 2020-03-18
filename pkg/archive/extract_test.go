@@ -20,9 +20,8 @@ func TestFetchAndExtract(t *testing.T) {
 		archive string
 		files   []string
 	}{
-		{"tarball", "testdata/docker-ctx.tar", []string{"Dockerfile", "app.py"}},
-		{"gzipped-tarball", "testdata/docker-ctx.tgz", []string{"Dockerfile", "app.py"}},
-		{"nested-dir", "testdata/nested-ctx.tar", []string{"trash/Dockerfile", "trash/app.py"}},
+		{"tarball", "testdata/simple-app.tar", []string{"Dockerfile", "app.py"}},
+		{"gzipped-tarball", "testdata/simple-app.tgz", []string{"Dockerfile", "app.py"}},
 	}
 
 	for _, tc := range cases {

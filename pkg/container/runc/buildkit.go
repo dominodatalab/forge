@@ -8,23 +8,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dominodatalab/forge/pkg/archive"
-
 	"github.com/containerd/console"
 	"github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/cmd/buildctl/build"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/dominodatalab/forge/pkg/archive"
 	"github.com/dominodatalab/forge/pkg/container/config"
 )
 
 const defaultTimeout = 300 * time.Second
 
 type Builder struct {
-	bk      *client.Client
-	timeout time.Duration
+	bk        *client.Client
+	timeout   time.Duration
+	extractor archive.Extractor
 }
 
 func NewRuncBuilder(addr string) (*Builder, error) {
@@ -34,16 +35,18 @@ func NewRuncBuilder(addr string) (*Builder, error) {
 	}
 
 	return &Builder{
-		timeout: defaultTimeout,
-		bk:      bk,
+		timeout:   defaultTimeout,
+		bk:        bk,
+		extractor: archive.FetchAndExtract,
 	}, nil
 }
 
 func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
-	solveopt, image, err := PrepareSolveOpt(opts)
+	solveopt, err := b.PrepareSolveOpt(opts)
 	if err != nil {
 		return "", err
 	}
+	imageURL := solveopt.Exports[0].Attrs["name"]
 
 	ctx, cancel := context.WithTimeout(ctx, b.timeout)
 	defer cancel()
@@ -66,7 +69,7 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 		}
 
 		if !strings.ContainsAny(opts.ImageName, ":@") {
-			image = fmt.Sprintf("%s@%s", image, digest)
+			imageURL = fmt.Sprintf("%s@%s", imageURL, digest)
 		}
 		return nil
 	})
@@ -82,64 +85,59 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	if err := eg.Wait(); err != nil {
 		return "", err
 	}
-	return image, nil
+	return imageURL, nil
 }
 
-func PrepareSolveOpt(opts config.BuildOptions) (*client.SolveOpt, string, error) {
-	_, err := archive.FetchAndExtract(opts.Context)
+func (b *Builder) PrepareSolveOpt(opts config.BuildOptions) (*client.SolveOpt, error) {
+	localCtx, err := b.extractor(opts.Context)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	if opts.Dockerfile == "" {
-		opts.Dockerfile = "Dockerfile"
-	}
-
-	solveopt := client.SolveOpt{
+	solveOpt := &client.SolveOpt{
 		Frontend: "dockerfile.v0",
 		FrontendAttrs: map[string]string{
-			"filename": opts.Dockerfile,
+			"filename": "Dockerfile",
 		},
 		LocalDirs: map[string]string{
-			"context":    opts.Context,
-			"dockerfile": opts.Context,
+			"context":    localCtx.ContentsDir,
+			"dockerfile": localCtx.ContentsDir,
 		},
 		Session: []session.Attachable{authprovider.NewDockerAuthProvider(os.Stderr)},
-	}
-
-	if opts.NoCache {
-		solveopt.FrontendAttrs["no-cache"] = ""
-	}
-
-	image := fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName)
-	solveopt.Exports = []client.ExportEntry{
-		{
-			Type: "image",
-			Attrs: map[string]string{
-				"name":              image,
-				"push":              "true",
-				"registry.insecure": strconv.FormatBool(opts.InsecureRegistry),
+		Exports: []client.ExportEntry{
+			{
+				Type: "image",
+				Attrs: map[string]string{
+					"name":              fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName),
+					"push":              "true",
+					"registry.insecure": strconv.FormatBool(opts.InsecureRegistry),
+				},
 			},
 		},
 	}
-	return &solveopt, image, nil
-}
 
-//func prepareContextDir(contextURL string) (dir string, err error) {
-//
-//	//dir, err = ioutil.TempDir("", "forge-build")
-//	//if err != nil {
-//	//	return
-//	//}
-//	//defer os.RemoveAll(dir)
-//	//
-//	//fp := filepath.Join(dir, "context.archive")
-//	//if err := util.DownloadFile(fp, contextURL); err != nil {
-//	//	return
-//	//}
-//	//
-//	//if err := util.ExtractArchive(fp); err != nil {
-//	//	return
-//	//}
-//	//return
-//}
+	if opts.NoCache {
+		solveOpt.FrontendAttrs["no-cache"] = ""
+	}
+
+	if len(opts.BuildArgs) != 0 {
+		var buildArgs []string
+		for _, arg := range opts.BuildArgs {
+			buildArgs = append(buildArgs, fmt.Sprintf("build-arg:%s", arg))
+		}
+
+		attrsArgs, err := build.ParseOpt(buildArgs, nil)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range attrsArgs {
+			solveOpt.FrontendAttrs[k] = v
+		}
+	}
+
+	for k, v := range opts.Labels {
+		solveOpt.FrontendAttrs[fmt.Sprintf("label:%s", k)] = v
+	}
+
+	return solveOpt, nil
+}

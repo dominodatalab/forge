@@ -8,6 +8,7 @@ import (
 )
 
 type RuntimeBuilder interface {
+	//Initialize(ctx context.Context) error
 	Build(ctx context.Context, opts config.BuildOptions) (string, error)
 }
 

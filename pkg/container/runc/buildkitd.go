@@ -75,7 +75,7 @@ func EnsureBuildkitDaemon() (hostURL string, err error) {
 						Containers: []apiv1.Container{
 							{
 								Name:  commonResourceName,
-								Image: "moby/buildkit:master",
+								Image: "moby/buildkit:v0.6.4",
 								Args: []string{
 									"--addr", fmt.Sprintf("tcp://0.0.0.0:%d", communicationPort),
 									"--addr", "unix:///run/buildkit/buildkitd.sock",
@@ -140,7 +140,7 @@ func EnsureBuildkitDaemon() (hostURL string, err error) {
 	fmt.Printf("in-cluster addr: tcp://%s:%d", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port)
 
 	// NOTE replace w/ fmt.Sprintf("tcp://%s:%d", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port) when running inside cluster
-	return "tcp://192.168.64.76:30138", nil
+	return "tcp://192.168.64.78:30138", nil
 }
 
 func getK8sClient() (kubernetes.Interface, error) {

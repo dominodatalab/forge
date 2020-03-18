@@ -21,6 +21,8 @@ const (
 	mimeTypeGzip = mimeType("application/gzip")
 )
 
+type Extractor func(url string) (*Extraction, error)
+
 type Extraction struct {
 	RootDir     string
 	Archive     string
