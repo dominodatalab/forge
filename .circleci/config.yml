@@ -16,12 +16,18 @@ jobs:
             curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
             sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
             echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+      - run:
+          name: Setup Environment Variables
+          command: |
+            [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
+            echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
+      - setup_remote_docker
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
-          name: Run Unit Tests
-          command: make test
+          name: Build Docker Image
+          command: make ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}' --label quay.expires-after=4w" docker-build
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
