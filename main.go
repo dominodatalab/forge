@@ -52,8 +52,8 @@ func main() {
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	builder, err := container.NewBuilder()
-	if err != nil {
+	builder := container.NewBuilder()
+	if err := builder.Init(); err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
 	}

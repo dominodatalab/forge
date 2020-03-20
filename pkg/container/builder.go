@@ -8,15 +8,10 @@ import (
 )
 
 type RuntimeBuilder interface {
-	//Initialize(ctx context.Context) error
+	Init() error
 	Build(ctx context.Context, opts config.BuildOptions) (string, error)
 }
 
-func NewBuilder() (RuntimeBuilder, error) {
-	hostURL, err := runc.EnsureBuildkitDaemon()
-	if err != nil {
-		return nil, err
-	}
-
-	return runc.NewRuncBuilder(hostURL)
+func NewBuilder() RuntimeBuilder {
+	return runc.NewImageBuilder()
 }

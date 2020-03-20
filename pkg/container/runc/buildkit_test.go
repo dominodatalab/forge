@@ -22,7 +22,7 @@ var fakeExtractor = func(string) (*archive.Extraction, error) {
 }
 
 func TestBuilder_PrepareSolveOpt(t *testing.T) {
-	builder := Builder{extractor: fakeExtractor}
+	builder := builder{extractor: fakeExtractor}
 	opts := config.BuildOptions{
 		RegistryURL: "my-registry:5000",
 		ImageName:   "my-image",
@@ -51,7 +51,7 @@ func TestBuilder_PrepareSolveOpt(t *testing.T) {
 	}
 
 	t.Run("default", func(t *testing.T) {
-		actual, err := builder.PrepareSolveOpt(opts)
+		actual, err := builder.prepareSolveOpt(opts)
 
 		assert.NoError(t, err)
 		assert.Equal(t, expected, actual)

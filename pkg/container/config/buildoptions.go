@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 type BuildOptions struct {
 	Context          string
 	ImageName        string
@@ -10,4 +12,5 @@ type BuildOptions struct {
 	NoCache          bool
 	CpuQuota         uint16
 	Memory           string
+	Timeout          time.Duration
 }

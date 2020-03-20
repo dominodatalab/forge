@@ -44,6 +44,10 @@ type ContainerImageBuildSpec struct {
 	// Limits build memory consumption.
 	// +kubebuilder:validation:Optional
 	Memory string `json:"memory"`
+
+	// Optional deadline in seconds for image build to complete (defaults to 300).
+	// +kubebuilder:validation:Optional
+	TimeoutSeconds uint16 `json:"timeoutSeconds"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild

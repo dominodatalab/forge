@@ -74,6 +74,10 @@ spec:
                 a successful build.
               minLength: 1
               type: string
+            timeoutSeconds:
+              description: Optional deadline in seconds for image build to complete
+                (defaults to 300).
+              type: integer
           required:
           - context
           - imageName

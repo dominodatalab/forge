@@ -2,6 +2,7 @@ package runc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -22,27 +23,36 @@ import (
 
 const defaultTimeout = 300 * time.Second
 
-type Builder struct {
+type builder struct {
 	bk        *client.Client
-	timeout   time.Duration
 	extractor archive.Extractor
 }
 
-func NewRuncBuilder(addr string) (*Builder, error) {
-	bk, err := client.New(context.Background(), addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Builder{
-		timeout:   defaultTimeout,
-		bk:        bk,
-		extractor: archive.FetchAndExtract,
-	}, nil
+func NewImageBuilder() *builder {
+	return &builder{extractor: archive.FetchAndExtract}
 }
 
-func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
-	solveopt, err := b.PrepareSolveOpt(opts)
+func (b *builder) Init() error {
+	bkURL, err := EnsureBuildkitDaemon()
+	if err != nil {
+		return fmt.Errorf("failed to deploy buildkitd: %w", err)
+	}
+
+	bkClient, err := client.New(context.Background(), bkURL)
+	if err != nil {
+		return fmt.Errorf("cannot create buildkit client: %w", err)
+	}
+	b.bk = bkClient
+
+	return nil
+}
+
+func (b *builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
+	if b.bk == nil {
+		return "", errors.New("you must invoke Init() before Build()")
+	}
+
+	solveopt, err := b.prepareSolveOpt(opts)
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +65,10 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 
 	ch := make(chan *client.SolveStatus)
 
-	ctx, cancel := context.WithTimeout(ctx, b.timeout)
+	if opts.Timeout == 0 {
+		opts.Timeout = defaultTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -89,7 +102,7 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	return imageURL, nil
 }
 
-func (b *Builder) PrepareSolveOpt(opts config.BuildOptions) (*client.SolveOpt, error) {
+func (b *builder) prepareSolveOpt(opts config.BuildOptions) (*client.SolveOpt, error) {
 	localCtx, err := b.extractor(opts.Context)
 	if err != nil {
 		return nil, err
