@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/dominodatalab/forge/pkg/container/config"
-	"github.com/dominodatalab/forge/pkg/container/runc"
 )
 
 type RuntimeBuilder interface {
@@ -13,5 +12,6 @@ type RuntimeBuilder interface {
 }
 
 func NewBuilder() RuntimeBuilder {
-	return runc.NewImageBuilder()
+	return nil
+	//return runc.NewImageBuilder()
 }
