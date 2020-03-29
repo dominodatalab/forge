@@ -6,7 +6,7 @@ spec:
   imageName: multi-stage-app
   pushRegistry: docker-registry:5000
   context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
-  noCache: true
+  #noCache: true
   labels:
     dominodatalab.com/build-id: abc123
     dominodatalab.com/environment-id: dev

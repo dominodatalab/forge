@@ -1,86 +1,99 @@
-package container
+package runc
 
 import (
 	"context"
 	"fmt"
-	"github.com/containerd/console"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/genuinetools/img/client"
-	"github.com/genuinetools/img/types"
-	controlapi "github.com/moby/buildkit/api/services/control"
-	bkclient "github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/identity"
-	"github.com/moby/buildkit/session"
-	"github.com/moby/buildkit/util/appcontext"
-	"github.com/moby/buildkit/util/progress/progressui"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
+
+	"github.com/containerd/console"
+	"github.com/containerd/containerd/namespaces"
+	imgclient "github.com/genuinetools/img/client"
+	"github.com/genuinetools/img/types"
+	controlapi "github.com/moby/buildkit/api/services/control"
+	bkclient "github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/cmd/buildctl/build"
+	"github.com/moby/buildkit/identity"
+	"github.com/moby/buildkit/session"
+	"github.com/moby/buildkit/util/progress/progressui"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/dominodatalab/forge/pkg/archive"
+	"github.com/dominodatalab/forge/pkg/container/config"
 )
 
-func TestThings(t *testing.T) {
-	if err := build(); err != nil {
-		t.Errorf("%+v\n", err)
+type Builder struct {
+	stateDir string
+	backend  string
+}
+
+func NewImgBuilder() *Builder {
+	return &Builder{
+		stateDir: getStateDirectory(),
+		backend:  types.AutoBackend,
 	}
 }
 
-func build() error {
-	stateDir := defaultStateDirectory()
-	backend := types.AutoBackend
-	localDirs := getLocalDirs()
-
-	c, err := client.New(stateDir, backend, localDirs)
+func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
+	// download and extract remote OCI context
+	extract, err := archive.FetchAndExtract(opts.Context)
 	if err != nil {
-		return err
+		return "", err
+	}
+	defer os.RemoveAll(extract.RootDir)
+
+	// assume Dockerfile lives inside context root
+	localDirs := map[string]string{
+		"context":    extract.ContentsDir,
+		"dockerfile": extract.ContentsDir,
+	}
+
+	// initialize img client for every build
+	c, err := imgclient.New(b.stateDir, b.backend, localDirs)
+	if err != nil {
+		return "", err
 	}
 	defer c.Close()
 
-	ctx := appcontext.Context()
+	// create a new buildkit session
 	sess, sessDialer, err := c.Session(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
-	id := identity.NewID()
+
+	// prepare build parameters
+	solveReq, err := solveRequestWithContext(sess.ID(), opts)
+	if err != nil {
+		return "", err
+	}
+
+	// add build metadata to context
 	ctx = session.NewContext(ctx, sess.ID())
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 	eg, ctx := errgroup.WithContext(ctx)
 
+	// launch build
 	ch := make(chan *controlapi.StatusResponse)
 	eg.Go(func() error {
 		return sess.Run(ctx, sessDialer)
 	})
-	// Solve the dockerfile.
 	eg.Go(func() error {
 		defer sess.Close()
-		return c.Solve(ctx, &controlapi.SolveRequest{
-			Ref:      id,
-			Session:  sess.ID(),
-			Exporter: "image",
-			ExporterAttrs: map[string]string{
-				"name": "my-image",
-			},
-			Frontend: "dockerfile.v0",
-			FrontendAttrs: map[string]string{
-				"filename": "Dockerfile",
-			},
-		}, ch)
+		return c.Solve(ctx, solveReq, ch)
 	})
 	eg.Go(func() error {
-		noConsole := false
-		return showProgress(ch, noConsole)
+		return showProgress(ch, false)
 	})
 	if err := eg.Wait(); err != nil {
-		return err
+		return "", err
 	}
-	fmt.Printf("Successfully built %s\n", "latest")
 
-	return nil
+	// return final image url
+	return solveReq.ExporterAttrs["name"], nil
 }
 
-func defaultStateDirectory() string {
-	//  pam_systemd sets XDG_RUNTIME_DIR but not other dirs.
+func getStateDirectory() string {
 	xdgDataHome := os.Getenv("XDG_DATA_HOME")
 	if xdgDataHome != "" {
 		dirs := strings.Split(xdgDataHome, ":")
@@ -93,11 +106,44 @@ func defaultStateDirectory() string {
 	return "/tmp/forge"
 }
 
-func getLocalDirs() map[string]string {
-	return map[string]string{
-		"context":    "/tmp/my-test-context",
-		"dockerfile": "/tmp/my-test-context",
+func solveRequestWithContext(sessionID string, opts config.BuildOptions) (*controlapi.SolveRequest, error) {
+	req := &controlapi.SolveRequest{
+		Ref:      identity.NewID(),
+		Session:  sessionID,
+		Frontend: "dockerfile.v0",
+		FrontendAttrs: map[string]string{
+			"filename": "Dockerfile",
+		},
+		Exporter: "image",
+		ExporterAttrs: map[string]string{
+			"name": fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName),
+		},
 	}
+
+	if opts.NoCache {
+		req.FrontendAttrs["no-cache"] = ""
+	}
+
+	if len(opts.BuildArgs) != 0 {
+		var buildArgs []string
+		for _, arg := range opts.BuildArgs {
+			buildArgs = append(buildArgs, fmt.Sprintf("build-arg:%s", arg))
+		}
+
+		attrsArgs, err := build.ParseOpt(buildArgs, nil)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range attrsArgs {
+			req.FrontendAttrs[k] = v
+		}
+	}
+
+	for k, v := range opts.Labels {
+		req.FrontendAttrs[fmt.Sprintf("label:%s", k)] = v
+	}
+
+	return req, nil
 }
 
 func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
