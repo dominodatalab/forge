@@ -55,10 +55,11 @@ func main() {
 	builder := container.NewBuilder()
 
 	if err = (&controllers.ContainerImageBuildReconciler{
-		Client:  mgr.GetClient(),
-		Log:     ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
-		Scheme:  mgr.GetScheme(),
-		Builder: builder,
+		Log:      ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("containerimagebuild-controller"),
+		Builder:  builder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)
