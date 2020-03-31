@@ -15,6 +15,8 @@ require (
 	github.com/moby/buildkit v0.4.0
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
+	github.com/opencontainers/runc v1.0.0-rc2.0.20181113215238-10d38b660a77
+	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
