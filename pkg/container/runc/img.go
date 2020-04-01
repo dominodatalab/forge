@@ -9,7 +9,6 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/namespaces"
-	imgclient "github.com/genuinetools/img/client"
 	"github.com/genuinetools/img/types"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/dominodatalab/forge/pkg/archive"
 	"github.com/dominodatalab/forge/pkg/container/config"
+	imgclient "github.com/dominodatalab/forge/pkg/img/client"
 )
 
 type Builder struct {
@@ -36,6 +36,15 @@ func NewImgBuilder() *Builder {
 }
 
 func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
+	name, err := b.build(ctx, opts)
+	if err != nil {
+		return "", err
+	}
+
+	return name, nil
+}
+
+func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, error) {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.Context)
 	if err != nil {
@@ -91,6 +100,33 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 
 	// return final image url
 	return solveReq.ExporterAttrs["name"], nil
+}
+
+func (b *Builder) validateImageSize(name string, limit int64) error {
+	ctx := context.Background()
+
+	id := identity.NewID()
+	ctx = session.NewContext(ctx, id)
+	ctx = namespaces.WithNamespace(ctx, "buildkit")
+
+	c, err := imgclient.New(b.stateDir, b.backend, nil)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	images, err := c.ListImages(ctx, fmt.Sprintf("name==%s", name))
+	if err != nil {
+		return err
+	}
+	if len(images) != 1 {
+		return fmt.Errorf("could not find exact image %s in list: %v", name, images)
+	}
+	if images[0].ContentSize > limit {
+		return fmt.Errorf("blah")
+	}
+
+	return nil
 }
 
 func getStateDirectory() string {
