@@ -34,6 +34,7 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]ListedIma
 	if err != nil {
 		return nil, fmt.Errorf("opening boltdb failed: %v", err)
 	}
+	defer db.Close()
 
 	// Create the content store locally.
 	contentStore, err := local.NewStore(filepath.Join(c.root, "content"))
