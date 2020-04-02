@@ -10,17 +10,24 @@ require (
 	github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1
 	github.com/containerd/containerd v1.3.0-0.20190212172151-f5b0fa220df8
 	github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
-	github.com/genuinetools/img v0.5.7
+	github.com/docker/docker-credential-helpers v0.6.1 // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/go-logr/logr v0.1.0
+	github.com/gogo/googleapis v1.1.0 // indirect
 	github.com/h2non/filetype v1.0.12
+	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/moby/buildkit v0.4.0
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc v1.0.0-rc2.0.20181113215238-10d38b660a77
+	github.com/opencontainers/runtime-spec v1.0.1 // indirect
+	github.com/opentracing-contrib/go-stdlib v0.0.0-20180702182724-07a764486eb1 // indirect
+	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.3.0
+	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	go.etcd.io/bbolt v1.3.1-etcd.8
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/grpc v1.23.0
