@@ -37,18 +37,21 @@ func NewImgBuilder() (*Builder, error) {
 }
 
 func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
-	name, err := b.build(ctx, opts)
+	image, err := b.build(ctx, opts)
 	if err != nil {
 		return "", err
 	}
 
 	if opts.SizeLimit != 0 {
-		if err := b.validateImageSize(ctx, name, opts.SizeLimit); err != nil {
+		if err := b.validateImageSize(ctx, image, opts.SizeLimit); err != nil {
 			return "", err
 		}
 	}
 
-	return name, nil
+	if err := b.push(ctx, image); err != nil {
+		return "", err
+	}
+	return image, nil
 }
 
 func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, error) {
@@ -118,6 +121,30 @@ func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint
 	imageSize := uint64(images[0].ContentSize)
 	if imageSize > limit {
 		return fmt.Errorf("image %q is too large to push to registry (size: %d, limit: %d)", name, imageSize, limit)
+	}
+
+	return nil
+}
+
+func (b *Builder) push(ctx context.Context, image string) error {
+	sess, sessDialer, err := b.client.Session(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	ctx = session.NewContext(ctx, sess.ID())
+	ctx = namespaces.WithNamespace(ctx, "buildkit")
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		return sess.Run(ctx, sessDialer)
+	})
+	eg.Go(func() error {
+		defer sess.Close()
+		return b.client.Push(ctx, image, true)
+	})
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	return nil

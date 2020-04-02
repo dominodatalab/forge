@@ -19,13 +19,14 @@ func (c *Client) Push(ctx context.Context, image string, insecure bool) error {
 	named = reference.TagNameOnly(named)
 	image = named.String()
 
-	// Create the worker opts.
-	opt, err := c.createWorkerOpt(false)
-	if err != nil {
-		return fmt.Errorf("creating worker opt failed: %v", err)
+	if c.workerOpt == nil {
+		// Create the worker opts.
+		if _, err := c.createWorkerOpt(true); err != nil {
+			return fmt.Errorf("creating worker opt failed: %v", err)
+		}
 	}
 
-	imgObj, err := opt.ImageStore.Get(ctx, image)
+	imgObj, err := c.workerOpt.ImageStore.Get(ctx, image)
 	if err != nil {
 		return fmt.Errorf("getting image %q failed: %v", image, err)
 	}
@@ -34,5 +35,5 @@ func (c *Client) Push(ctx context.Context, image string, insecure bool) error {
 	if err != nil {
 		return err
 	}
-	return push.Push(ctx, sm, opt.ContentStore, imgObj.Target.Digest, image, insecure, opt.ResolveOptionsFunc)
+	return push.Push(ctx, sm, c.workerOpt.ContentStore, imgObj.Target.Digest, image, insecure, c.workerOpt.ResolveOptionsFunc)
 }
