@@ -1,37 +1,19 @@
-<<<<<<< HEAD
-=======
-
->>>>>>> reworked changes
 # Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-<<<<<<< HEAD
 
 # Test binary, built with `go test -c`
-=======
-bin
-
-# Test binary, build with `go test -c`
->>>>>>> reworked changes
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-<<<<<<< HEAD
-# Dependency directories (remove the comment below to include it)
-# vendor/
-=======
+# Ignore compiled binaries
+bin/
+
 # Kubernetes Generated files - skip generated files, except for vendored files
 
 !vendor/**/zz_generated.*
-
-# editor and IDE paraphernalia
-.idea
-*.swp
-*.swo
-*~
->>>>>>> reworked changes
