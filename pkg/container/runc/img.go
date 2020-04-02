@@ -9,6 +9,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -77,6 +78,7 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	// prepare build parameters
 	solveReq, err := solveRequestWithContext(sess.ID(), opts)
 	if err != nil {
+		sess.Close()
 		return "", err
 	}
 
@@ -164,6 +166,17 @@ func getStateDirectory() string {
 }
 
 func solveRequestWithContext(sessionID string, opts config.BuildOptions) (*controlapi.SolveRequest, error) {
+	image := fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName)
+
+	// Parse the image name and tag.
+	named, err := reference.ParseNormalizedNamed(image)
+	if err != nil {
+		return nil, fmt.Errorf("parsing image name %q failed: %v", image, err)
+	}
+	// Add the latest tag if they did not provide one.
+	named = reference.TagNameOnly(named)
+	image = named.String()
+
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
 		Session:  sessionID,
@@ -173,7 +186,7 @@ func solveRequestWithContext(sessionID string, opts config.BuildOptions) (*contr
 		},
 		Exporter: "image",
 		ExporterAttrs: map[string]string{
-			"name": fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName),
+			"name": image,
 		},
 	}
 
