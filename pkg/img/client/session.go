@@ -23,7 +23,7 @@ func (c *Client) getSessionManager() (*session.Manager, error) {
 
 // Session creates the session manager and returns the session and it's
 // dialer.
-func (c *Client) Session(ctx context.Context) (*session.Session, session.Dialer, error) {
+func (c *Client) Session(ctx context.Context, localDirs map[string]string) (*session.Session, session.Dialer, error) {
 	m, err := c.getSessionManager()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create session manager")
@@ -33,8 +33,8 @@ func (c *Client) Session(ctx context.Context) (*session.Session, session.Dialer,
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create session")
 	}
-	syncedDirs := make([]filesync.SyncedDir, 0, len(c.localDirs))
-	for name, d := range c.localDirs {
+	syncedDirs := make([]filesync.SyncedDir, 0, len(localDirs))
+	for name, d := range localDirs {
 		syncedDirs = append(syncedDirs, filesync.SyncedDir{Name: name, Dir: d})
 	}
 	s.Allow(filesync.NewFSSyncProvider(syncedDirs))

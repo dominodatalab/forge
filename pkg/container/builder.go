@@ -11,6 +11,6 @@ type RuntimeBuilder interface {
 	Build(ctx context.Context, opts config.BuildOptions) (string, error)
 }
 
-func NewBuilder() RuntimeBuilder {
+func NewBuilder() (RuntimeBuilder, error) {
 	return runc.NewImgBuilder()
 }

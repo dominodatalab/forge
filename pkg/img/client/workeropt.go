@@ -34,6 +34,7 @@ import (
 	"github.com/dominodatalab/forge/pkg/img/types"
 )
 
+// createWorkerOpt creates a base.WorkerOpt to be used for a new worker.
 func (c *Client) createWorkerOpt(withExecutor bool) (opt base.WorkerOpt, err error) {
 	// Create the metadata store.
 	md, err := metadata.NewStore(filepath.Join(c.root, "metadata.db"))
@@ -86,7 +87,6 @@ func (c *Client) createWorkerOpt(withExecutor bool) (opt base.WorkerOpt, err err
 	if err != nil {
 		return opt, err
 	}
-	c.metadatadb = db
 
 	// Create the new database for metadata.
 	mdb := ctdmetadata.NewDB(db, contentStore, map[string]ctdsnapshot.Snapshotter{
@@ -142,6 +142,7 @@ func (c *Client) createWorkerOpt(withExecutor bool) (opt base.WorkerOpt, err err
 		Platforms:          supportedPlatforms,
 		ResolveOptionsFunc: resolver.NewResolveOptionsFunc(nil),
 	}
+	c.workerOpt = &opt
 
 	return opt, err
 }

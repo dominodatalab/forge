@@ -9,7 +9,6 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/genuinetools/img/types"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -21,18 +20,20 @@ import (
 	"github.com/dominodatalab/forge/pkg/archive"
 	"github.com/dominodatalab/forge/pkg/container/config"
 	imgclient "github.com/dominodatalab/forge/pkg/img/client"
+	"github.com/dominodatalab/forge/pkg/img/types"
 )
 
 type Builder struct {
-	stateDir string
-	backend  string
+	client *imgclient.Client
 }
 
-func NewImgBuilder() *Builder {
-	return &Builder{
-		stateDir: getStateDirectory(),
-		backend:  types.AutoBackend,
+func NewImgBuilder() (*Builder, error) {
+	c, err := imgclient.New(getStateDirectory(), types.AutoBackend)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Builder{client: c}, nil
 }
 
 func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
@@ -42,7 +43,7 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 	}
 
 	if opts.SizeLimit != 0 {
-		if err := b.validateImageSize(name, opts.SizeLimit); err != nil {
+		if err := b.validateImageSize(ctx, name, opts.SizeLimit); err != nil {
 			return "", err
 		}
 	}
@@ -64,15 +65,8 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 		"dockerfile": extract.ContentsDir,
 	}
 
-	// initialize img client for every build
-	c, err := imgclient.New(b.stateDir, b.backend, localDirs)
-	if err != nil {
-		return "", err
-	}
-	defer c.Close()
-
 	// create a new buildkit session
-	sess, sessDialer, err := c.Session(ctx)
+	sess, sessDialer, err := b.client.Session(ctx, localDirs)
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +89,7 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return c.Solve(ctx, solveReq, ch)
+		return b.client.Solve(ctx, solveReq, ch)
 	})
 	eg.Go(func() error {
 		return showProgress(ch, false)
@@ -108,20 +102,12 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	return solveReq.ExporterAttrs["name"], nil
 }
 
-func (b *Builder) validateImageSize(name string, limit uint64) error {
-	ctx := context.Background()
-
+func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint64) error {
 	id := identity.NewID()
 	ctx = session.NewContext(ctx, id)
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 
-	c, err := imgclient.New(b.stateDir, b.backend, nil)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	images, err := c.ListImages(ctx, fmt.Sprintf("name==%s", name))
+	images, err := b.client.ListImages(ctx, fmt.Sprintf("name==%s", name))
 	if err != nil {
 		return err
 	}
@@ -131,7 +117,7 @@ func (b *Builder) validateImageSize(name string, limit uint64) error {
 
 	imageSize := uint64(images[0].ContentSize)
 	if imageSize > limit {
-		return fmt.Errorf("image %q is too large to push to registry (size %d, limit %d)", name, imageSize, limit)
+		return fmt.Errorf("image %q is too large to push to registry (size: %d, limit: %d)", name, imageSize, limit)
 	}
 
 	return nil

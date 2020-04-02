@@ -60,7 +60,11 @@ func main() {
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	builder := container.NewBuilder()
+	builder, err := container.NewBuilder()
+	if err != nil {
+		setupLog.Error(err, "Image builder initialization failed")
+		os.Exit(1)
+	}
 
 	if err = (&controllers.ContainerImageBuildReconciler{
 		Log:      ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),

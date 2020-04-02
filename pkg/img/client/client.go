@@ -7,23 +7,25 @@ import (
 	"github.com/containerd/containerd/snapshots/overlay"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
+	"github.com/moby/buildkit/worker/base"
 	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
 
 	"github.com/dominodatalab/forge/pkg/img/types"
 )
 
+// Client holds the information for the client we will use for communicating
+// with the buildkit controller.
 type Client struct {
-	backend   string
-	localDirs map[string]string
-	root      string
+	backend string
+	root    string
 
 	sessionManager *session.Manager
 	controller     *control.Controller
-	metadatadb     *bolt.DB
+	workerOpt      *base.WorkerOpt
 }
 
-func New(root, backend string, localDirs map[string]string) (*Client, error) {
+// New returns a new client for communicating with the buildkit controller.
+func New(root, backend string) (*Client, error) {
 	// Set the name for the directory executor.
 	name := "runc"
 
@@ -45,17 +47,12 @@ func New(root, backend string, localDirs map[string]string) (*Client, error) {
 
 	// Create the start of the client.
 	return &Client{
-		backend:   backend,
-		root:      root,
-		localDirs: localDirs,
+		backend: backend,
+		root:    root,
 	}, nil
 }
 
 // Close safely closes the client.
 // This used to shut down the FUSE server but since that was removed
 // it is basically a no-op now.
-func (c *Client) Close() {
-	if c.metadatadb != nil {
-		c.metadatadb.Close()
-	}
-}
+func (c *Client) Close() {}
