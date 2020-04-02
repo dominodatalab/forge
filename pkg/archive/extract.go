@@ -142,10 +142,8 @@ func extract(fp string, ct mimeType, dst string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
-				}
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
 			}
 		case tar.TypeReg:
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
