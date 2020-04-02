@@ -41,6 +41,12 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 		return "", err
 	}
 
+	if opts.SizeLimit != 0 {
+		if err := b.validateImageSize(name, opts.SizeLimit); err != nil {
+			return "", err
+		}
+	}
+
 	return name, nil
 }
 
@@ -102,7 +108,7 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	return solveReq.ExporterAttrs["name"], nil
 }
 
-func (b *Builder) validateImageSize(name string, limit int64) error {
+func (b *Builder) validateImageSize(name string, limit uint64) error {
 	ctx := context.Background()
 
 	id := identity.NewID()
@@ -120,10 +126,12 @@ func (b *Builder) validateImageSize(name string, limit int64) error {
 		return err
 	}
 	if len(images) != 1 {
-		return fmt.Errorf("could not find exact image %s in list: %v", name, images)
+		return fmt.Errorf("could not find exact image %q in list: %v", name, images)
 	}
-	if images[0].ContentSize > limit {
-		return fmt.Errorf("blah")
+
+	imageSize := uint64(images[0].ContentSize)
+	if imageSize > limit {
+		return fmt.Errorf("image %q is too large to push to registry (size %d, limit %d)", name, imageSize, limit)
 	}
 
 	return nil

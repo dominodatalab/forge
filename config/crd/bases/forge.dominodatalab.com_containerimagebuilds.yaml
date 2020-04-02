@@ -58,6 +58,11 @@ spec:
               description: Name used to build an image.
               minLength: 1
               type: string
+            imageSizeLimit:
+              description: Prevents images larger than this size (in bytes) from being
+                pushed to a registry. By default, an image of any size will be pushed.
+              format: int64
+              type: integer
             labels:
               additionalProperties:
                 type: string

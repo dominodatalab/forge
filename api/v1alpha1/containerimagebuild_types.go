@@ -48,6 +48,11 @@ type ContainerImageBuildSpec struct {
 	// Optional deadline in seconds for image build to complete (defaults to 300).
 	// +kubebuilder:validation:Optional
 	TimeoutSeconds uint16 `json:"timeoutSeconds"`
+
+	// Prevents images larger than this size (in bytes) from being pushed to a registry. By default,
+	// an image of any size will be pushed.
+	// +kubebuilder:validation:Optional
+	ImageSizeLimit uint64 `json:"imageSizeLimit"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild

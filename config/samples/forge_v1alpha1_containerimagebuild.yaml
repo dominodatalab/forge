@@ -12,3 +12,4 @@ spec:
     dominodatalab.com/environment-id: dev
   buildArgs:
     - port=5000
+  imageSizeLimit: 52428800

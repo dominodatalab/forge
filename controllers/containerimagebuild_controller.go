@@ -69,6 +69,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		CpuQuota:         build.Spec.CpuQuota,
 		Memory:           build.Spec.Memory,
 		Timeout:          time.Duration(build.Spec.TimeoutSeconds) * time.Second,
+		SizeLimit:        build.Spec.ImageSizeLimit,
 		InsecureRegistry: true,
 	}
 

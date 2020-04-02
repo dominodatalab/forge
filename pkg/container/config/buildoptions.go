@@ -13,4 +13,5 @@ type BuildOptions struct {
 	CpuQuota         uint16
 	Memory           string
 	Timeout          time.Duration
+	SizeLimit        uint64
 }
