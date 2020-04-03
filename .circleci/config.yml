@@ -1,0 +1,54 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.14
+    environment:
+      KUBEBUILDER_VERSION: 2.2.0
+    steps:
+      - checkout
+      - run:
+          name: Install Kubebuilder
+          command: |
+            os=$(go env GOOS)
+            arch=$(go env GOARCH)
+            curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
+            sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
+            echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+      - run:
+          name: Setup Environment Variables
+          command: |
+            [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
+            echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
+      - restore_cache:
+          keys:
+            - go-modules-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Run Unit Tests
+          command: make test
+      - setup_remote_docker
+      - run:
+          name: Build Docker Image
+          command: |
+            ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}'"
+            if [[ ${CIRCLE_BRANCH} != "master" ]]; then
+              ARGS="$ARGS --label quay.expires-after='4w'"
+            fi
+            make docker-build ARGS="${ARGS}"
+      - run:
+          name: Push Docker Image
+          command: |
+            docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+            make docker-push
+      - save_cache:
+          key: go-modules-v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build:
+          context: org-global

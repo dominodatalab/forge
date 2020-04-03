@@ -1,0 +1,118 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: containerimagebuilds.forge.dominodatalab.com
+spec:
+  group: forge.dominodatalab.com
+  names:
+    kind: ContainerImageBuild
+    listKind: ContainerImageBuildList
+    plural: containerimagebuilds
+    shortNames:
+    - cib
+    singular: containerimagebuild
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ContainerImageBuild is the Schema for the containerimagebuilds
+        API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ContainerImageBuildSpec defines the desired state of ContainerImageBuild
+          properties:
+            buildArgs:
+              description: Image build arguments.
+              items:
+                type: string
+              type: array
+            context:
+              description: Build context for the image. This can be a local path or
+                url.
+              type: string
+            cpuQuota:
+              description: Limits build cpu consumption (value should be some value
+                from 0 to 100_000).
+              maximum: 100000
+              minimum: 10000
+              type: integer
+            imageName:
+              description: Name used to build an image.
+              minLength: 1
+              type: string
+            imageSizeLimit:
+              description: Prevents images larger than this size (in bytes) from being
+                pushed to a registry. By default, an image of any size will be pushed.
+              format: int64
+              type: integer
+            labels:
+              additionalProperties:
+                type: string
+              description: Labels added to the image during build.
+              type: object
+            memory:
+              description: Limits build memory consumption.
+              type: string
+            noCache:
+              description: Disable the use of cache layers for a build.
+              type: boolean
+            pushRegistry:
+              description: Registry where an image should be pushed at the end of
+                a successful build.
+              minLength: 1
+              type: string
+            timeoutSeconds:
+              description: Optional deadline in seconds for image build to complete
+                (defaults to 300).
+              type: integer
+          required:
+          - context
+          - imageName
+          - pushRegistry
+          type: object
+        status:
+          description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
+          properties:
+            buildCompletedAt:
+              format: date-time
+              type: string
+            buildStartedAt:
+              format: date-time
+              type: string
+            errorMessage:
+              type: string
+            imageURL:
+              type: string
+            state:
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

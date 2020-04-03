@@ -1,0 +1,28 @@
+apiVersion: forge.dominodatalab.com/v1alpha1
+kind: ContainerImageBuild
+metadata:
+  name: example-build
+spec:
+  # tag is optional (e.g. multi-stage-app:v1.0.0)
+  imageName: multi-stage-app
+
+  # push image here after build
+  pushRegistry: 192.168.64.80:30000
+
+  # remote context can either be a .tar or .tgz file
+  context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
+
+  # disable the cache if necessary
+  noCache: false
+
+  # metadata attached to image during build
+  labels:
+    dominodatalab.com/build-id: abc123
+    dominodatalab.com/environment-id: dev
+
+  # image build args
+  buildArgs:
+    - port=5000
+
+  # do not push image if greater than 50MB
+  imageSizeLimit: 52428800
