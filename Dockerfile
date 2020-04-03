@@ -10,8 +10,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 COPY internal/ internal/
 COPY pkg/ pkg/
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o forge \
-    && cp forge /usr/bin/
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o /usr/bin/forge
 
 FROM base AS runc
 RUN apk add --no-cache bash build-base git libseccomp-dev linux-headers
