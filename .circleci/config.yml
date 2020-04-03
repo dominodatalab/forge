@@ -30,7 +30,12 @@ jobs:
       - setup_remote_docker
       - run:
           name: Build Docker Image
-          command: make docker-build ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}' --label quay.expires-after=4w"
+          command: |
+            ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}'"
+            if [[ ${CIRCLE_BRANCH} != "master" ]]; then
+              ARGS="$ARGS --label quay.expires-after=4w"
+            fi
+            make docker-build ARGS
       - run:
           name: Push Docker Image
           command: |
