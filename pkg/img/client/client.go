@@ -39,6 +39,10 @@ func New(root, backend string) (*Client, error) {
 		logrus.Debugf("using backend: %s", backend)
 	}
 
+	if backend == types.NativeBackend {
+		logrus.Warn("using native fs backend for image building, performance may be severely impacted")
+	}
+
 	// Create the root/
 	root = filepath.Join(root, name, backend)
 	if err := os.MkdirAll(root, 0700); err != nil {
