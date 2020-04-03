@@ -21,10 +21,13 @@ jobs:
           command: |
             [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
             echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
-      - setup_remote_docker
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Run Unit Tests
+          command: make test
+      - setup_remote_docker
       - run:
           name: Build Docker Image
           command: make docker-build ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}' --label quay.expires-after=4w"
