@@ -99,12 +99,9 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	eg.Go(func() error {
 		return showProgress(ch, false)
 	})
-	if err := eg.Wait(); err != nil {
-		return "", err
-	}
 
-	// return final image url
-	return solveReq.ExporterAttrs["name"], nil
+	// return final image url and error when one occurs
+	return solveReq.ExporterAttrs["name"], eg.Wait()
 }
 
 func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint64) error {
