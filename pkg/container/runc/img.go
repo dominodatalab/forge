@@ -109,15 +109,12 @@ func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint
 	ctx = session.NewContext(ctx, id)
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 
-	images, err := b.client.ListImages(ctx, fmt.Sprintf("name==%s", name))
+	image, err := b.client.GetImage(ctx, name)
 	if err != nil {
-		return err
-	}
-	if len(images) != 1 {
-		return fmt.Errorf("could not find exact image %q in list: %v", name, images)
+		return fmt.Errorf("cannot validate image size: %v", err)
 	}
 
-	imageSize := uint64(images[0].ContentSize)
+	imageSize := uint64(image.ContentSize)
 	if imageSize > limit {
 		return fmt.Errorf("image %q is too large to push to registry (size: %d, limit: %d)", name, imageSize, limit)
 	}
