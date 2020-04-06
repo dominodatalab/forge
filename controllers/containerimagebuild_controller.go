@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -124,7 +125,7 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 		log.Error(err, "Unable to update status")
 
 		msg := fmt.Sprintf("Forge was unable to update this resource status: %v", err)
-		r.Recorder.Event(build, "Warning", "UpdateFailed", msg)
+		r.Recorder.Event(build, corev1.EventTypeWarning, "UpdateFailed", msg)
 	}
 
 	return err
