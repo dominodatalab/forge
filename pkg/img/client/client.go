@@ -40,7 +40,7 @@ func New(root, backend string) (*Client, error) {
 	}
 
 	if backend == types.NativeBackend {
-		logrus.Warn("using native fs backend for image building, performance may be severely impacted")
+		logrus.Warn("Using native fs backend for image building, performance may be severely impacted")
 	}
 
 	// Create the root/
