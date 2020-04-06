@@ -43,4 +43,4 @@ USER user
 ENV USER user
 ENV HOME /home/user
 ENV XDG_RUNTIME_DIR=/run/user/1000
-CMD ["/usr/bin/forge"]
+ENTRYPOINT ["/usr/bin/forge"]
