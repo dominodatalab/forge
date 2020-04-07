@@ -34,8 +34,8 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - bin/
-            - config/crd/bases/
+            - bin/*
+            - config/crd/bases/*
 
       # - setup_remote_docker
       # - run:
@@ -69,6 +69,7 @@ jobs:
           name: Publish GitHub Release
           command: |
             ls -al ./artifacts
+            echo ${CIRCLE_SHA1}
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
