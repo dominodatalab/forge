@@ -69,13 +69,14 @@ jobs:
           name: Publish GitHub Release
           command: |
             ls -al ./artifacts
+            TAG_NAME="v0.1.0"
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
               -repository ${CIRCLE_PROJECT_REPONAME} \
               -commitish ${CIRCLE_SHA1} \
               -prerelease \
-              ./artifacts/
+              $TAG_NAME ./artifacts/
 
 workflows:
   version: 2
