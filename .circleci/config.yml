@@ -30,11 +30,12 @@ jobs:
       - run:
           name: Run Unit Tests
           command: make all test BUILD_ARGS="-ldflags='-X main.version=${VERSION}'"
+      - run:
+          name: Prepare Artifacts
+          command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
       - persist_to_workspace:
           root: .
-          paths:
-            - bin/forge
-            - config/crd/bases/*
+          path: artifacts/*
 
       # - setup_remote_docker
       # - run:
@@ -55,7 +56,6 @@ jobs:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /$GOPATH/pkg/mod
-
   publish_release:
     executor: golang
     steps:
@@ -68,6 +68,9 @@ jobs:
           name: Publish GitHub Release
           command: |
             # TODO: add -prerelease flag if not vX.X.X format
+            sudo apt-get update && sudo apt-get install -y tree
+            tree artifacts/
+
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
