@@ -19,7 +19,7 @@ jobs:
             arch=$(go env GOARCH)
             curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
             sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
-            echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+            echo 'export PATH="$PATH:/usr/local/kubebuilder/bin"' >> $BASH_ENV
       - run:
           name: Setup Environment Variables
           command: |
@@ -31,6 +31,11 @@ jobs:
       - run:
           name: Run Unit Tests
           command: make test
+      - persist_to_workspace:
+          root: .
+          paths:
+            - bin/
+            - config/crd/bases/
 
       # - setup_remote_docker
       # - run:
@@ -46,19 +51,31 @@ jobs:
       #     command: |
       #       docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
       #       make docker-push
+
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
-            - /go/pkg/mod
+            - /$GOPATH/pkg/mod
 
   publish_release:
     executor: golang
     steps:
-      - checkout
+      - attach_workspace:
+          at: ./artifacts
       - run:
           name: Install ghr
-          command: go get github.com/tcnksm/ghr
-      - run: ghr -h
+          command: go get -v github.com/tcnksm/ghr
+      - run:
+          name: Publish GitHub Release
+          command: |
+            ls -al ./artifacts
+            ghr \
+              -token ${GITHUB_TOKEN} \
+              -owner ${CIRCLE_PROJECT_USERNAME} \
+              -repository ${CIRCLE_PROJECT_REPONAME} \
+              -commit ${CIRCLE_SHA1} \
+              -prerelease \
+              ./artifacts/
 
 workflows:
   version: 2
