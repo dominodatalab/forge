@@ -30,7 +30,7 @@ jobs:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
           name: Run Unit Tests
-          command: make test
+          command: make all test
       - persist_to_workspace:
           root: .
           paths:
@@ -60,21 +60,20 @@ jobs:
   publish_release:
     executor: golang
     steps:
-      - attach_workspace:
-          at: ./artifacts
       - run:
           name: Install ghr
           command: go get -v github.com/tcnksm/ghr
+      - attach_workspace:
+          at: ./artifacts
       - run:
           name: Publish GitHub Release
           command: |
             ls -al ./artifacts
-            echo ${CIRCLE_SHA1}
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
               -repository ${CIRCLE_PROJECT_REPONAME} \
-              -commit ${CIRCLE_SHA1} \
+              -commitish ${CIRCLE_SHA1} \
               -prerelease \
               ./artifacts/
 
