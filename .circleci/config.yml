@@ -1,9 +1,13 @@
-version: 2
+version: 2.1
+
+executors:
+  golang:
+    docker:
+      - image: circleci/golang:1.14
 
 jobs:
   build:
-    docker:
-      - image: circleci/golang:1.14
+    executor: golang
     environment:
       KUBEBUILDER_VERSION: 2.2.0
     steps:
@@ -27,24 +31,34 @@ jobs:
       - run:
           name: Run Unit Tests
           command: make test
-      - setup_remote_docker
-      - run:
-          name: Build Docker Image
-          command: |
-            ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}'"
-            if [[ ${CIRCLE_BRANCH} != "master" ]]; then
-              ARGS="$ARGS --label quay.expires-after='4w'"
-            fi
-            make docker-build ARGS="${ARGS}"
-      - run:
-          name: Push Docker Image
-          command: |
-            docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
-            make docker-push
+
+      # - setup_remote_docker
+      # - run:
+      #     name: Build Docker Image
+      #     command: |
+      #       ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}'"
+      #       if [[ ${CIRCLE_BRANCH} != "master" ]]; then
+      #         ARGS="$ARGS --label quay.expires-after='4w'"
+      #       fi
+      #       make docker-build ARGS="${ARGS}"
+      # - run:
+      #     name: Push Docker Image
+      #     command: |
+      #       docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+      #       make docker-push
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /go/pkg/mod
+
+  publish_release:
+    executor: golang
+    steps:
+      - checkout
+      - run:
+          name: Install ghr
+          command: go get github.com/tcnksm/ghr
+      - run: ghr -h
 
 workflows:
   version: 2
@@ -52,3 +66,6 @@ workflows:
     jobs:
       - build:
           context: org-global
+      - publish_release:
+          requires:
+            - build
