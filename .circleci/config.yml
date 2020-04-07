@@ -1,10 +1,8 @@
 version: 2.1
-
 executors:
   golang:
     docker:
       - image: circleci/golang:1.14
-
 jobs:
   build:
     executor: golang
@@ -25,16 +23,17 @@ jobs:
           command: |
             [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
             echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
+            echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
           name: Run Unit Tests
-          command: make all test
+          command: make all test BUILD_ARGS="-ldflags='-X main.version=${VERSION}'"
       - persist_to_workspace:
           root: .
           paths:
-            - bin/*
+            - bin/forge
             - config/crd/bases/*
 
       # - setup_remote_docker
@@ -68,15 +67,15 @@ jobs:
       - run:
           name: Publish GitHub Release
           command: |
-            ls -al ./artifacts
-            TAG_NAME="v0.1.0"
+            # TODO: add -prerelease flag if not vX.X.X format
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
               -repository ${CIRCLE_PROJECT_REPONAME} \
               -commitish ${CIRCLE_SHA1} \
-              -prerelease \
-              $TAG_NAME ./artifacts/
+              -recreate \
+              $(./artifacts/bin/forge -version) \
+              artifacts/
 
 workflows:
   version: 2
