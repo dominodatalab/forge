@@ -29,7 +29,7 @@ jobs:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
           name: Run Unit Tests
-          command: make all test BUILD_ARGS="-ldflags='-X main.version=${VERSION}'"
+          command: make all test BUILD_FLAGS="-ldflags='-X main.version=${VERSION}'"
       - run:
           name: Prepare Artifacts
           command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
