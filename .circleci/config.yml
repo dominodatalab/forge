@@ -78,7 +78,7 @@ jobs:
               -repository ${CIRCLE_PROJECT_REPONAME} \
               -commitish ${CIRCLE_SHA1} \
               -recreate \
-              $(./artifacts/bin/forge -version) \
+              $(./artifacts/forge -version) \
               artifacts/
 
 workflows:
