@@ -83,6 +83,9 @@ workflows:
     jobs:
       - build:
           context: org-global
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
       - publish_release:
           requires:
             - build
