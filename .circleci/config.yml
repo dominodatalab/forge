@@ -1,9 +1,11 @@
-version: 2
-
-jobs:
-  build:
+version: 2.1
+executors:
+  golang:
     docker:
       - image: circleci/golang:1.14
+jobs:
+  build:
+    executor: golang
     environment:
       KUBEBUILDER_VERSION: 2.2.0
     steps:
@@ -15,18 +17,26 @@ jobs:
             arch=$(go env GOARCH)
             curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
             sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
-            echo 'export PATH=$PATH:/usr/local/kubebuilder/bin' >> $BASH_ENV
+            echo 'export PATH="$PATH:/usr/local/kubebuilder/bin"' >> $BASH_ENV
       - run:
           name: Setup Environment Variables
           command: |
             [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
             echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
+            echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
           name: Run Unit Tests
-          command: make test
+          command: make all test BUILD_FLAGS="-ldflags='-X main.version=${VERSION}'"
+      - run:
+          name: Prepare Artifacts
+          command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
+      - persist_to_workspace:
+          root: ./artifacts
+          paths:
+            - "*"
       - setup_remote_docker
       - run:
           name: Build Docker Image
@@ -44,11 +54,41 @@ jobs:
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
-            - /go/pkg/mod
-
+            - /$GOPATH/pkg/mod
+  publish_release:
+    executor: golang
+    environment:
+      GHR_VERSION: v0.13.0
+    steps:
+      - run:
+          name: Install ghr
+          command: GO111MODULE="on" go get -v github.com/tcnksm/ghr@${GHR_VERSION}
+      - attach_workspace:
+          at: ./artifacts
+      - run:
+          name: Publish GitHub Release
+          command: |
+            ghr \
+              -token ${GITHUB_TOKEN} \
+              -owner ${CIRCLE_PROJECT_USERNAME} \
+              -repository ${CIRCLE_PROJECT_REPONAME} \
+              -commitish ${CIRCLE_SHA1} \
+              $(./artifacts/forge -version) \
+              artifacts/
 workflows:
   version: 2
   main:
     jobs:
       - build:
           context: org-global
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+      - publish_release:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
