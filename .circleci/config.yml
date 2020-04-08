@@ -34,9 +34,9 @@ jobs:
           name: Prepare Artifacts
           command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
       - persist_to_workspace:
-          root: .
+          root: ./artifacts
           paths:
-            - artifacts/*
+            - "*"
 
       # - setup_remote_docker
       # - run:
