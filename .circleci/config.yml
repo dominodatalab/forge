@@ -73,6 +73,7 @@ jobs:
               -owner ${CIRCLE_PROJECT_USERNAME} \
               -repository ${CIRCLE_PROJECT_REPONAME} \
               -commitish ${CIRCLE_SHA1} \
+              -prerelease \
               $(./artifacts/forge -version) \
               artifacts/
 workflows:
