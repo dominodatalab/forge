@@ -59,28 +59,24 @@ jobs:
             - /$GOPATH/pkg/mod
   publish_release:
     executor: golang
+    environment:
+      GHR_VERSION: v0.13.0
     steps:
       - run:
           name: Install ghr
-          command: go get -v github.com/tcnksm/ghr
+          command: GO111MODULE="on" go get -v github.com/tcnksm/ghr@${GHR_VERSION}
       - attach_workspace:
           at: ./artifacts
       - run:
           name: Publish GitHub Release
           command: |
-            # TODO: add -prerelease flag if not vX.X.X format
-            sudo apt-get update && sudo apt-get install -y tree
-            tree artifacts/
-
             ghr \
               -token ${GITHUB_TOKEN} \
               -owner ${CIRCLE_PROJECT_USERNAME} \
               -repository ${CIRCLE_PROJECT_REPONAME} \
               -commitish ${CIRCLE_SHA1} \
-              -recreate \
               $(./artifacts/forge -version) \
               artifacts/
-
 workflows:
   version: 2
   main:
@@ -90,3 +86,8 @@ workflows:
       - publish_release:
           requires:
             - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
