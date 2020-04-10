@@ -63,6 +63,9 @@ spec:
                 pushed to a registry. By default, an image of any size will be pushed.
               format: int64
               type: integer
+            insecureRegistry:
+              description: Push image to an insecure registry.
+              type: boolean
             labels:
               additionalProperties:
                 type: string
