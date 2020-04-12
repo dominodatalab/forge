@@ -49,7 +49,7 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 		}
 	}
 
-	if err := b.push(ctx, image); err != nil {
+	if err := b.push(ctx, image, opts.InsecureRegistry); err != nil {
 		return "", err
 	}
 	return image, nil
@@ -122,7 +122,7 @@ func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint
 	return nil
 }
 
-func (b *Builder) push(ctx context.Context, image string) error {
+func (b *Builder) push(ctx context.Context, image string, insecure bool) error {
 	sess, sessDialer, err := b.client.Session(ctx, nil)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (b *Builder) push(ctx context.Context, image string) error {
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return b.client.Push(ctx, image, true)
+		return b.client.Push(ctx, image, insecure)
 	})
 	if err := eg.Wait(); err != nil {
 		return err

@@ -71,7 +71,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		Memory:           build.Spec.Memory,
 		Timeout:          time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 		SizeLimit:        build.Spec.ImageSizeLimit,
-		InsecureRegistry: true,
+		InsecureRegistry: build.Spec.InsecureRegistry,
 	}
 
 	imageURL, err := r.Builder.Build(ctx, opts)

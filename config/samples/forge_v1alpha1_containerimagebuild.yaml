@@ -7,7 +7,7 @@ spec:
   imageName: multi-stage-app
 
   # push image here after build
-  pushRegistry: 192.168.64.80:30000
+  pushRegistry: my-docker-registry:5000
 
   # remote context can either be a .tar or .tgz file
   context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
@@ -26,3 +26,6 @@ spec:
 
   # do not push image if greater than 50MB
   imageSizeLimit: 52428800
+
+  # push image to an insecure registry
+  insecureRegistry: false

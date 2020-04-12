@@ -53,6 +53,10 @@ type ContainerImageBuildSpec struct {
 	// an image of any size will be pushed.
 	// +kubebuilder:validation:Optional
 	ImageSizeLimit uint64 `json:"imageSizeLimit"`
+
+	// Push image to an insecure registry.
+	// +kubebuilder:validation:Optional
+	InsecureRegistry bool `json:"insecureRegistry"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
