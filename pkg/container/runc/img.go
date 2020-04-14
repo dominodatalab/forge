@@ -49,7 +49,7 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, 
 		}
 	}
 
-	if err := b.push(ctx, image, opts.InsecureRegistry); err != nil {
+	if err := b.push(ctx, image, opts.Registry.Insecure, opts.Registry.Username, opts.Registry.Password); err != nil {
 		return "", err
 	}
 	return image, nil
@@ -122,7 +122,7 @@ func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint
 	return nil
 }
 
-func (b *Builder) push(ctx context.Context, image string, insecure bool) error {
+func (b *Builder) push(ctx context.Context, image string, insecure bool, username, password string) error {
 	sess, sessDialer, err := b.client.Session(ctx, nil)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (b *Builder) push(ctx context.Context, image string, insecure bool) error {
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return b.client.Push(ctx, image, insecure)
+		return b.client.Push(ctx, image, insecure, username, password)
 	})
 	if err := eg.Wait(); err != nil {
 		return err
@@ -160,7 +160,7 @@ func getStateDirectory() string {
 }
 
 func solveRequestWithContext(sessionID string, opts config.BuildOptions) (*controlapi.SolveRequest, error) {
-	image := fmt.Sprintf("%s/%s", opts.RegistryURL, opts.ImageName)
+	image := fmt.Sprintf("%s/%s", opts.Registry.URL, opts.ImageName)
 
 	// Parse the image name and tag.
 	named, err := reference.ParseNormalizedNamed(image)

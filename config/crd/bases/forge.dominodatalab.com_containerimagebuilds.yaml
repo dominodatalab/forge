@@ -82,6 +82,12 @@ spec:
                 a successful build.
               minLength: 1
               type: string
+            registryPassword:
+              description: Password for registry with basic authentication enabled.
+              type: string
+            registryUsername:
+              description: Username for registry with basic authentication enabled.
+              type: string
             timeoutSeconds:
               description: Optional deadline in seconds for image build to complete
                 (defaults to 300).

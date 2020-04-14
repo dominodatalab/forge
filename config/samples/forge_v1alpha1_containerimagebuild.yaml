@@ -9,6 +9,15 @@ spec:
   # push image here after build
   pushRegistry: my-docker-registry:5000
 
+  # push image to an insecure registry
+  insecureRegistry: false
+
+  # basic auth username
+  registryUsername: push-user
+
+  # basic auth password
+  registryPassword: $0$3cr3t
+
   # remote context can either be a .tar or .tgz file
   context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
 
@@ -26,6 +35,3 @@ spec:
 
   # do not push image if greater than 50MB
   imageSizeLimit: 52428800
-
-  # push image to an insecure registry
-  insecureRegistry: false

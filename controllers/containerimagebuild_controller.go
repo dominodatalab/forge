@@ -61,17 +61,21 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	// construct build directives and dispatch operation
 	opts := config.BuildOptions{
-		ImageName:        build.Spec.ImageName,
-		Context:          build.Spec.Context,
-		RegistryURL:      build.Spec.PushRegistry,
-		NoCache:          build.Spec.NoCache,
-		Labels:           build.Spec.Labels,
-		BuildArgs:        build.Spec.BuildArgs,
-		CpuQuota:         build.Spec.CpuQuota,
-		Memory:           build.Spec.Memory,
-		Timeout:          time.Duration(build.Spec.TimeoutSeconds) * time.Second,
-		SizeLimit:        build.Spec.ImageSizeLimit,
-		InsecureRegistry: build.Spec.InsecureRegistry,
+		Registry: config.Registry{
+			URL:      build.Spec.PushRegistry,
+			Insecure: build.Spec.InsecureRegistry,
+			Username: build.Spec.RegistryUsername,
+			Password: build.Spec.RegistryPassword,
+		},
+		ImageName: build.Spec.ImageName,
+		Context:   build.Spec.Context,
+		NoCache:   build.Spec.NoCache,
+		Labels:    build.Spec.Labels,
+		BuildArgs: build.Spec.BuildArgs,
+		CpuQuota:  build.Spec.CpuQuota,
+		Memory:    build.Spec.Memory,
+		Timeout:   time.Duration(build.Spec.TimeoutSeconds) * time.Second,
+		SizeLimit: build.Spec.ImageSizeLimit,
 	}
 
 	imageURL, err := r.Builder.Build(ctx, opts)
