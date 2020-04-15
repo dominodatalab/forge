@@ -176,11 +176,20 @@ func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, 
 		input := secret.Data[corev1.DockerConfigJsonKey]
 		var output credentials.DockerConfigJSON
 		if err = json.Unmarshal(input, &output); err != nil {
-			err = fmt.Errorf("cannot extract username/password from registry secret: %v", err)
+			err = fmt.Errorf("cannot parse docker config in registry secret: %v", err)
 			return
 		}
 
-		auth := output.Auths["https://index.docker.io/v1/"]
+		auth, ok := output.Auths[registry.URL]
+		if !ok {
+			var urls []string
+			for k, _ := range output.Auths {
+				urls = append(urls, k)
+			}
+			err = fmt.Errorf("auth url (%s) is not in registry secret (%s) auth list (%s)", registry.URL, registry.SecretName, urls)
+			return
+		}
+
 		username = auth.Username
 		password = auth.Password
 	default:
