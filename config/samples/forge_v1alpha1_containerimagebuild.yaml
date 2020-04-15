@@ -6,18 +6,6 @@ spec:
   # tag is optional (e.g. multi-stage-app:v1.0.0)
   imageName: multi-stage-app
 
-  # push image here after build
-  pushRegistry: my-docker-registry:5000
-
-  # push image to an insecure registry
-  insecureRegistry: false
-
-  # basic auth username
-  registryUsername: push-user
-
-  # basic auth password
-  registryPassword: $0$3cr3t
-
   # remote context can either be a .tar or .tgz file
   context: https://sonny-forge-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
 
@@ -35,3 +23,26 @@ spec:
 
   # do not push image if greater than 50MB
   imageSizeLimit: 52428800
+
+  # registry details
+  registry:
+    # push image here after build
+    url: my-docker-registry:5000
+
+    # push to a plain HTTP registry
+    insecure: false
+
+    # push to a registry with native basic auth ("Inline","Secret")
+    basicAuth: Secret
+
+    # secret containing dockerconfigjson credentials to registry
+    secretName: my-docker-config-json-secret
+
+    # namespace where secret resides
+    secretNamespace: my-ns
+
+    # inline basic auth username
+    #username: docker-push-user
+
+    # inline basic auth password
+    #password: $0$3cr3t

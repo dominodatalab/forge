@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/pkg/container"
 	"github.com/dominodatalab/forge/pkg/container/config"
 )
@@ -59,13 +62,27 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return result, err
 	}
 
+	// process registry authentication params
+	username, password, err := r.getAuthCredentials(ctx, build.Spec.Registry)
+	if err != nil {
+		log.Error(err, "AuthN credential processing failed")
+
+		build.Status.State = forgev1alpha1.Failed
+		build.Status.ErrorMessage = err.Error()
+
+		if iErr := r.updateResourceStatus(ctx, log, &build); iErr != nil {
+			return result, iErr
+		}
+		return result, nil
+	}
+
 	// construct build directives and dispatch operation
 	opts := config.BuildOptions{
 		Registry: config.Registry{
-			URL:      build.Spec.PushRegistry,
-			Insecure: build.Spec.InsecureRegistry,
-			Username: build.Spec.RegistryUsername,
-			Password: build.Spec.RegistryPassword,
+			URL:      build.Spec.Registry.URL,
+			Insecure: build.Spec.Registry.Insecure,
+			Username: username,
+			Password: password,
 		},
 		ImageName: build.Spec.ImageName,
 		Context:   build.Spec.Context,
@@ -74,8 +91,8 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		BuildArgs: build.Spec.BuildArgs,
 		CpuQuota:  build.Spec.CpuQuota,
 		Memory:    build.Spec.Memory,
-		Timeout:   time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 		SizeLimit: build.Spec.ImageSizeLimit,
+		Timeout:   time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
 	imageURL, err := r.Builder.Build(ctx, opts)
@@ -133,4 +150,42 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 	}
 
 	return err
+}
+
+func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, registry forgev1alpha1.Registry) (username, password string, err error) {
+	switch registry.BasicAuth {
+	case forgev1alpha1.BasicAuthInline:
+		username = registry.Username
+		password = registry.Password
+	case forgev1alpha1.BasicAuthSecret:
+		var secret corev1.Secret
+		if err = r.Client.Get(ctx, types.NamespacedName{
+			Namespace: registry.SecretNamespace,
+			Name:      registry.SecretName,
+		}, &secret); err != nil {
+			err = fmt.Errorf("cannot find registry auth secret: %v", err)
+			return
+		}
+
+		actual, expected := secret.Type, corev1.SecretTypeDockerConfigJson
+		if actual != expected {
+			err = fmt.Errorf("registry auth secret type must be %v, not %v", expected, actual)
+			return
+		}
+
+		input := secret.Data[corev1.DockerConfigJsonKey]
+		var output credentials.DockerConfigJSON
+		if err = json.Unmarshal(input, &output); err != nil {
+			err = fmt.Errorf("cannot extract username/password from registry secret: %v", err)
+			return
+		}
+
+		auth := output.Auths["https://index.docker.io/v1/"]
+		username = auth.Username
+		password = auth.Password
+	default:
+		err = fmt.Errorf("invalid auth scheme: %v", registry.BasicAuth)
+	}
+
+	return
 }
