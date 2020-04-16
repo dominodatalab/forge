@@ -24,25 +24,25 @@ spec:
   # do not push image if greater than 50MB
   imageSizeLimit: 52428800
 
-  # registry details
-  registry:
-    # push image here after build
-    url: my-docker-registry:5000
+  # push details for one or more registries
+  registries:
+    - # push image here after build
+      url: my-docker-registry:5000
 
-    # push to a plain HTTP registry
-    insecure: false
+      # push to a plain HTTP registry
+      insecure: false
 
-    # push to a registry with native basic auth ("Inline","Secret")
-    basicAuth: Secret
+      # push to a registry with native basic auth ("Inline","Secret")
+      basicAuth: Secret
 
-    # secret containing dockerconfigjson credentials to registry
-    secretName: my-docker-config-json-secret
+      # secret containing dockerconfigjson credentials to registry
+      secretName: my-docker-config-json-secret
 
-    # namespace where secret resides
-    secretNamespace: my-ns
+      # namespace where secret resides
+      secretNamespace: my-ns
 
-    # inline basic auth username
-    #username: docker-push-user
+      # inline basic auth username
+      #username: docker-push-user
 
-    # inline basic auth password
-    #password: $0$3cr3t
+      # inline basic auth password
+      #password: $0$3cr3t

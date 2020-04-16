@@ -47,8 +47,9 @@ type Registry struct {
 
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
 type ContainerImageBuildSpec struct {
-	// Registry push configuration.
-	Registry Registry `json:"registry"`
+	// Push to one or more registries.
+	// +kubebuilder:validation:MinItems=1
+	Registries []Registry `json:"registries"`
 
 	// Name used to build an image.
 	// +kubebuilder:validation:MinLength=1
@@ -92,7 +93,7 @@ type ContainerImageBuildSpec struct {
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
 type ContainerImageBuildStatus struct {
 	State            BuildState   `json:"state,omitempty"`
-	ImageURL         string       `json:"imageURL,omitempty"`
+	ImageURLs        []string     `json:"imageURLs,omitempty"`
 	ErrorMessage     string       `json:"errorMessage,omitempty"`
 	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
 	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`

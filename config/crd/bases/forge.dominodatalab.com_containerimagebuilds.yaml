@@ -74,39 +74,42 @@ spec:
             noCache:
               description: Disable the use of cache layers for a build.
               type: boolean
-            registry:
-              description: Registry push configuration.
-              properties:
-                basicAuth:
-                  description: Push to a registry with native basic auth enabled.
-                  enum:
-                  - Inline
-                  - Secret
-                  type: string
-                insecure:
-                  description: Push image to a plain HTTP registry.
-                  type: boolean
-                password:
-                  description: Inline basic auth password.
-                  type: string
-                secretName:
-                  description: Name of secret containing dockerconfigjson credentials
-                    to registry.
-                  type: string
-                secretNamespace:
-                  description: Namespace where credentials secret resides.
-                  type: string
-                url:
-                  description: URL where an image should be pushed at the end of a
-                    successful build.
-                  minLength: 1
-                  type: string
-                username:
-                  description: Inline basic auth username.
-                  type: string
-              required:
-              - url
-              type: object
+            registries:
+              description: Push to one or more registries.
+              items:
+                properties:
+                  basicAuth:
+                    description: Push to a registry with native basic auth enabled.
+                    enum:
+                    - Inline
+                    - Secret
+                    type: string
+                  insecure:
+                    description: Push image to a plain HTTP registry.
+                    type: boolean
+                  password:
+                    description: Inline basic auth password.
+                    type: string
+                  secretName:
+                    description: Name of secret containing dockerconfigjson credentials
+                      to registry.
+                    type: string
+                  secretNamespace:
+                    description: Namespace where credentials secret resides.
+                    type: string
+                  url:
+                    description: URL where an image should be pushed at the end of
+                      a successful build.
+                    minLength: 1
+                    type: string
+                  username:
+                    description: Inline basic auth username.
+                    type: string
+                required:
+                - url
+                type: object
+              minItems: 1
+              type: array
             timeoutSeconds:
               description: Optional deadline in seconds for image build to complete
                 (defaults to 300).
@@ -114,7 +117,7 @@ spec:
           required:
           - context
           - imageName
-          - registry
+          - registries
           type: object
         status:
           description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
@@ -127,8 +130,10 @@ spec:
               type: string
             errorMessage:
               type: string
-            imageURL:
-              type: string
+            imageURLs:
+              items:
+                type: string
+              type: array
             state:
               type: string
           type: object

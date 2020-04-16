@@ -2,6 +2,7 @@ package runc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,29 +38,60 @@ func NewImgBuilder() (*Builder, error) {
 	return &Builder{client: c}, nil
 }
 
-func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) (string, error) {
-	image, err := b.build(ctx, opts)
-	if err != nil {
-		return "", err
+func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) ([]string, error) {
+	if len(opts.Registries) == 0 {
+		return nil, errors.New("image builds require at least one push registry")
 	}
 
-	if opts.SizeLimit != 0 {
-		if err := b.validateImageSize(ctx, image, opts.SizeLimit); err != nil {
-			return "", err
+	var headImg string
+	var images []string
+	for idx, registry := range opts.Registries {
+		// Build fully-qualified image name
+		image := fmt.Sprintf("%s/%s", registry.URL, opts.ImageName)
+
+		// Parse the image name and tag.
+		named, err := reference.ParseNormalizedNamed(image)
+		if err != nil {
+			return nil, fmt.Errorf("parsing image name %q failed: %v", image, err)
 		}
+
+		// Add the latest tag if they did not provide one.
+		named = reference.TagNameOnly(named)
+		image = named.String()
+
+		if idx == 0 { // Build, check image size, and set ref to head image
+			headImg = image
+
+			if err := b.build(ctx, headImg, opts); err != nil {
+				return nil, err
+			}
+			if opts.SizeLimit != 0 {
+				if err := b.validateImageSize(ctx, headImg, opts.SizeLimit); err != nil {
+					return nil, err
+				}
+			}
+		} else { // Tag tail images
+			if err := b.tag(ctx, headImg, image); err != nil {
+				return nil, err
+			}
+		}
+
+		// Push image into registry
+		if err := b.push(ctx, image, registry.Insecure, registry.Username, registry.Password); err != nil {
+			return nil, err
+		}
+		images = append(images, image)
 	}
 
-	if err := b.push(ctx, image, opts.Registry.Insecure, opts.Registry.Username, opts.Registry.Password); err != nil {
-		return "", err
-	}
-	return image, nil
+	// Return a list of every registry image
+	return images, nil
 }
 
-func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, error) {
+func (b *Builder) build(ctx context.Context, image string, opts config.BuildOptions) error {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.Context)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.RemoveAll(extract.RootDir)
 
@@ -72,14 +104,14 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 	// create a new buildkit session
 	sess, sessDialer, err := b.client.Session(ctx, localDirs)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// prepare build parameters
-	solveReq, err := solveRequestWithContext(sess.ID(), opts)
+	solveReq, err := solveRequestWithContext(sess.ID(), image, opts)
 	if err != nil {
 		sess.Close()
-		return "", err
+		return err
 	}
 
 	// add build metadata to context
@@ -100,8 +132,8 @@ func (b *Builder) build(ctx context.Context, opts config.BuildOptions) (string, 
 		return showProgress(ch, false)
 	})
 
-	// return final image url and error when one occurs
-	return solveReq.ExporterAttrs["name"], eg.Wait()
+	// return error when one occurs
+	return eg.Wait()
 }
 
 func (b *Builder) validateImageSize(ctx context.Context, name string, limit uint64) error {
@@ -146,6 +178,14 @@ func (b *Builder) push(ctx context.Context, image string, insecure bool, usernam
 	return nil
 }
 
+func (b *Builder) tag(ctx context.Context, image, target string) error {
+	id := identity.NewID()
+	ctx = session.NewContext(ctx, id)
+	ctx = namespaces.WithNamespace(ctx, "buildkit")
+
+	return b.client.TagImage(ctx, image, target)
+}
+
 func getStateDirectory() string {
 	xdgDataHome := os.Getenv("XDG_DATA_HOME")
 	if xdgDataHome != "" {
@@ -159,18 +199,7 @@ func getStateDirectory() string {
 	return "/tmp/forge"
 }
 
-func solveRequestWithContext(sessionID string, opts config.BuildOptions) (*controlapi.SolveRequest, error) {
-	image := fmt.Sprintf("%s/%s", opts.Registry.URL, opts.ImageName)
-
-	// Parse the image name and tag.
-	named, err := reference.ParseNormalizedNamed(image)
-	if err != nil {
-		return nil, fmt.Errorf("parsing image name %q failed: %v", image, err)
-	}
-	// Add the latest tag if they did not provide one.
-	named = reference.TagNameOnly(named)
-	image = named.String()
-
+func solveRequestWithContext(sessionID string, image string, opts config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
 		Session:  sessionID,

@@ -63,39 +63,45 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// process registry authentication params
-	username, password, err := r.getAuthCredentials(ctx, build.Spec.Registry)
-	if err != nil {
-		log.Error(err, "AuthN credential processing failed")
+	var cfgRegs []config.Registry
+	for _, apiReg := range build.Spec.Registries {
+		username, password, err := r.getAuthCredentials(ctx, apiReg)
+		if err != nil {
+			log.Error(err, "AuthN credential processing failed")
 
-		build.Status.State = forgev1alpha1.Failed
-		build.Status.ErrorMessage = err.Error()
+			build.Status.State = forgev1alpha1.Failed
+			build.Status.ErrorMessage = err.Error()
 
-		if iErr := r.updateResourceStatus(ctx, log, &build); iErr != nil {
-			return result, iErr
+			if iErr := r.updateResourceStatus(ctx, log, &build); iErr != nil {
+				return result, iErr
+			}
+			return result, nil
 		}
-		return result, nil
+
+		reg := config.Registry{
+			URL:      apiReg.URL,
+			Insecure: apiReg.Insecure,
+			Username: username,
+			Password: password,
+		}
+		cfgRegs = append(cfgRegs, reg)
 	}
 
 	// construct build directives and dispatch operation
 	opts := config.BuildOptions{
-		Registry: config.Registry{
-			URL:      build.Spec.Registry.URL,
-			Insecure: build.Spec.Registry.Insecure,
-			Username: username,
-			Password: password,
-		},
-		ImageName: build.Spec.ImageName,
-		Context:   build.Spec.Context,
-		NoCache:   build.Spec.NoCache,
-		Labels:    build.Spec.Labels,
-		BuildArgs: build.Spec.BuildArgs,
-		CpuQuota:  build.Spec.CpuQuota,
-		Memory:    build.Spec.Memory,
-		SizeLimit: build.Spec.ImageSizeLimit,
-		Timeout:   time.Duration(build.Spec.TimeoutSeconds) * time.Second,
+		Registries: cfgRegs,
+		ImageName:  build.Spec.ImageName,
+		Context:    build.Spec.Context,
+		NoCache:    build.Spec.NoCache,
+		Labels:     build.Spec.Labels,
+		BuildArgs:  build.Spec.BuildArgs,
+		CpuQuota:   build.Spec.CpuQuota,
+		Memory:     build.Spec.Memory,
+		SizeLimit:  build.Spec.ImageSizeLimit,
+		Timeout:    time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
-	imageURL, err := r.Builder.Build(ctx, opts)
+	imageURLs, err := r.Builder.Build(ctx, opts)
 	if err != nil {
 		log.Error(err, "Build process failed")
 
@@ -111,7 +117,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// mark resource status to indicate build was successful
-	build.Status.ImageURL = imageURL
+	build.Status.ImageURLs = imageURLs
 	build.Status.State = forgev1alpha1.Completed
 	build.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
 
