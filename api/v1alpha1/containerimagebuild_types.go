@@ -2,19 +2,54 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +kubebuilder:validation:Enum=Inline;Secret
+type BasicAuthSource string
 type BuildState string
 
 const (
+	BasicAuthInline BasicAuthSource = "Inline"
+	BasicAuthSecret BasicAuthSource = "Secret"
+
 	Building  BuildState = "Building"
 	Completed BuildState = "Completed"
 	Failed    BuildState = "Failed"
 )
 
+type Registry struct {
+	// URL where an image should be pushed at the end of a successful build.
+	// +kubebuilder:validation:MinLength=1
+	URL string `json:"url"`
+
+	// Push image to a plain HTTP registry.
+	// +kubebuilder:validation:Optional
+	Insecure bool `json:"insecure"`
+
+	// Push to a registry with native basic auth enabled.
+	// +kubebuilder:validation:Optional
+	BasicAuth BasicAuthSource `json:"basicAuth"`
+
+	// Inline basic auth username.
+	// +kubebuilder:validation:Optional
+	Username string `json:"username"`
+
+	// Inline basic auth password.
+	// +kubebuilder:validation:Optional
+	Password string `json:"password"`
+
+	// Name of secret containing dockerconfigjson credentials to registry.
+	// +kubebuilder:validation:Optional
+	SecretName string `json:"secretName"`
+
+	// Namespace where credentials secret resides.
+	// +kubebuilder:validation:Optional
+	SecretNamespace string `json:"secretNamespace"`
+}
+
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
 type ContainerImageBuildSpec struct {
-	// Registry where an image should be pushed at the end of a successful build.
-	// +kubebuilder:validation:MinLength=1
-	PushRegistry string `json:"pushRegistry"`
+	// Push to one or more registries.
+	// +kubebuilder:validation:MinItems=1
+	Registries []Registry `json:"registries"`
 
 	// Name used to build an image.
 	// +kubebuilder:validation:MinLength=1
@@ -53,16 +88,12 @@ type ContainerImageBuildSpec struct {
 	// an image of any size will be pushed.
 	// +kubebuilder:validation:Optional
 	ImageSizeLimit uint64 `json:"imageSizeLimit"`
-
-	// Push image to an insecure registry.
-	// +kubebuilder:validation:Optional
-	InsecureRegistry bool `json:"insecureRegistry"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
 type ContainerImageBuildStatus struct {
 	State            BuildState   `json:"state,omitempty"`
-	ImageURL         string       `json:"imageURL,omitempty"`
+	ImageURLs        []string     `json:"imageURLs,omitempty"`
 	ErrorMessage     string       `json:"errorMessage,omitempty"`
 	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
 	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`

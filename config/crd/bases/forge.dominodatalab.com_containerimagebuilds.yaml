@@ -63,9 +63,6 @@ spec:
                 pushed to a registry. By default, an image of any size will be pushed.
               format: int64
               type: integer
-            insecureRegistry:
-              description: Push image to an insecure registry.
-              type: boolean
             labels:
               additionalProperties:
                 type: string
@@ -77,11 +74,42 @@ spec:
             noCache:
               description: Disable the use of cache layers for a build.
               type: boolean
-            pushRegistry:
-              description: Registry where an image should be pushed at the end of
-                a successful build.
-              minLength: 1
-              type: string
+            registries:
+              description: Push to one or more registries.
+              items:
+                properties:
+                  basicAuth:
+                    description: Push to a registry with native basic auth enabled.
+                    enum:
+                    - Inline
+                    - Secret
+                    type: string
+                  insecure:
+                    description: Push image to a plain HTTP registry.
+                    type: boolean
+                  password:
+                    description: Inline basic auth password.
+                    type: string
+                  secretName:
+                    description: Name of secret containing dockerconfigjson credentials
+                      to registry.
+                    type: string
+                  secretNamespace:
+                    description: Namespace where credentials secret resides.
+                    type: string
+                  url:
+                    description: URL where an image should be pushed at the end of
+                      a successful build.
+                    minLength: 1
+                    type: string
+                  username:
+                    description: Inline basic auth username.
+                    type: string
+                required:
+                - url
+                type: object
+              minItems: 1
+              type: array
             timeoutSeconds:
               description: Optional deadline in seconds for image build to complete
                 (defaults to 300).
@@ -89,7 +117,7 @@ spec:
           required:
           - context
           - imageName
-          - pushRegistry
+          - registries
           type: object
         status:
           description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
@@ -102,8 +130,10 @@ spec:
               type: string
             errorMessage:
               type: string
-            imageURL:
-              type: string
+            imageURLs:
+              items:
+                type: string
+              type: array
             state:
               type: string
           type: object
