@@ -7,6 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY main.go main.go
 COPY api/ api/
+COPY cmd/ cmd/
 COPY controllers/ controllers/
 COPY internal/ internal/
 COPY pkg/ pkg/
