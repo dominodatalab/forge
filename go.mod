@@ -26,6 +26,7 @@ require (
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	go.etcd.io/bbolt v1.3.1-etcd.8
