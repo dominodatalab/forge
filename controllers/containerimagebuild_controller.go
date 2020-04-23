@@ -160,6 +160,8 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 
 func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, registry forgev1alpha1.Registry) (username, password string, err error) {
 	switch registry.BasicAuth {
+	case "":
+		return
 	case forgev1alpha1.BasicAuthInline:
 		username = registry.Username
 		password = registry.Password
