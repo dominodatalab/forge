@@ -55,8 +55,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	if brokerOpts != nil {
 		setupLog.Info("Initializing message publisher")
 
-		publisher, err = message.NewProducer(brokerOpts)
-		if err != nil {
+		if publisher, err = message.NewProducer(brokerOpts); err != nil {
 			setupLog.Error(err, "Message publisher initialization failed")
 			os.Exit(1)
 		}
