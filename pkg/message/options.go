@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type Options struct {
 	Broker Broker
@@ -10,23 +13,13 @@ type Options struct {
 }
 
 func ValidationOpts(opts *Options) error {
-	name := opts.Broker
-
-	ok := false
-	for _, broker := range SupportedBrokers {
-		if name == broker {
-			ok = true
-		}
-	}
-	if !ok {
-		return fmt.Errorf("broker %q is invalid (supported brokers: %v)", name, SupportedBrokers)
-	}
-
 	switch opts.Broker {
-	case "amqp":
+	case AmqpBroker:
 		if opts.AmqpURI == "" || opts.AmqpQueue == "" {
-			return fmt.Errorf("broker %q requires a uri and queue name", "amqp")
+			return errors.New("amqp broker requires a uri and queue name")
 		}
+	default:
+		return fmt.Errorf("broker %q is invalid (supported brokers: %v)", opts.Broker, SupportedBrokers)
 	}
 
 	return nil
