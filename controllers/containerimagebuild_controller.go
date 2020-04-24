@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -21,6 +22,7 @@ import (
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/pkg/container"
 	"github.com/dominodatalab/forge/pkg/container/config"
+	"github.com/dominodatalab/forge/pkg/message"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
@@ -30,6 +32,7 @@ type ContainerImageBuildReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 	Builder  container.RuntimeBuilder
+	Producer message.Producer
 }
 
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds,verbs=get;list;watch;create;update;patch;delete
@@ -49,13 +52,13 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// ignore resources that have been processed on start
-	if len(build.Status.State) != 0 {
+	if build.Status.State != "" {
 		log.Info("Skipping resource", "state", build.Status.State)
 		return result, nil
 	}
 
 	// mark resource status and update before launching build
-	build.Status.State = forgev1alpha1.Building
+	build.Status.SetState(forgev1alpha1.Building)
 	build.Status.BuildStartedAt = &metav1.Time{Time: time.Now()}
 
 	if err := r.updateResourceStatus(ctx, log, &build); err != nil {
@@ -105,7 +108,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	if err != nil {
 		log.Error(err, "Build process failed")
 
-		build.Status.State = forgev1alpha1.Failed
+		build.Status.SetState(forgev1alpha1.Failed)
 		build.Status.ErrorMessage = err.Error()
 
 		if uErr := r.updateResourceStatus(ctx, log, &build); uErr != nil {
@@ -118,7 +121,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	// mark resource status to indicate build was successful
 	build.Status.ImageURLs = imageURLs
-	build.Status.State = forgev1alpha1.Completed
+	build.Status.SetState(forgev1alpha1.Completed)
 	build.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
 
 	if err := r.updateResourceStatus(ctx, log, &build); err != nil {
@@ -146,20 +149,14 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Complete(r)
 }
 
-func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context, log logr.Logger, build *forgev1alpha1.ContainerImageBuild) error {
-	err := r.Status().Update(ctx, build)
-	if err != nil {
-		log.Error(err, "Unable to update status")
-
-		msg := fmt.Sprintf("Forge was unable to update this resource status: %v", err)
-		r.Recorder.Event(build, corev1.EventTypeWarning, "UpdateFailed", msg)
+func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, registry forgev1alpha1.Registry) (username, password string, err error) {
+	if registry.BasicAuth == "" {
+		return
 	}
 
-	return err
-}
-
-func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, registry forgev1alpha1.Registry) (username, password string, err error) {
 	switch registry.BasicAuth {
+	case "":
+		return
 	case forgev1alpha1.BasicAuthInline:
 		username = registry.Username
 		password = registry.Password
@@ -203,4 +200,30 @@ func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, 
 	}
 
 	return
+}
+
+func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context, log logr.Logger, build *forgev1alpha1.ContainerImageBuild) error {
+	if err := r.Status().Update(ctx, build); err != nil {
+		log.Error(err, "Unable to update status")
+
+		msg := fmt.Sprintf("Forge was unable to update this resource status: %v", err)
+		r.Recorder.Event(build, corev1.EventTypeWarning, "UpdateFailed", msg)
+
+		return err
+	}
+
+	if r.Producer != nil {
+		update := &StatusUpdate{
+			Name:          build.Name,
+			ObjectLink:    strings.TrimSuffix(build.GetSelfLink(), "/status"),
+			PreviousState: string(build.Status.PreviousState),
+			CurrentState:  string(build.Status.State),
+			ImageURLs:     build.Status.ImageURLs,
+			ErrorMessage:  build.Status.ErrorMessage,
+		}
+		if err := r.Producer.Publish(update); err != nil {
+			log.Error(err, "Unable to publish message")
+		}
+	}
+	return nil
 }

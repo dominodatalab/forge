@@ -10,9 +10,10 @@ const (
 	BasicAuthInline BasicAuthSource = "Inline"
 	BasicAuthSecret BasicAuthSource = "Secret"
 
-	Building  BuildState = "Building"
-	Completed BuildState = "Completed"
-	Failed    BuildState = "Failed"
+	Initialized BuildState = "Initialized"
+	Building    BuildState = "Building"
+	Completed   BuildState = "Completed"
+	Failed      BuildState = "Failed"
 )
 
 type Registry struct {
@@ -92,11 +93,22 @@ type ContainerImageBuildSpec struct {
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
 type ContainerImageBuildStatus struct {
+	PreviousState    BuildState   `json:"-"` // NOTE: should we persist this value?
 	State            BuildState   `json:"state,omitempty"`
 	ImageURLs        []string     `json:"imageURLs,omitempty"`
 	ErrorMessage     string       `json:"errorMessage,omitempty"`
 	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
 	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`
+}
+
+func (s *ContainerImageBuildStatus) SetState(state BuildState) {
+	// NOTE: try to leverage kubebuilder default values on State later; currently doesn't work
+	if s.State == "" {
+		s.State = Initialized
+	}
+
+	s.PreviousState = s.State
+	s.State = state
 }
 
 // +kubebuilder:object:root=true

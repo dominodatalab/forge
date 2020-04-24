@@ -17,6 +17,7 @@ import (
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	_ "github.com/dominodatalab/forge/internal/unshare"
 	"github.com/dominodatalab/forge/pkg/container"
+	"github.com/dominodatalab/forge/pkg/message"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -25,7 +26,7 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool) {
+func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options) {
 	reexec()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
@@ -50,12 +51,24 @@ func StartManager(metricsAddr string, enableLeaderElection bool) {
 		os.Exit(1)
 	}
 
+	var publisher message.Producer
+	if brokerOpts != nil {
+		setupLog.Info("Initializing message publisher")
+
+		if publisher, err = message.NewProducer(brokerOpts); err != nil {
+			setupLog.Error(err, "Message publisher initialization failed")
+			os.Exit(1)
+		}
+		defer publisher.Close()
+	}
+
 	if err = (&ContainerImageBuildReconciler{
 		Log:      ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		Builder:  builder,
+		Producer: publisher,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)
