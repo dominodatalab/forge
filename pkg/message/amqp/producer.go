@@ -38,7 +38,7 @@ func (p *producer) Publish(event interface{}) error {
 	q, err := ch.QueueDeclare(
 		p.queueName,
 		true,
-		true,
+		false,
 		false,
 		false,
 		nil,
