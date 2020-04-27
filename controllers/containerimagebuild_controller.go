@@ -215,6 +215,7 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 	if r.Producer != nil {
 		update := &StatusUpdate{
 			Name:          build.Name,
+			Annotations:   build.Annotations,
 			ObjectLink:    strings.TrimSuffix(build.GetSelfLink(), "/status"),
 			PreviousState: string(build.Status.PreviousState),
 			CurrentState:  string(build.Status.State),
