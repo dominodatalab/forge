@@ -41,7 +41,9 @@ func (p *producer) Publish(event interface{}) error {
 		false,
 		false,
 		false,
-		nil,
+		amqp.Table{
+			"x-single-active-consumer": true,
+		},
 	)
 	if err != nil {
 		return err
