@@ -38,10 +38,12 @@ func (p *producer) Publish(event interface{}) error {
 	q, err := ch.QueueDeclare(
 		p.queueName,
 		true,
-		true,
 		false,
 		false,
-		nil,
+		false,
+		amqp.Table{
+			"x-single-active-consumer": true,
+		},
 	)
 	if err != nil {
 		return err
