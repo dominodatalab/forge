@@ -48,7 +48,7 @@ func processBrokerOpts(cmd *cobra.Command, args []string) error {
 		AmqpURI:   amqpURI,
 		AmqpQueue: amqpQueue,
 	}
-	return message.ValidationOpts(brokerOpts)
+	return message.ValidateOpts(brokerOpts)
 }
 
 func init() {

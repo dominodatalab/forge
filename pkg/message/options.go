@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Options defines the configuration for supported brokers.
 type Options struct {
 	Broker Broker
 
@@ -12,7 +13,8 @@ type Options struct {
 	AmqpQueue string
 }
 
-func ValidationOpts(opts *Options) error {
+// ValidateOpts enforces broker-specific configuration requirements.
+func ValidateOpts(opts *Options) error {
 	switch opts.Broker {
 	case AmqpBroker:
 		if opts.AmqpURI == "" || opts.AmqpQueue == "" {
