@@ -55,6 +55,17 @@ jobs:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /$GOPATH/pkg/mod
+  test:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - run:
+          name: Install and Launch Kubernetes
+          command: curl -sfL https://get.k3s.io | sh -
+      - run:
+          name: Run e2e tests
+          command: ./scripts/e2e.sh
   publish_release:
     executor: golang
     environment:
@@ -85,9 +96,15 @@ workflows:
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
-      - publish_release:
+      - test:
           requires:
             - build
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+      - publish_release:
+          requires:
+            - test
           filters:
             branches:
               ignore: /.*/
