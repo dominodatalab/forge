@@ -71,7 +71,7 @@ jobs:
           name: Install Helm
           command: |
             curl -L https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz | tar -xvz -C /tmp
-            mv /tmp/linux-amd64/helm /usr/local/bin/
+            sudo mv /tmp/linux-amd64/helm /usr/local/bin/
       - run:
           name: Run e2e tests
           command: ./scripts/e2e.sh
