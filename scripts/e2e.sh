@@ -23,8 +23,9 @@ namespace="forge-test-$(tr -cd 'a-z0-9' < /dev/urandom | fold -w10 | head -n1)"
 info "Creating test namespace: $namespace"
 kubectl create ns "$namespace"
 
-info "Ensuring stable Helm repository is present"
+info "Ensuring Helm repositories are configured"
 helm repo add stable https://kubernetes-charts.storage.googleapis.com
+helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
 
 info "Installing Docker Registry chart"
@@ -33,12 +34,11 @@ helm install docker-registry stable/docker-registry \
   --namespace "$namespace"
 
 info "Installing RabbitMQ chart"
-helm install rabbitmq stable/rabbitmq \
+helm install rabbitmq bitnami/rabbitmq \
   --version 6.18.2 \
   --namespace "$namespace"
 
-info "Launching Forge controller"
-echo "launching $image"
+info "Launching Forge controller: $image"
 
 #kubectl run forge \
 #  --image "$image" \
