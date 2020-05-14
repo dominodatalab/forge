@@ -67,6 +67,7 @@ jobs:
       HELM_VERSION: "v3.2.1"
       K3S_KUBECONFIG_MODE: "644"
     steps:
+      - checkout
       - load_env
       - run:
           name: Install and Launch Kubernetes
