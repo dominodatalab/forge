@@ -58,11 +58,20 @@ jobs:
   test:
     machine:
       image: ubuntu-1604:201903-01
+    environment:
+      KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      HELM_VERSION: "v3.2.1"
+      K3S_KUBECONFIG_MODE: "644"
     steps:
       - checkout
       - run:
           name: Install and Launch Kubernetes
           command: curl -sfL https://get.k3s.io | sh -
+      - run:
+          name: Install Helm
+          command: |
+            curl -L https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz | tar -xvz -C /tmp
+            mv /tmp/linux-amd64/helm /usr/local/bin/
       - run:
           name: Run e2e tests
           command: ./scripts/e2e.sh
