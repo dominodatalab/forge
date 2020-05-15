@@ -38,6 +38,9 @@ helm install rabbitmq bitnami/rabbitmq \
   --version 6.18.2 \
   --namespace "$namespace"
 
+info "Installing ContainerImageBuild CRD"
+kubectl apply -f config/crd/bases/
+
 info "Launching Forge controller: $image"
 
 #kubectl run forge \
