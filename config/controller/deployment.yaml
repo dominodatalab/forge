@@ -15,12 +15,42 @@ spec:
         app.kubernetes.io/name: forge
     spec:
       serviceAccountName: forge
+      volumes:
+        - name: ca-tls
+          secret:
+            secretName: docker-registry-tls
+        - name: ssl-certs
+          emptyDir: {}
+      initContainers:
+        - name: init-ca
+          image: debian:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -ex
+              apt update
+              apt install -y ca-certificates
+              cp /tmp/forge/ca-tls/ca.crt /usr/local/share/ca-certificates/custom.crt
+              update-ca-certificates
+          env:
+            - name: CERT_DIR
+              value: /tmp/forge/ca-tls
+          volumeMounts:
+            - name: ca-tls
+              mountPath: /tmp/forge/ca-tls
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
       containers:
         - name: controller
-          image: forge:latest
+          image: quay.io/domino/forge:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
-              cpu: 100m
+              cpu: 1
               memory: 20Mi
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
       terminationGracePeriodSeconds: 10
