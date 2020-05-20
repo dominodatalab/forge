@@ -17,3 +17,6 @@ bin/
 # Kubernetes Generated files - skip generated files, except for vendored files
 
 !vendor/**/zz_generated.*
+
+# Ignore custom root CA files generated during testing
+e2e/rootCA.*
