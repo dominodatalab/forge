@@ -102,7 +102,8 @@ popd
 kubectl apply -k config/controller
 kubectl wait pod --for=condition=ready \
   --namespace "$namespace" \
-  --selector app.kubernetes.io/name=forge
+  --selector app.kubernetes.io/name=forge \
+  --timeout 120s
 
 info "Running test case: Build should push to a private registry with TLS enabled"
 kubectl apply -f e2e/builds/tls_with_basic_auth.yaml
