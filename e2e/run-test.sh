@@ -37,7 +37,8 @@ info "Installing cert-manager chart"
 helm install cert-manager jetstack/cert-manager \
   --version v0.15.0 \
   --namespace "$namespace" \
-  --set installCRDs=true
+  --set installCRDs=true \
+  --wait
 
 info "Generate custom root CA"
 pushd e2e
