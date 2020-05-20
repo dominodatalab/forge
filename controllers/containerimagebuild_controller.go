@@ -68,7 +68,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	// process registry authentication params
 	var cfgRegs []config.Registry
 	for _, apiReg := range build.Spec.Registries {
-		username, password, err := r.getAuthCredentials(ctx, apiReg)
+		username, password, err := r.getAuthCredentials(ctx, log, apiReg)
 		if err != nil {
 			log.Error(err, "AuthN credential processing failed")
 
@@ -149,18 +149,17 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Complete(r)
 }
 
-func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, registry forgev1alpha1.Registry) (username, password string, err error) {
-	if registry.BasicAuth == "" {
-		return
-	}
-
+func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, log logr.Logger, registry forgev1alpha1.Registry) (username, password string, err error) {
 	switch registry.BasicAuth {
 	case "":
+		log.Info("Not using registry credentials")
 		return
 	case forgev1alpha1.BasicAuthInline:
+		log.Info("Processing inline registry credentials")
 		username = registry.Username
 		password = registry.Password
 	case forgev1alpha1.BasicAuthSecret:
+		log.Info("Processing secret registry credentials")
 		var secret corev1.Secret
 		if err = r.Client.Get(ctx, types.NamespacedName{
 			Namespace: registry.SecretNamespace,

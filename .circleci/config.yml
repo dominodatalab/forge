@@ -79,7 +79,7 @@ jobs:
             sudo mv /tmp/linux-amd64/helm /usr/local/bin/
       - run:
           name: Run e2e tests
-          command: ./scripts/e2e.sh ${IMG}
+          command: ./e2e/run-test.sh ${IMG}
   publish_release:
     executor: golang
     environment:

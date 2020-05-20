@@ -19,6 +19,7 @@ import (
 	"github.com/moby/buildkit/util/progress/progressui"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/pkg/archive"
 	"github.com/dominodatalab/forge/pkg/container/config"
 	imgclient "github.com/dominodatalab/forge/pkg/img/client"
@@ -61,6 +62,13 @@ func (b *Builder) Build(ctx context.Context, opts config.BuildOptions) ([]string
 
 		if idx == 0 { // Build, check image size, and set ref to head image
 			headImg = image
+
+			// Login prior to building so we handle FROM private registry images
+			if registry.Username !="" && registry.Password != "" {
+				if err := credentials.DockerLogin(registry.Username, registry.Password, registry.URL, registry.Insecure); err != nil {
+					return nil, fmt.Errorf("docker login failed: %w", err)
+				}
+			}
 
 			if err := b.build(ctx, headImg, opts); err != nil {
 				return nil, err

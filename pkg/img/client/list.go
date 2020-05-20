@@ -65,7 +65,7 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]ListedIma
 		return nil, fmt.Errorf("listing images with filters (%s) failed: %v", strings.Join(filters, ", "), err)
 	}
 
-	listedImages := []ListedImage{}
+	var listedImages []ListedImage
 	for _, image := range i {
 		size, err := image.Size(ctx, contentStore, platforms.Default())
 		if err != nil {
