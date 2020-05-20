@@ -3,6 +3,7 @@ executors:
   golang:
     docker:
       - image: circleci/golang:1.14
+    resource_class: large
 commands:
   load_env:
     steps:
@@ -62,6 +63,7 @@ jobs:
   test:
     machine:
       image: ubuntu-1604:202004-01
+    resource_class: large
     environment:
       KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
       HELM_VERSION: "v3.2.1"
