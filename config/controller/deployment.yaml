@@ -53,4 +53,6 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
+          securityContext:
+            privileged: true # TODO: figure out why this is required for k3s testing in CircleCI and then remove
       terminationGracePeriodSeconds: 10
