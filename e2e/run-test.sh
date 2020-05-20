@@ -44,7 +44,7 @@ kubectl create secret tls custom-root-ca \
   --cert rootCA.crt
 
 info "Creating self-signed issuer"
-kubectl apply --namespace "$namespace" -f- <<EOH
+cat <<EOH kubectl apply --namespace "$namespace" -f -
 apiVersion: cert-manager.io/v1alpha2
 kind: Issuer
 metadata:
@@ -55,7 +55,7 @@ spec:
 EOH
 
 info "Creating certificate for docker registry"
-kubectl apply --namespace "$namespace" -f- <<EOH
+cat <<EOH kubectl apply --namespace "$namespace" -f -
 apiVersion: cert-manager.io/v1alpha2
 kind: Certificate
 metadata:
