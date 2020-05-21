@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-#
-# test cases:
-# - insecure
-# - TLS
-# - authN using both inline and secret credentials
-# - publishing to amqp broker
 
 set -e
 
@@ -129,7 +123,7 @@ while true; do
     if [[ $state == "Failed" ]]; then
     error "Test failed"
     kubectl logs --namespace "$namespace" --selector app.kubernetes.io/name=forge
-    break
+    exit 1
   fi
 
   counter=$((counter+1))
