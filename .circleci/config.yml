@@ -3,6 +3,15 @@ executors:
   golang:
     docker:
       - image: circleci/golang:1.14
+commands:
+  load_env:
+    steps:
+      - run:
+          name: Setup Environment Variables
+          command: |
+            [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
+            echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
+            echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
 jobs:
   build:
     executor: golang
@@ -10,6 +19,7 @@ jobs:
       KUBEBUILDER_VERSION: 2.2.0
     steps:
       - checkout
+      - load_env
       - run:
           name: Install Kubebuilder
           command: |
@@ -18,12 +28,6 @@ jobs:
             curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
             sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
             echo 'export PATH="$PATH:/usr/local/kubebuilder/bin"' >> $BASH_ENV
-      - run:
-          name: Setup Environment Variables
-          command: |
-            [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
-            echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
-            echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
@@ -42,7 +46,7 @@ jobs:
           name: Build Docker Image
           command: |
             ARGS="--label build='${CIRCLE_BUILD_URL}' --label author='${CIRCLE_USERNAME}' --label commit-sha='${CIRCLE_SHA1}'"
-            if [[ ${CIRCLE_BRANCH} != "master" ]]; then
+            if [[ ${CIRCLE_BRANCH} != "master" && -z ${CIRCLE_TAG} ]]; then
               ARGS="$ARGS --label quay.expires-after='4w'"
             fi
             make docker-build ARGS="${ARGS}"
@@ -55,6 +59,33 @@ jobs:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /$GOPATH/pkg/mod
+  test:
+    machine:
+      image: ubuntu-1604:202004-01
+    environment:
+      KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      HELM_VERSION: "v3.2.1"
+      KUSTOMIZE_VERSION: "v3.5.5"
+      K3S_KUBECONFIG_MODE: "644"
+    steps:
+      - checkout
+      - load_env
+      - run:
+          name: Install and Launch Kubernetes
+          command: curl -sfL https://get.k3s.io | sh -
+      - run:
+          name: Install Helm
+          command: |
+            curl -L https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz | tar -xvz -C /tmp
+            sudo mv /tmp/linux-amd64/helm /usr/local/bin/
+      - run:
+          name: Install Kustomize
+          command: |
+            curl -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar -xzv -C /tmp
+            sudo mv /tmp/kustomize /usr/local/bin/
+      - run:
+          name: Run e2e tests
+          command: ./e2e/run-test.sh ${IMG}
   publish_release:
     executor: golang
     environment:
@@ -85,9 +116,15 @@ workflows:
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
-      - publish_release:
+      - test:
           requires:
             - build
+          filters:
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
+      - publish_release:
+          requires:
+            - test
           filters:
             branches:
               ignore: /.*/
