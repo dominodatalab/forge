@@ -109,8 +109,8 @@ while true; do
     exit 1
   fi
 
-  info "Waiting 5 secs for test to complete..."
-  sleep 5
+  info "Waiting 10 secs for test to complete..."
+  sleep 10
 
   state="$(kubectl get cib tls-with-basic-auth -o jsonpath='{.status.state}')"
   info "Current build state: '$state'"
