@@ -20,9 +20,9 @@ import (
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/credentials"
+	"github.com/dominodatalab/forge/internal/message"
 	"github.com/dominodatalab/forge/pkg/container"
 	"github.com/dominodatalab/forge/pkg/container/config"
-	"github.com/dominodatalab/forge/pkg/message"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object

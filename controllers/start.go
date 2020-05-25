@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/message"
 	_ "github.com/dominodatalab/forge/internal/unshare"
 	"github.com/dominodatalab/forge/pkg/container"
-	"github.com/dominodatalab/forge/pkg/message"
 	// +kubebuilder:scaffold:imports
 )
 

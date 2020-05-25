@@ -3,7 +3,7 @@ package message
 import (
 	"fmt"
 
-	"github.com/dominodatalab/forge/pkg/message/amqp"
+	"github.com/dominodatalab/forge/internal/message/amqp"
 )
 
 // Broker represents a messaging protocol implementation.
