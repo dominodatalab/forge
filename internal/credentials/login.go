@@ -72,4 +72,3 @@ func configureAuth(username, password, server string) (*configfile.ConfigFile, *
 
 	return dockerCfg, &authConfig, nil
 }
-
