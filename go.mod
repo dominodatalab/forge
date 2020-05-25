@@ -1,6 +1,6 @@
 module github.com/dominodatalab/forge
 
-go 1.14
+go 1.13
 
 replace github.com/containerd/containerd v1.3.0-0.20190212172151-f5b0fa220df8 => github.com/containerd/containerd v1.2.1-0.20190212172151-f5b0fa220df8
 
