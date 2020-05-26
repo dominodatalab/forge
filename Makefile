@@ -14,6 +14,9 @@ endif
 
 all: manager
 
+static:
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o bin/forge
+
 # Run tests
 test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
