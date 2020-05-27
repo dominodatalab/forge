@@ -1,21 +1,15 @@
 package bkimage
 
 import (
-	"context"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 
-	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/diff/apply"
 	"github.com/containerd/containerd/diff/walking"
 	ctdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/containerd/snapshots/native"
-	"github.com/containerd/containerd/snapshots/overlay"
 	bkmetadata "github.com/moby/buildkit/cache/metadata"
 	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/executor/runcexecutor"
@@ -27,9 +21,6 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/system"
 	log "github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
-
-	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
 )
 
 func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
@@ -38,15 +29,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 		return opt, err
 	}
 
-	mdb, err := c.getMetadataDB()
-	if err != nil {
-		return opt, err
-	}
-
-	imageStore := ctdmetadata.NewImageStore(mdb)
-	contentStore := containerdsnapshot.NewContentStore(mdb.ContentStore(), "buildkit")
-
-	// executor logic
+	// worker executor
 	unprivileged := system.GetParentNSeuid() != 0
 	log.Infof("Executor running unprivileged: %t", unprivileged)
 
@@ -66,7 +49,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 		return opt, err
 	}
 
-	// worker opt metadata
+	// worker metadata
 	id, err := base.ID(c.rootDir)
 	if err != nil {
 		return opt, err
@@ -90,54 +73,19 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 		GCPolicy:        nil,
 		MetadataStore:   md,
 		Executor:        exe,
-		Snapshotter:     containerdsnapshot.NewSnapshotter(c.backend, mdb.Snapshotter(c.backend), "buildkit", nil),
-		ContentStore:    contentStore,
-		Applier:         apply.NewFileSystemApplier(contentStore),
-		Differ:          walking.NewWalkingDiff(contentStore),
-		ImageStore:      imageStore,
+		Snapshotter:     containerdsnapshot.NewSnapshotter(c.backend, c.metadataDB.Snapshotter(c.backend), "buildkit", nil),
+		ContentStore:    c.contentStore,
+		Applier:         apply.NewFileSystemApplier(c.contentStore),
+		Differ:          walking.NewWalkingDiff(c.contentStore),
+		ImageStore:      c.imageStore,
 		RegistryHosts:   docker.ConfigureDefaultRegistries(), // TODO: this may be the place to hook in authN for private registries
 		IdentityMapping: nil,
-		LeaseManager:    leaseutil.WithNamespace(ctdmetadata.NewLeaseManager(mdb), "buildkit"),
-		GarbageCollect:  mdb.GarbageCollect,
+		LeaseManager:    leaseutil.WithNamespace(ctdmetadata.NewLeaseManager(c.metadataDB), "buildkit"),
+		GarbageCollect:  c.metadataDB.GarbageCollect,
 	}
 	c.workerOpt = &opt // NOTE: modified
 
 	return
-}
-
-func (c *Client) getMetadataDB() (*ctdmetadata.DB, error) {
-	db, err := bolt.Open(filepath.Join(c.rootDir, "container-metadata.db"), 0644, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	cs, err := local.NewStore(filepath.Join(c.rootDir, "content"))
-	if err != nil {
-		return nil, err
-	}
-
-	snapshotDir := filepath.Join(c.rootDir, "snapshotter")
-	var snapshotter snapshots.Snapshotter
-	switch c.backend {
-	case types.NativeBackend:
-		snapshotter, err = native.NewSnapshotter(snapshotDir)
-	case types.OverlayFSBackend:
-		snapshotter, err = overlay.NewSnapshotter(snapshotDir)
-	default:
-		return nil, fmt.Errorf("%s is not a valid snapshotter", c.backend)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("creating %s snapshotter failed: %w", c.backend, err)
-	}
-
-	metadataDB := ctdmetadata.NewDB(db, cs, map[string]snapshots.Snapshotter{
-		c.backend: snapshotter,
-	})
-	if err := metadataDB.Init(context.TODO()); err != nil {
-		return nil, err
-	}
-
-	return metadataDB, nil
 }
 
 func getProcessMode() oci.ProcessMode {

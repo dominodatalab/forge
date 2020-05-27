@@ -161,7 +161,7 @@ func (d *driver) push(ctx context.Context, image string, insecure bool, username
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return d.bk.Push(ctx, image, insecure, username, password)
+		return d.bk.PushImage(ctx, image, insecure, username, password)
 	})
 	if err := eg.Wait(); err != nil {
 		return err

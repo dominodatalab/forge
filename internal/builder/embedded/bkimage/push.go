@@ -9,23 +9,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (c *Client) Push(ctx context.Context, image string, insecure bool, username, password string) error {
+func (c *Client) PushImage(ctx context.Context, image string, insecure bool, username, password string) error {
 	image, err := parseImageName(image)
 	if err != nil {
 		return err
 	}
 
-	// create worker opt if missing
-	if c.workerOpt == nil { // NOTE: modified
-		opt, err := c.createWorkerOpt()
-		if err != nil {
-			return fmt.Errorf("created worker opt failed: %w", err)
-		}
-		c.workerOpt = &opt
-	}
-
 	// grab reference to local image object
-	imgObj, err := c.workerOpt.ImageStore.Get(ctx, image)
+	imgObj, err := c.imageStore.Get(ctx, image)
 	if err != nil {
 		return fmt.Errorf("getting image %q from image store failed: %w", image, err)
 	}
@@ -59,7 +50,7 @@ func (c *Client) Push(ctx context.Context, image string, insecure bool, username
 	ctx = context.Background()
 
 	// "insecure" param is not used in the following call
-	return push.Push(ctx, sm, c.workerOpt.ContentStore, imgObj.Target.Digest, image, insecure, hosts, false)
+	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, hosts, false)
 }
 
 // NOTE: trying to figure out how to configure all provided hosts

@@ -1,9 +1,13 @@
 package bkimage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/snapshots/overlay"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
@@ -20,15 +24,19 @@ type Client struct {
 	backend string
 	rootDir string
 
+	metadataDB   *metadata.DB
+	imageStore   images.Store
+	contentStore content.Store
+
 	sessionManager *session.Manager
 	controller     *control.Controller
 	workerOpt      *base.WorkerOpt // NOTE: modified
 }
 
 func NewClient(rootDir, backend string) (*Client, error) {
-	// select appropriate backend
+	// select appropriate system backend
 	if backend == types.AutoBackend {
-		if overlay.Supported(rootDir) == nil { // NOTE: this operation generates the root directory
+		if overlay.Supported(rootDir) == nil {
 			backend = types.OverlayFSBackend
 		} else {
 			backend = types.NativeBackend
@@ -42,9 +50,14 @@ func NewClient(rootDir, backend string) (*Client, error) {
 		return nil, err
 	}
 
-	// create client with operational data
-	return &Client{
+	// create operational client
+	client := &Client{
 		backend: backend,
 		rootDir: rootDir,
-	}, nil
+	}
+	if err := client.initDataStores(); err != nil {
+		return nil, fmt.Errorf("initializing data stores failed: %w", err)
+	}
+
+	return client, nil
 }
