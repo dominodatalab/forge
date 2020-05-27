@@ -4,9 +4,9 @@ import "time"
 
 type Registry struct {
 	Host     string
+	NonSSL   bool
 	Username string
 	Password string
-	NonSSL   bool
 }
 
 type BuildOptions struct {
@@ -18,8 +18,9 @@ type BuildOptions struct {
 	NoCache        bool
 	Timeout        time.Duration
 	Registries     []Registry
+	PushRegistries []string
 
-	// NOTE: these are not currently used; remove them?
+	// NOTE: these are not currently used, should we remove them?
 	CpuQuota uint16
 	Memory   string
 }

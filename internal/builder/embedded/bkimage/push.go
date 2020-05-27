@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (c *Client) PushImage(ctx context.Context, image string, insecure bool, username, password string) error {
+func (c *Client) PushImage(ctx context.Context, image string) error {
 	image, err := parseImageName(image)
 	if err != nil {
 		return err
@@ -32,5 +32,6 @@ func (c *Client) PushImage(ctx context.Context, image string, insecure bool, use
 	ctx = context.Background()
 
 	// "insecure" param is not used in the following call
+	insecure := false
 	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, c.RegistryHosts, false)
 }

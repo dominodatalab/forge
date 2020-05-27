@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/remotes/docker"
 	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/identity"
@@ -38,16 +37,22 @@ func NewDriver() (*driver, error) {
 }
 
 func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([]string, error) {
-	if len(opts.Registries) == 0 {
+	if len(opts.PushRegistries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
+
+	// HACK: configure registry hosts for every run and reset afterwards
+	original := d.bk.RegistryHosts
 	d.bk.RegistryHosts = generateRegistryHosts(opts.Registries)
+	defer func() {
+		d.bk.RegistryHosts = original
+	}()
 
 	var headImg string
 	var images []string
-	for idx, registry := range opts.Registries {
+	for idx, registry := range opts.PushRegistries {
 		// Build fully-qualified image name
-		image := fmt.Sprintf("%s/%s", registry.Host, opts.ImageName)
+		image := fmt.Sprintf("%s/%s", registry, opts.ImageName)
 
 		// Parse the image name and tag.
 		named, err := reference.ParseNormalizedNamed(image)
@@ -77,7 +82,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 		}
 
 		// Push image into registry
-		if err := d.push(ctx, image, registry.NonSSL, registry.Username, registry.Password); err != nil {
+		if err := d.push(ctx, image); err != nil {
 			return nil, err
 		}
 		images = append(images, image)
@@ -144,7 +149,7 @@ func (d *driver) tag(ctx context.Context, image, target string) error {
 	return d.bk.TagImage(ctx, image, target)
 }
 
-func (d *driver) push(ctx context.Context, image string, insecure bool, username, password string) error {
+func (d *driver) push(ctx context.Context, image string) error {
 	sess, sessDialer, err := d.bk.Session(ctx, nil)
 	if err != nil {
 		return err
@@ -159,7 +164,7 @@ func (d *driver) push(ctx context.Context, image string, insecure bool, username
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return d.bk.PushImage(ctx, image, insecure, username, password)
+		return d.bk.PushImage(ctx, image)
 	})
 	if err := eg.Wait(); err != nil {
 		return err
@@ -184,33 +189,4 @@ func (d *driver) validateImageSize(ctx context.Context, name string, limit uint6
 	}
 
 	return nil
-}
-
-func generateRegistryHosts(registries []config.Registry) docker.RegistryHosts {
-	rHostMap := map[string]config.Registry{}
-	for _, reg := range registries {
-		rHostMap[reg.Host] = reg
-	}
-
-	// authentication credentials func
-	authOpt := docker.WithAuthCreds(func(host string) (string, string, error) {
-		if reg, ok := rHostMap[host]; ok {
-			return reg.Username, reg.Password, nil
-		}
-		return "", "", nil
-	})
-	authorizer := docker.NewDockerAuthorizer(authOpt)
-
-	// plain http scheme func
-	matchNonSSL := func(host string) (bool, error) {
-		if reg, ok := rHostMap[host]; ok {
-			return reg.NonSSL, nil
-		}
-		return false, nil
-	}
-
-	return docker.ConfigureDefaultRegistries(
-		docker.WithAuthorizer(authorizer),
-		docker.WithPlainHTTP(matchNonSSL),
-	)
 }

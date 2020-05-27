@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/remotes/docker"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -118,4 +119,33 @@ func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
 		}
 	}
 	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
+}
+
+func generateRegistryHosts(registries []config.Registry) docker.RegistryHosts {
+	rHostMap := map[string]config.Registry{}
+	for _, reg := range registries {
+		rHostMap[reg.Host] = reg
+	}
+
+	// authentication credentials func
+	authOpt := docker.WithAuthCreds(func(host string) (string, string, error) {
+		if reg, ok := rHostMap[host]; ok {
+			return reg.Username, reg.Password, nil
+		}
+		return "", "", nil
+	})
+	authorizer := docker.NewDockerAuthorizer(authOpt)
+
+	// plain http scheme func
+	matchNonSSL := func(host string) (bool, error) {
+		if reg, ok := rHostMap[host]; ok {
+			return reg.NonSSL, nil
+		}
+		return false, nil
+	}
+
+	return docker.ConfigureDefaultRegistries(
+		docker.WithAuthorizer(authorizer),
+		docker.WithPlainHTTP(matchNonSSL),
+	)
 }

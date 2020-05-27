@@ -50,6 +50,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		log.Error(err, "Unable to find resource")
 		return result, client.IgnoreNotFound(err)
 	}
+	spec := build.Spec
 
 	// ignore resources that have been processed on start
 	if build.Status.State != "" {
@@ -65,45 +66,36 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return result, err
 	}
 
-	// process registry authentication params
-	var cfgRegs []config.Registry
-	for _, apiReg := range build.Spec.Registries {
-		username, password, err := r.getAuthCredentials(ctx, log, apiReg)
-		if err != nil {
-			log.Error(err, "AuthN credential processing failed")
+	// process registry configs
+	registries, err := r.buildRegistryConfig(ctx, spec.Registries)
+	if err != nil {
+		log.Error(err, "Registry config processing failed")
 
-			build.Status.State = forgev1alpha1.Failed
-			build.Status.ErrorMessage = err.Error()
+		build.Status.State = forgev1alpha1.Failed
+		build.Status.ErrorMessage = err.Error()
 
-			if iErr := r.updateResourceStatus(ctx, log, &build); iErr != nil {
-				return result, iErr
-			}
-			return result, nil
+		if iErr := r.updateResourceStatus(ctx, log, &build); iErr != nil {
+			return result, iErr
 		}
-
-		reg := config.Registry{
-			Host:     apiReg.URL,
-			NonSSL:   apiReg.Insecure,
-			Username: username,
-			Password: password,
-		}
-		cfgRegs = append(cfgRegs, reg)
+		return result, nil
 	}
 
-	// construct build directives and dispatch operation
+	// construct build directives
 	opts := &config.BuildOptions{
-		Registries:     cfgRegs,
-		ImageName:      build.Spec.ImageName,
-		ImageSizeLimit: build.Spec.ImageSizeLimit,
-		ContextURL:     build.Spec.Context,
-		NoCache:        build.Spec.NoCache,
-		Labels:         build.Spec.Labels,
-		BuildArgs:      build.Spec.BuildArgs,
-		CpuQuota:       build.Spec.CpuQuota,
-		Memory:         build.Spec.Memory,
+		Registries:     registries,
+		PushRegistries: spec.PushRegistries,
+		ImageName:      spec.ImageName,
+		ImageSizeLimit: spec.ImageSizeLimit,
+		ContextURL:     spec.Context,
+		NoCache:        spec.NoCache,
+		Labels:         spec.Labels,
+		BuildArgs:      spec.BuildArgs,
+		CpuQuota:       spec.CpuQuota,
+		Memory:         spec.Memory,
 		Timeout:        time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
+	// dispatch build operation
 	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
 	if err != nil {
 		log.Error(err, "Build process failed")
@@ -149,56 +141,65 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Complete(r)
 }
 
-func (r *ContainerImageBuildReconciler) getAuthCredentials(ctx context.Context, log logr.Logger, registry forgev1alpha1.Registry) (username, password string, err error) {
-	switch registry.BasicAuth {
-	case "":
-		log.Info("Not using registry credentials")
-		return
-	case forgev1alpha1.BasicAuthInline:
-		log.Info("Processing inline registry credentials")
-		username = registry.Username
-		password = registry.Password
-	case forgev1alpha1.BasicAuthSecret:
-		log.Info("Processing secret registry credentials")
-		var secret corev1.Secret
-		if err = r.Client.Get(ctx, types.NamespacedName{
-			Namespace: registry.SecretNamespace,
-			Name:      registry.SecretName,
-		}, &secret); err != nil {
-			err = fmt.Errorf("cannot find registry auth secret: %v", err)
-			return
+// NOTE: the following 2 funcs should not really be attached to the Reconciler
+
+func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context, apiRegs []forgev1alpha1.Registry) ([]config.Registry, error) {
+	var configs []config.Registry
+	for _, apiReg := range apiRegs {
+		regConf := config.Registry{
+			Host:   apiReg.Server,
+			NonSSL: apiReg.NonSSL,
 		}
 
-		actual, expected := secret.Type, corev1.SecretTypeDockerConfigJson
-		if actual != expected {
-			err = fmt.Errorf("registry auth secret type must be %v, not %v", expected, actual)
-			return
-		}
+		// NOTE: should we validate?
+		//if err := apiReg.BasicAuth.Validate(); err != nil {
+		//	return nil, fmt.Errorf("basic auth validation failed: %w", err)
+		//}
 
-		input := secret.Data[corev1.DockerConfigJsonKey]
-		var output credentials.DockerConfigJSON
-		if err = json.Unmarshal(input, &output); err != nil {
-			err = fmt.Errorf("cannot parse docker config in registry secret: %v", err)
-			return
-		}
-
-		auth, ok := output.Auths[registry.URL]
-		if !ok {
-			var urls []string
-			for k, _ := range output.Auths {
-				urls = append(urls, k)
+		switch {
+		case apiReg.BasicAuth.IsInline():
+			regConf.Username = apiReg.BasicAuth.Username
+			regConf.Password = apiReg.BasicAuth.Password
+		case apiReg.BasicAuth.IsSecret():
+			var err error
+			regConf.Username, regConf.Password, err = r.getDockerAuthFromSecret(ctx, apiReg.Server, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
+			if err != nil {
+				return nil, err
 			}
-			err = fmt.Errorf("auth url (%s) is not in registry secret (%s) auth list (%s)", registry.URL, registry.SecretName, urls)
-			return
 		}
 
-		username = auth.Username
-		password = auth.Password
-	default:
-		err = fmt.Errorf("invalid auth scheme: %v", registry.BasicAuth)
+		configs = append(configs, regConf)
 	}
 
-	return
+	return configs, nil
+}
+
+func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
+	var secret corev1.Secret
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); err != nil {
+		return "", "", fmt.Errorf("cannot find registry auth secret: %w", err)
+	}
+
+	if secret.Type != corev1.SecretTypeDockerConfigJson {
+		return "", "", fmt.Errorf("registry auth secret must be %v, not %v", corev1.SecretTypeDockerConfigJson, secret.Type)
+	}
+
+	input := secret.Data[corev1.DockerConfigJsonKey]
+	var output credentials.DockerConfigJSON
+	if err := json.Unmarshal(input, &output); err != nil {
+		return "", "", fmt.Errorf("cannot parse docker config in registry secret: %w", err)
+	}
+
+	auth, ok := output.Auths[host]
+	if !ok {
+		var urls []string
+		for k, _ := range output.Auths {
+			urls = append(urls, k)
+		}
+		return "", "", fmt.Errorf("registry server %q is not in registry secret %q: server list %v", host, name, urls)
+	}
+
+	return auth.Username, auth.Password, nil
 }
 
 func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context, log logr.Logger, build *forgev1alpha1.ContainerImageBuild) error {
