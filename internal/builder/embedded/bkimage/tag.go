@@ -21,7 +21,7 @@ func (c *Client) TagImage(ctx context.Context, src, dest string) error {
 
 	// create worker opt if missing
 	if c.workerOpt == nil { // NOTE: modified
-		opt, err := c.createWorkerOpt(true)
+		opt, err := c.createWorkerOpt()
 		if err != nil {
 			return fmt.Errorf("created worker opt failed: %w", err)
 		}

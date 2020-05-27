@@ -13,8 +13,9 @@ import (
 
 const sessionName = "forge"
 
-// Session creates a new session and its dialer. The embedded dirs should reference the "context" and "dockerfile"
-// directories for a particular build.
+// Session creates a new session and its dialer.
+//
+// The localDirs should reference the "context" and "dockerfile" directories for a particular build.
 func (c *Client) Session(ctx context.Context, localDirs map[string]string) (*session.Session, session.Dialer, error) {
 	// fetch the session manager
 	sm, err := c.getSessionManager()

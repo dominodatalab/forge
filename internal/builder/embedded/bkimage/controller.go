@@ -26,7 +26,7 @@ func (c *Client) createController() error {
 	}
 
 	// create the worker opts
-	opt, err := c.createWorkerOpt(true)
+	opt, err := c.createWorkerOpt()
 	if err != nil {
 		return fmt.Errorf("creating worker opt failed: %w", err)
 	}

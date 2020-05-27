@@ -17,7 +17,6 @@ import (
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/overlay"
 	bkmetadata "github.com/moby/buildkit/cache/metadata"
-	"github.com/moby/buildkit/executor"
 	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/executor/runcexecutor"
 	containerdsnapshot "github.com/moby/buildkit/snapshot/containerd"
@@ -33,7 +32,7 @@ import (
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
 )
 
-func (c *Client) createWorkerOpt(withExecutor bool) (opt base.WorkerOpt, err error) {
+func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 	md, err := bkmetadata.NewStore(filepath.Join(c.rootDir, "metadata.db"))
 	if err != nil {
 		return opt, err
@@ -51,25 +50,20 @@ func (c *Client) createWorkerOpt(withExecutor bool) (opt base.WorkerOpt, err err
 	unprivileged := system.GetParentNSeuid() != 0
 	log.Infof("Executor running unprivileged: %t", unprivileged)
 
-	var exe executor.Executor
-	if withExecutor {
-		exeOpt := runcexecutor.Opt{
-			Root:        filepath.Join(c.rootDir, "executor"),
-			Rootless:    unprivileged,
-			ProcessMode: getProcessMode(),
-		}
+	exeOpt := runcexecutor.Opt{
+		Root:        filepath.Join(c.rootDir, "executor"),
+		Rootless:    unprivileged,
+		ProcessMode: getProcessMode(),
+	}
 
-		np, err := netproviders.Providers(netproviders.Opt{Mode: "auto"})
-		if err != nil {
-			return opt, err
-		}
+	np, err := netproviders.Providers(netproviders.Opt{Mode: "auto"})
+	if err != nil {
+		return opt, err
+	}
 
-		exe, err = runcexecutor.New(exeOpt, np)
-		if err != nil {
-			return opt, err
-		}
-
-		fmt.Println(exe)
+	exe, err := runcexecutor.New(exeOpt, np)
+	if err != nil {
+		return opt, err
 	}
 
 	// worker opt metadata
