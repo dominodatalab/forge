@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/builder"
 	"github.com/dominodatalab/forge/internal/message"
 	_ "github.com/dominodatalab/forge/internal/unshare"
-	"github.com/dominodatalab/forge/pkg/container"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,7 +45,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	builder, err := container.NewBuilder()
+	bldr, err := builder.New()
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
@@ -67,7 +67,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("containerimagebuild-controller"),
-		Builder:  builder,
+		Builder:  bldr,
 		Producer: publisher,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")

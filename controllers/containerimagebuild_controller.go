@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/builder"
+	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/internal/message"
-	"github.com/dominodatalab/forge/pkg/container"
-	"github.com/dominodatalab/forge/pkg/container/config"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
@@ -31,7 +31,7 @@ type ContainerImageBuildReconciler struct {
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-	Builder  container.RuntimeBuilder
+	Builder  builder.OCIImageBuilder
 	Producer message.Producer
 }
 
@@ -82,8 +82,8 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		}
 
 		reg := config.Registry{
-			URL:      apiReg.URL,
-			Insecure: apiReg.Insecure,
+			Host:     apiReg.URL,
+			NonSSL:   apiReg.Insecure,
 			Username: username,
 			Password: password,
 		}
@@ -91,20 +91,20 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// construct build directives and dispatch operation
-	opts := config.BuildOptions{
-		Registries: cfgRegs,
-		ImageName:  build.Spec.ImageName,
-		Context:    build.Spec.Context,
-		NoCache:    build.Spec.NoCache,
-		Labels:     build.Spec.Labels,
-		BuildArgs:  build.Spec.BuildArgs,
-		CpuQuota:   build.Spec.CpuQuota,
-		Memory:     build.Spec.Memory,
-		SizeLimit:  build.Spec.ImageSizeLimit,
-		Timeout:    time.Duration(build.Spec.TimeoutSeconds) * time.Second,
+	opts := &config.BuildOptions{
+		Registries:     cfgRegs,
+		ImageName:      build.Spec.ImageName,
+		ImageSizeLimit: build.Spec.ImageSizeLimit,
+		ContextURL:     build.Spec.Context,
+		NoCache:        build.Spec.NoCache,
+		Labels:         build.Spec.Labels,
+		BuildArgs:      build.Spec.BuildArgs,
+		CpuQuota:       build.Spec.CpuQuota,
+		Memory:         build.Spec.Memory,
+		Timeout:        time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
-	imageURLs, err := r.Builder.Build(ctx, opts)
+	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
 	if err != nil {
 		log.Error(err, "Build process failed")
 
