@@ -24,25 +24,22 @@ spec:
   # do not push image if greater than 50MB
   imageSizeLimit: 52428800
 
-  # push details for one or more registries
+  # push image to one or more registries after build
+  pushTo:
+    - my-docker-registry:5000
+
+  # configure auth/https for one or more registries (used to pull/push/resolve images)
   registries:
-    - # push image here after build
-      url: my-docker-registry:5000
-
-      # push to a plain HTTP registry
-      insecure: false
-
-      # push to a registry with native basic auth ("Inline","Secret")
-      basicAuth: Secret
-
-      # secret containing dockerconfigjson credentials to registry
-      secretName: my-docker-config-json-secret
-
-      # namespace where secret resides
-      secretNamespace: my-ns
-
-      # inline basic auth username
-      #username: docker-push-user
-
-      # inline basic auth password
-      #password: $0$3cr3t
+    # inline basic auth credentials
+    - server: quay.io
+      basicAuth:
+          username: foo
+          password: bar
+    # secret with dockerconfigjson auth credentials
+    - server: docker.io
+      basicAuth:
+        secretName: docker-io-auth
+        secretNamespace: your-ns
+    # registry w/o tls encryption and basic auth
+    - server: my-docker-registry:5000
+      noSSL: true

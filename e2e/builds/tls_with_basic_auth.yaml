@@ -5,8 +5,10 @@ metadata:
 spec:
   imageName: simple-app
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz
+  pushTo:
+    - docker-registry:5000
   registries:
-    - url: docker-registry:5000
-      basicAuth: Inline
-      username: homer
-      password: simpson
+    - server: docker-registry:5000
+      basicAuth:
+        username: homer
+        password: simpson
