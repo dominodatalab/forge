@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/remotes/docker"
 	"github.com/moby/buildkit/util/push"
 	log "github.com/sirupsen/logrus"
 )
@@ -26,23 +25,6 @@ func (c *Client) PushImage(ctx context.Context, image string, insecure bool, use
 		return err
 	}
 
-	var rOpts []docker.RegistryOpt
-	if insecure {
-		opt := docker.WithPlainHTTP(func(s string) (bool, error) {
-			return true, nil
-		})
-		rOpts = append(rOpts, opt)
-	}
-	if username != "" && password != "" {
-		authOpt := docker.WithAuthCreds(func(s string) (string, string, error) {
-			return username, password, nil
-		})
-		authorizer := docker.NewDockerAuthorizer(authOpt)
-		opt := docker.WithAuthorizer(authorizer)
-		rOpts = append(rOpts, opt)
-	}
-	hosts := docker.ConfigureDefaultRegistries(rOpts...)
-
 	log.Infof("Pushing image %q", image)
 
 	// push with context absent session to avoid authorizer override
@@ -50,35 +32,5 @@ func (c *Client) PushImage(ctx context.Context, image string, insecure bool, use
 	ctx = context.Background()
 
 	// "insecure" param is not used in the following call
-	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, hosts, false)
+	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, c.RegistryHosts, false)
 }
-
-// NOTE: trying to figure out how to configure all provided hosts
-//func newRegistryConfig(regs []config.Registry) docker.RegistryHosts {
-//	regsMap := map[string]config.Registry{}
-//	for _, reg := range regs {
-//		regsMap[reg.Host] = reg
-//	}
-//
-//	// authentication credentials informer
-//	authOpt := docker.WithAuthCreds(func(host string) (string, string, error) {
-//		if reg, ok := regsMap[host]; ok {
-//			return reg.Username, reg.Password, nil
-//		}
-//		return "", "", nil
-//	})
-//	authorizer := docker.NewDockerAuthorizer(authOpt)
-//
-//	// plain http scheme informer
-//	matchProvidedHosts := func(host string) (bool, error) {
-//		if reg, ok := regsMap[host]; ok {
-//			return reg.NonSSL, nil
-//		}
-//		return false, nil
-//	}
-//
-//	return docker.ConfigureDefaultRegistries(
-//		docker.WithAuthorizer(authorizer),
-//		docker.WithPlainHTTP(matchProvidedHosts),
-//	)
-//}

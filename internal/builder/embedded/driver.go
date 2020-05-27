@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/identity"
@@ -40,10 +41,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 	if len(opts.Registries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
-
-	// TODO: hook in registry config for pull/push rights here?
-	//registryConf := newRegistryConfig(opts.Registries)
-	//d.bk.SetRegistryConfig(registryConf)
+	d.bk.RegistryHosts = generateRegistryHosts(opts.Registries)
 
 	var headImg string
 	var images []string
@@ -186,4 +184,33 @@ func (d *driver) validateImageSize(ctx context.Context, name string, limit uint6
 	}
 
 	return nil
+}
+
+func generateRegistryHosts(registries []config.Registry) docker.RegistryHosts {
+	rHostMap := map[string]config.Registry{}
+	for _, reg := range registries {
+		rHostMap[reg.Host] = reg
+	}
+
+	// authentication credentials func
+	authOpt := docker.WithAuthCreds(func(host string) (string, string, error) {
+		if reg, ok := rHostMap[host]; ok {
+			return reg.Username, reg.Password, nil
+		}
+		return "", "", nil
+	})
+	authorizer := docker.NewDockerAuthorizer(authOpt)
+
+	// plain http scheme func
+	matchNonSSL := func(host string) (bool, error) {
+		if reg, ok := rHostMap[host]; ok {
+			return reg.NonSSL, nil
+		}
+		return false, nil
+	}
+
+	return docker.ConfigureDefaultRegistries(
+		docker.WithAuthorizer(authorizer),
+		docker.WithPlainHTTP(matchNonSSL),
+	)
 }

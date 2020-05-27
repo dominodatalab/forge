@@ -8,6 +8,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/snapshots/overlay"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
@@ -21,6 +22,8 @@ import (
 const ociRuntime = "runc"
 
 type Client struct {
+	RegistryHosts docker.RegistryHosts
+
 	backend string
 	rootDir string
 
@@ -52,8 +55,9 @@ func NewClient(rootDir, backend string) (*Client, error) {
 
 	// create operational client
 	client := &Client{
-		backend: backend,
-		rootDir: rootDir,
+		backend:       backend,
+		rootDir:       rootDir,
+		RegistryHosts: docker.ConfigureDefaultRegistries(),
 	}
 	if err := client.initDataStores(); err != nil {
 		return nil, fmt.Errorf("initializing data stores failed: %w", err)

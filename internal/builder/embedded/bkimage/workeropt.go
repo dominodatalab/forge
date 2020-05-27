@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/diff/walking"
 	ctdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes/docker"
 	bkmetadata "github.com/moby/buildkit/cache/metadata"
 	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/executor/runcexecutor"
@@ -78,7 +77,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 		Applier:         apply.NewFileSystemApplier(c.contentStore),
 		Differ:          walking.NewWalkingDiff(c.contentStore),
 		ImageStore:      c.imageStore,
-		RegistryHosts:   docker.ConfigureDefaultRegistries(), // TODO: this may be the place to hook in authN for private registries
+		RegistryHosts:   c.RegistryHosts,
 		IdentityMapping: nil,
 		LeaseManager:    leaseutil.WithNamespace(ctdmetadata.NewLeaseManager(c.metadataDB), "buildkit"),
 		GarbageCollect:  c.metadataDB.GarbageCollect,

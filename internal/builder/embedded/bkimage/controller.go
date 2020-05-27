@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/containerd/containerd/remotes/docker"
 	"github.com/moby/buildkit/cache/remotecache"
 	inlineremotecache "github.com/moby/buildkit/cache/remotecache/inline"
 	registryremotecache "github.com/moby/buildkit/cache/remotecache/registry"
@@ -58,7 +57,7 @@ func (c *Client) createController() error {
 		"inline": inlineremotecache.ResolveCacheExporterFunc(),
 	}
 	remoteCacheImporterFuncs := map[string]remotecache.ResolveCacheImporterFunc{
-		"registry": registryremotecache.ResolveCacheImporterFunc(sm, opt.ContentStore, docker.ConfigureDefaultRegistries()),
+		"registry": registryremotecache.ResolveCacheImporterFunc(sm, opt.ContentStore, c.RegistryHosts),
 	}
 	controller, err := control.NewController(control.Opt{
 		SessionManager:            sm,
