@@ -24,35 +24,31 @@ type BasicAuthConfig struct {
 	SecretNamespace string `json:"secretNamespace"`
 }
 
-func (auth BasicAuthConfig) Validate() error {
-	username := auth.Username != ""
-	password := auth.Password != ""
-	secretName := auth.SecretName != ""
-	secretNamespace := auth.SecretNamespace != ""
-
-	switch {
-	case !username && !password && !secretName && !secretNamespace: // no basic auth provided
-		return nil
-	case (username && !password) || (!username && password): // inline auth validation
-		return errors.New("inline basic auth requires both username and password")
-	case (secretName && !secretNamespace) || (!secretName && secretNamespace): // secret auth validation
-		return errors.New("secret basic auth requires both secret name and namespace")
-	case (username && (secretName || secretNamespace)) ||
-		(password && (secretName || secretNamespace)) ||
-		(secretName && (username || password)) ||
-		(secretNamespace && (username || password)):
-		return errors.New("basic auth cannot be both inline and secret-based")
-	}
-
-	return nil
-}
-
 func (auth BasicAuthConfig) IsInline() bool {
 	return auth.Username != "" && auth.Password != ""
 }
 
 func (auth BasicAuthConfig) IsSecret() bool {
 	return auth.SecretName != "" && auth.SecretNamespace != ""
+}
+
+func (auth BasicAuthConfig) Validate() error {
+	switch {
+	case auth.Username == "" && auth.Password == "" && auth.SecretName == "" && auth.SecretNamespace == "":
+		// no basic auth
+		return nil
+	case (auth.Username != "" && auth.Password == "") || (auth.Username == "" && auth.Password != ""):
+		// partial inline auth
+		return errors.New("inline basic auth requires both username and password")
+	case (auth.SecretName != "" && auth.SecretNamespace == "") || (auth.SecretName == "" && auth.SecretNamespace != ""):
+		// partial secret auth
+		return errors.New("secret basic auth requires both secret name and namespace")
+	case (auth.IsInline() || auth.IsSecret()) && (auth.IsInline() && auth.IsSecret()):
+		// multiple credential types
+		return errors.New("basic auth cannot be both inline and secret-based")
+	}
+
+	return nil
 }
 
 type Registry struct {

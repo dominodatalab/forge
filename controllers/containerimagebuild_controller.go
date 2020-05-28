@@ -141,7 +141,7 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Complete(r)
 }
 
-// NOTE: the following 2 funcs should not really be attached to the Reconciler
+// TODO: move the following 2 funcs off of the Reconciler and give them their own k8s client
 
 func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context, apiRegs []forgev1alpha1.Registry) ([]config.Registry, error) {
 	var configs []config.Registry
@@ -151,10 +151,9 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 			NonSSL: apiReg.NonSSL,
 		}
 
-		// NOTE: should we validate?
-		//if err := apiReg.BasicAuth.Validate(); err != nil {
-		//	return nil, fmt.Errorf("basic auth validation failed: %w", err)
-		//}
+		if err := apiReg.BasicAuth.Validate(); err != nil {
+			return nil, fmt.Errorf("basic auth validation failed: %w", err)
+		}
 
 		switch {
 		case apiReg.BasicAuth.IsInline():
