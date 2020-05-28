@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dominodatalab/forge/controllers"
-	"github.com/dominodatalab/forge/pkg/message"
+	"github.com/dominodatalab/forge/internal/message"
 )
 
 var (

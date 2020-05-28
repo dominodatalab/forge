@@ -1,0 +1,3 @@
+secrets:
+  # username: marge | password: simpson
+  htpasswd: marge:$2y$05$A7hoz4tK5ydn7iOE3vBxi.fHajQ6flUuRjgc6R6GurJPIgyNYbzT2

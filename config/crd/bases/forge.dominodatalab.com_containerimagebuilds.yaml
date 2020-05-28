@@ -74,41 +74,44 @@ spec:
             noCache:
               description: Disable the use of cache layers for a build.
               type: boolean
-            registries:
+            pushTo:
               description: Push to one or more registries.
+              items:
+                type: string
+              minItems: 1
+              type: array
+            registries:
+              description: Configure one or more registry hosts with special requirements.
               items:
                 properties:
                   basicAuth:
-                    description: Push to a registry with native basic auth enabled.
-                    enum:
-                    - Inline
-                    - Secret
-                    type: string
-                  insecure:
+                    description: Configure basic authentication credentials for a
+                      registry.
+                    properties:
+                      password:
+                        description: Inline basic auth password.
+                        type: string
+                      secretName:
+                        description: Name of secret containing dockerconfigjson credentials
+                          to registry.
+                        type: string
+                      secretNamespace:
+                        description: Namespace where credentials secret resides.
+                        type: string
+                      username:
+                        description: Inline basic auth username.
+                        type: string
+                    type: object
+                  nonSSL:
                     description: Push image to a plain HTTP registry.
                     type: boolean
-                  password:
-                    description: Inline basic auth password.
-                    type: string
-                  secretName:
-                    description: Name of secret containing dockerconfigjson credentials
-                      to registry.
-                    type: string
-                  secretNamespace:
-                    description: Namespace where credentials secret resides.
-                    type: string
-                  url:
-                    description: URL where an image should be pushed at the end of
-                      a successful build.
+                  server:
+                    description: Registry hostname.
                     minLength: 1
                     type: string
-                  username:
-                    description: Inline basic auth username.
-                    type: string
                 required:
-                - url
+                - server
                 type: object
-              minItems: 1
               type: array
             timeoutSeconds:
               description: Optional deadline in seconds for image build to complete
@@ -117,7 +120,7 @@ spec:
           required:
           - context
           - imageName
-          - registries
+          - pushTo
           type: object
         status:
           description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
@@ -135,6 +138,7 @@ spec:
                 type: string
               type: array
             state:
+              description: BuildState represents a phase in the build process.
               type: string
           type: object
       type: object

@@ -1,34 +1,12 @@
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"errors"
 
-// +kubebuilder:validation:Enum=Inline;Secret
-type BasicAuthSource string
-type BuildState string
-
-const (
-	BasicAuthInline BasicAuthSource = "Inline"
-	BasicAuthSecret BasicAuthSource = "Secret"
-
-	Initialized BuildState = "Initialized"
-	Building    BuildState = "Building"
-	Completed   BuildState = "Completed"
-	Failed      BuildState = "Failed"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Registry struct {
-	// URL where an image should be pushed at the end of a successful build.
-	// +kubebuilder:validation:MinLength=1
-	URL string `json:"url"`
-
-	// Push image to a plain HTTP registry.
-	// +kubebuilder:validation:Optional
-	Insecure bool `json:"insecure"`
-
-	// Push to a registry with native basic auth enabled.
-	// +kubebuilder:validation:Optional
-	BasicAuth BasicAuthSource `json:"basicAuth"`
-
+type BasicAuthConfig struct {
 	// Inline basic auth username.
 	// +kubebuilder:validation:Optional
 	Username string `json:"username"`
@@ -46,18 +24,63 @@ type Registry struct {
 	SecretNamespace string `json:"secretNamespace"`
 }
 
+func (auth BasicAuthConfig) IsInline() bool {
+	return auth.Username != "" && auth.Password != ""
+}
+
+func (auth BasicAuthConfig) IsSecret() bool {
+	return auth.SecretName != "" && auth.SecretNamespace != ""
+}
+
+func (auth BasicAuthConfig) Validate() error {
+	switch {
+	case auth.Username == "" && auth.Password == "" && auth.SecretName == "" && auth.SecretNamespace == "":
+		// no basic auth
+		return nil
+	case (auth.Username != "" && auth.Password == "") || (auth.Username == "" && auth.Password != ""):
+		// partial inline auth
+		return errors.New("inline basic auth requires both username and password")
+	case (auth.SecretName != "" && auth.SecretNamespace == "") || (auth.SecretName == "" && auth.SecretNamespace != ""):
+		// partial secret auth
+		return errors.New("secret basic auth requires both secret name and namespace")
+	case (auth.IsInline() || auth.IsSecret()) && (auth.IsInline() && auth.IsSecret()):
+		// multiple credential types
+		return errors.New("basic auth cannot be both inline and secret-based")
+	}
+
+	return nil
+}
+
+type Registry struct {
+	// Registry hostname.
+	// +kubebuilder:validation:MinLength=1
+	Server string `json:"server"`
+
+	// Push image to a plain HTTP registry.
+	// +kubebuilder:validation:Optional
+	NonSSL bool `json:"nonSSL"`
+
+	// Configure basic authentication credentials for a registry.
+	// +kubebuilder:validation:Optional
+	BasicAuth BasicAuthConfig `json:"basicAuth"`
+}
+
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
 type ContainerImageBuildSpec struct {
-	// Push to one or more registries.
-	// +kubebuilder:validation:MinItems=1
-	Registries []Registry `json:"registries"`
-
 	// Name used to build an image.
 	// +kubebuilder:validation:MinLength=1
 	ImageName string `json:"imageName"`
 
 	// Build context for the image. This can be a local path or url.
 	Context string `json:"context"`
+
+	// Push to one or more registries.
+	// +kubebuilder:validation:MinItems=1
+	PushRegistries []string `json:"pushTo"`
+
+	// Configure one or more registry hosts with special requirements.
+	// +kubebuilder:validation:Optional
+	Registries []Registry `json:"registries"`
 
 	// Image build arguments.
 	// +kubebuilder:validation:Optional
