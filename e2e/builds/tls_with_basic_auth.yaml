@@ -1,7 +1,7 @@
 apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
-  name: tls-with-basic-auth
+  name: test-tls-with-basic-auth
 spec:
   imageName: simple-app
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz

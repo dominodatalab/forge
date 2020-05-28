@@ -10,6 +10,44 @@ function error {
   echo -e "--> \033[1;31m$1\033[0m"
 }
 
+function run_test {
+  local test_name="$1"
+  local yaml_file="$2"
+  local resource_name="$3"
+
+  info "Running test case: $test_name"
+  kubectl apply -f "$yaml_file"
+
+  local counter=0
+  while true; do
+    if [[ $counter -eq 5 ]]; then
+      error "Test timeout reached"
+      exit 1
+    fi
+
+    info "Waiting 10 secs for test to complete..."
+    sleep 10
+
+    local state
+    state="$(kubectl get cib "$resource_name" -o jsonpath='{.status.state}')"
+    info "Current build state: '$state'"
+
+    if [[ $state == "Completed" ]]; then
+      info "Test succeeded"
+      break
+    fi
+
+      if [[ $state == "Failed" ]]; then
+      error "Test failed"
+      kubectl logs --namespace "$namespace" --selector app.kubernetes.io/name=forge
+      kubectl get cib "$resource_name" -o yaml
+      exit 1
+    fi
+
+    counter=$((counter+1))
+  done
+}
+
 if [[ -z $1 ]]; then
   echo -e "Run integration tests against a Forge OCI image.\n\nUsage: $0 image"
   exit 1
@@ -79,6 +117,13 @@ helm install docker-registry stable/docker-registry \
   --values e2e/helm_values/docker-registry-secure.yaml \
   --wait
 
+info "Installing docker-registry-2 chart"
+helm install docker-registry-2 stable/docker-registry \
+  --version 1.9.2 \
+  --namespace "$namespace" \
+  --values e2e/helm_values/docker-registry-auth-only.yaml \
+  --wait
+
 info "Installing rabbitmq chart"
 helm install rabbitmq bitnami/rabbitmq \
   --version 6.18.2 \
@@ -99,34 +144,11 @@ kubectl wait pod --for=condition=ready \
   --selector app.kubernetes.io/name=forge \
   --timeout 120s
 
-info "Running test case: Build should push to a private registry with TLS enabled"
-kubectl apply -f e2e/builds/tls_with_basic_auth.yaml
-
-counter=0
-while true; do
-  if [[ $counter -eq 5 ]]; then
-    error "Test timeout reached"
-    exit 1
-  fi
-
-  info "Waiting 10 secs for test to complete..."
-  sleep 10
-
-  state="$(kubectl get cib tls-with-basic-auth -o jsonpath='{.status.state}')"
-  info "Current build state: '$state'"
-
-  if [[ $state == "Completed" ]]; then
-    info "Test succeeded"
-    break
-  fi
-
-    if [[ $state == "Failed" ]]; then
-    error "Test failed"
-    kubectl logs --namespace "$namespace" --selector app.kubernetes.io/name=forge
-    exit 1
-  fi
-
-  counter=$((counter+1))
-done
+run_test "Build should push to a private registry with TLS enabled" \
+          e2e/builds/tls_with_basic_auth.yaml \
+          test-tls-with-basic-auth
+run_test "Build should pull base image from a private registry" \
+          e2e/builds/private_base_image.yaml \
+          test-private-base-image
 
 info "All tests ran successfully"
