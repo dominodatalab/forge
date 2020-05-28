@@ -77,7 +77,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 		Applier:         apply.NewFileSystemApplier(c.contentStore),
 		Differ:          walking.NewWalkingDiff(c.contentStore),
 		ImageStore:      c.imageStore,
-		RegistryHosts:   c.RegistryHosts,
+		RegistryHosts:   c.getRegistryHosts(),
 		IdentityMapping: nil,
 		LeaseManager:    leaseutil.WithNamespace(ctdmetadata.NewLeaseManager(c.metadataDB), "buildkit"),
 		GarbageCollect:  c.metadataDB.GarbageCollect,

@@ -33,5 +33,5 @@ func (c *Client) PushImage(ctx context.Context, image string) error {
 
 	// "insecure" param is not used in the following call
 	insecure := false
-	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, c.RegistryHosts, false)
+	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, insecure, c.getRegistryHosts(), false)
 }

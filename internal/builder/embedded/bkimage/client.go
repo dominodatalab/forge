@@ -22,8 +22,6 @@ import (
 const ociRuntime = "runc"
 
 type Client struct {
-	RegistryHosts docker.RegistryHosts
-
 	backend string
 	rootDir string
 
@@ -34,6 +32,10 @@ type Client struct {
 	sessionManager *session.Manager
 	controller     *control.Controller
 	workerOpt      *base.WorkerOpt // NOTE: modified
+
+	// dynamic elements
+	registryHosts   docker.RegistryHosts
+	hostCredentials CredentialsFn
 }
 
 func NewClient(rootDir, backend string) (*Client, error) {
@@ -55,10 +57,11 @@ func NewClient(rootDir, backend string) (*Client, error) {
 
 	// create operational client
 	client := &Client{
-		backend:       backend,
-		rootDir:       rootDir,
-		RegistryHosts: docker.ConfigureDefaultRegistries(),
+		backend: backend,
+		rootDir: rootDir,
 	}
+	client.ResetHostConfigurations()
+
 	if err := client.initDataStores(); err != nil {
 		return nil, fmt.Errorf("initializing data stores failed: %w", err)
 	}

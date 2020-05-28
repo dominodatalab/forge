@@ -41,12 +41,9 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 		return nil, errors.New("image builds require at least one push registry")
 	}
 
-	// HACK: configure registry hosts for every run and reset afterwards
-	original := d.bk.RegistryHosts
-	d.bk.RegistryHosts = generateRegistryHosts(opts.Registries)
-	defer func() {
-		d.bk.RegistryHosts = original
-	}()
+	// configure registry hosts for every run and reset afterwards
+	d.bk.ConfigureHosts(generateRegistryFunc(opts.Registries))
+	defer func() { d.bk.ResetHostConfigurations() }()
 
 	var headImg string
 	var images []string

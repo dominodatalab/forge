@@ -57,7 +57,7 @@ func (c *Client) createController() error {
 		"inline": inlineremotecache.ResolveCacheExporterFunc(),
 	}
 	remoteCacheImporterFuncs := map[string]remotecache.ResolveCacheImporterFunc{
-		"registry": registryremotecache.ResolveCacheImporterFunc(sm, opt.ContentStore, c.RegistryHosts),
+		"registry": registryremotecache.ResolveCacheImporterFunc(sm, opt.ContentStore, c.getRegistryHosts()),
 	}
 	controller, err := control.NewController(control.Opt{
 		SessionManager:            sm,

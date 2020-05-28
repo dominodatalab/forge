@@ -3,10 +3,8 @@ package bkimage
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/moby/buildkit/session"
-	"github.com/moby/buildkit/session/auth/authprovider"
 	"github.com/moby/buildkit/session/filesync"
 	"github.com/moby/buildkit/session/testutil"
 )
@@ -38,7 +36,7 @@ func (c *Client) Session(ctx context.Context, localDirs map[string]string) (*ses
 	}
 
 	sess.Allow(filesync.NewFSSyncProvider(syncedDirs))
-	sess.Allow(authprovider.NewDockerAuthProvider(os.Stderr))
+	sess.Allow(NewDynamicAuthProvider(c.getHostCredentials()))
 
 	// create a session dialer
 	dialer := session.Dialer(testutil.TestStream(testutil.Handler(sm.HandleConn)))
