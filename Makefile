@@ -15,7 +15,7 @@ endif
 all: manager
 
 static:
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o bin/forge
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor
 
 # Run tests
 test: generate fmt vet manifests
@@ -23,7 +23,7 @@ test: generate fmt vet manifests
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/forge $(BUILD_FLAGS) main.go
+	go build -o bin/forge -mod vendor $(BUILD_FLAGS) main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
