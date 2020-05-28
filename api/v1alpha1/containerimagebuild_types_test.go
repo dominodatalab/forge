@@ -81,6 +81,22 @@ func TestBasicAuthConfig_Validate(t *testing.T) {
 			BasicAuthConfig{Username: "name", Password: "pass", SecretName: "secret", SecretNamespace: "namespace"},
 			errors.New("basic auth cannot be both inline and secret-based"),
 		},
+		{
+			BasicAuthConfig{Username: "name", SecretName: "secret", SecretNamespace: "namespace"},
+			errors.New("inline basic auth requires both username and password"),
+		},
+		{
+			BasicAuthConfig{Password: "pass", SecretName: "secret", SecretNamespace: "namespace"},
+			errors.New("inline basic auth requires both username and password"),
+		},
+		{
+			BasicAuthConfig{Username: "name", Password: "pass", SecretName: "secret"},
+			errors.New("secret basic auth requires both secret name and namespace"),
+		},
+		{
+			BasicAuthConfig{Username: "name", Password: "pass", SecretNamespace: "namespace"},
+			errors.New("secret basic auth requires both secret name and namespace"),
+		},
 	}
 	for _, tc := range tests {
 		assert.Equal(t, tc.err, tc.cfg.Validate())
