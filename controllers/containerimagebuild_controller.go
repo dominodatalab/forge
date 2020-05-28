@@ -151,6 +151,7 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 			NonSSL: apiReg.NonSSL,
 		}
 
+		// NOTE: move BasicAuth validation into an admission webhook at a later time
 		if err := apiReg.BasicAuth.Validate(); err != nil {
 			return nil, fmt.Errorf("basic auth validation failed: %w", err)
 		}
