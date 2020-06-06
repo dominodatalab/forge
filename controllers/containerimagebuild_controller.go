@@ -100,15 +100,15 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		Timeout:        time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	fields := make(logrus.Fields)
-	if buildId, exists := build.Annotations[BuildIdAnnotation]; exists {
-		fields["logKey"] = buildId
-	}
-
 	// dispatch build operation
 	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, func(statusChannel chan *bkclient.SolveStatus) error {
+		logger := logrus.New()
+		logger.SetFormatter(&logrus.JSONFormatter{})
+		fields := make(logrus.Fields)
+		if buildId, exists := build.Annotations[BuildIdAnnotation]; exists {
+			fields["logKey"] = buildId
+		}
+
 		for status := range statusChannel {
 			for _, vertex := range status.Vertexes {
 				logger.WithFields(fields).Info(vertex.Name)

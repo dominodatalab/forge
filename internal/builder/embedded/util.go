@@ -1,10 +1,14 @@
 package embedded
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/containerd/console"
+	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
@@ -71,6 +75,7 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 func funnelProgress(ch chan *controlapi.StatusResponse, displayChannels []chan *bkclient.SolveStatus) error {
 	for resp := range ch {
 		s := bkclient.SolveStatus{}
+
 		for _, v := range resp.Vertexes {
 			s.Vertexes = append(s.Vertexes, &bkclient.Vertex{
 				Digest:    v.Digest,
@@ -113,6 +118,14 @@ func funnelProgress(ch chan *controlapi.StatusResponse, displayChannels []chan *
 	}
 
 	return nil
+}
+
+func outputProgressToConsole(displayChannel chan *bkclient.SolveStatus) error {
+	var c console.Console
+	if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
+		c = cf
+	}
+	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayChannel)
 }
 
 func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {

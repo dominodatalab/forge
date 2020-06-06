@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/containerd/console"
 	bkclient "github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/util/progress/progressui"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
@@ -134,20 +132,15 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		return d.bk.Solve(ctx, solveReq, ch)
 	})
 
-	progressFuncs = append(progressFuncs, func(displayChannel chan *bkclient.SolveStatus) error {
-		var c console.Console
-		if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
-			c = cf
-		}
-
-		return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayChannel)
-	})
-
-	displayChs := make([]chan *bkclient.SolveStatus, len(progressFuncs))
+	var displayChs []chan *bkclient.SolveStatus
 	for i, progressFunc := range progressFuncs {
-		displayChs[i] = make(chan *bkclient.SolveStatus)
+		displayChs = append(displayChs, make(chan *bkclient.SolveStatus))
 		eg.Go(func() error { return progressFunc(displayChs[i]) })
 	}
+
+	// TODO: why does this not work when appended to progressFuncs
+	displayChs = append(displayChs, make(chan *bkclient.SolveStatus))
+	eg.Go(func() error { return outputProgressToConsole(displayChs[len(displayChs) - 1]) })
 
 	eg.Go(func() error { return funnelProgress(ch, displayChs) })
 
