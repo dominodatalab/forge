@@ -28,8 +28,8 @@ helm upgrade cert-manager jetstack/cert-manager \
 info "Generate custom root CA"
 if ! kubectl get secret -n "$namespace" custom-root-ca &> /dev/null; then
   pushd e2e
-  "$(brew --prefix openssl)"/bin/openssl genrsa -out rootCA.key 4096
-  "$(brew --prefix openssl)"/bin/openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 365 -out rootCA.crt \
+  openssl genrsa -out rootCA.key 4096
+  openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 365 -out rootCA.crt \
     -subj "/C=US/ST=CA/L=San Francisco/O=Domino Data Lab, Inc./OU=Engineering/CN=dominodatalab.com"
   kubectl create secret tls custom-root-ca \
     --namespace "$namespace" \
