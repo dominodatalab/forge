@@ -83,7 +83,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 }
 
 func reexec() {
-	if len(os.Getenv("IMG_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
+	if len(os.Getenv("IMG_RUNNING_TESTS")) <= 0 && len(os.Getenv("IMG_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
 		setupLog.Info("Preparing to unshare process namespace")
 
 		var (

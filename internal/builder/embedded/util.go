@@ -1,21 +1,17 @@
 package embedded
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/console"
+	"github.com/dominodatalab/forge/internal/builder/config"
+	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
 	"github.com/moby/buildkit/identity"
-	"github.com/moby/buildkit/util/progress/progressui"
-
-	"github.com/dominodatalab/forge/internal/builder/config"
-	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 )
 
 func getStateDir() string {
@@ -72,53 +68,51 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 	return req, nil
 }
 
-func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
-	displayCh := make(chan *bkclient.SolveStatus)
-	go func() {
-		for resp := range ch {
-			s := bkclient.SolveStatus{}
-			for _, v := range resp.Vertexes {
-				s.Vertexes = append(s.Vertexes, &bkclient.Vertex{
-					Digest:    v.Digest,
-					Inputs:    v.Inputs,
-					Name:      v.Name,
-					Started:   v.Started,
-					Completed: v.Completed,
-					Error:     v.Error,
-					Cached:    v.Cached,
-				})
-			}
-			for _, v := range resp.Statuses {
-				s.Statuses = append(s.Statuses, &bkclient.VertexStatus{
-					ID:        v.ID,
-					Vertex:    v.Vertex,
-					Name:      v.Name,
-					Total:     v.Total,
-					Current:   v.Current,
-					Timestamp: v.Timestamp,
-					Started:   v.Started,
-					Completed: v.Completed,
-				})
-			}
-			for _, v := range resp.Logs {
-				s.Logs = append(s.Logs, &bkclient.VertexLog{
-					Vertex:    v.Vertex,
-					Stream:    int(v.Stream),
-					Data:      v.Msg,
-					Timestamp: v.Timestamp,
-				})
-			}
-			displayCh <- &s
+func funnelProgress(ch chan *controlapi.StatusResponse, displayChannels []chan *bkclient.SolveStatus) error {
+	for resp := range ch {
+		s := bkclient.SolveStatus{}
+		for _, v := range resp.Vertexes {
+			s.Vertexes = append(s.Vertexes, &bkclient.Vertex{
+				Digest:    v.Digest,
+				Inputs:    v.Inputs,
+				Name:      v.Name,
+				Started:   v.Started,
+				Completed: v.Completed,
+				Error:     v.Error,
+				Cached:    v.Cached,
+			})
 		}
-		close(displayCh)
-	}()
-	var c console.Console
-	if !noConsole {
-		if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
-			c = cf
+		for _, v := range resp.Statuses {
+			s.Statuses = append(s.Statuses, &bkclient.VertexStatus{
+				ID:        v.ID,
+				Vertex:    v.Vertex,
+				Name:      v.Name,
+				Total:     v.Total,
+				Current:   v.Current,
+				Timestamp: v.Timestamp,
+				Started:   v.Started,
+				Completed: v.Completed,
+			})
+		}
+		for _, v := range resp.Logs {
+			s.Logs = append(s.Logs, &bkclient.VertexLog{
+				Vertex:    v.Vertex,
+				Stream:    int(v.Stream),
+				Data:      v.Msg,
+				Timestamp: v.Timestamp,
+			})
+		}
+
+		for _, displayChannel := range displayChannels {
+			displayChannel <- &s
 		}
 	}
-	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
+
+	for _, displayChannel := range displayChannels {
+		close(displayChannel)
+	}
+
+	return nil
 }
 
 func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {

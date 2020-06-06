@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	bkclient "github.com/moby/buildkit/client"
+	"github.com/sirupsen/logrus"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +37,8 @@ type ContainerImageBuildReconciler struct {
 	Builder  builder.OCIImageBuilder
 	Producer message.Producer
 }
+
+const BuildIdAnnotation = "imagebuilder.dominodatalab.com/build-id"
 
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds/status,verbs=get;update;patch
@@ -95,8 +100,27 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		Timeout:        time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{})
+	fields := make(logrus.Fields)
+	if buildId, exists := build.Annotations[BuildIdAnnotation]; exists {
+		fields["logKey"] = buildId
+	}
+
 	// dispatch build operation
-	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
+	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, func(statusChannel chan *bkclient.SolveStatus) error {
+		for status := range statusChannel {
+			for _, vertex := range status.Vertexes {
+				logger.WithFields(fields).Info(vertex.Name)
+			}
+			for _, log := range status.Logs {
+				logger.WithFields(fields).Info(string(log.Data))
+			}
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		log.Error(err, "Build process failed")
 

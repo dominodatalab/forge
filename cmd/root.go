@@ -56,7 +56,7 @@ func init() {
 
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	rootCmd.Flags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
-	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
-	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
+	rootCmd.Flags().StringVar(&messageBroker, "message-broker", os.Getenv("MESSAGE_BROKEN"), fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
+	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", os.Getenv("AMQP_URI"), "AMQP broker connection URI")
+	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", os.Getenv("AMQP_QUEUE"), "AMQP broker queue name")
 }

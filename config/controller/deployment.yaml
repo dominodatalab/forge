@@ -13,6 +13,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: forge
+      annotations:
+        logKey: forge
     spec:
       serviceAccountName: forge
       volumes:
@@ -45,6 +47,16 @@ spec:
         - name: controller
           image: quay.io/domino/forge:latest
           imagePullPolicy: IfNotPresent
+          env:
+            - name: MESSAGE_BROKEN
+              value: amqp
+            - name: AMQP_URI
+              value: amqp://user:password@rabbitmq
+            - name: AMQP_QUEUE
+              value: containerimagebuilds.status-update
+          # env:
+          #   - name: IMG_RUNNING_TESTS
+          #     value: "1"
           resources:
             requests:
               cpu: 1

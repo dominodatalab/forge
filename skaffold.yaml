@@ -1,0 +1,35 @@
+apiVersion: skaffold/v2beta4
+kind: Config
+metadata:
+  name: forge
+build:
+  tagPolicy:
+    sha256: {}
+  artifacts:
+#  - image: forge
+#    docker:
+#      dockerfile: Dockerfile
+  - image: forge-dev-runtime
+    docker:
+      dockerfile: Dockerfile.dev-runtime
+  - image: forge-dev
+    buildpack:
+      builder: "gcr.io/buildpacks/builder"
+      runImage: forge-dev-runtime
+      dependencies:
+        paths:
+        - api
+        - cmd
+        - controllers
+        - hack
+        - internal
+        - main.go
+        - go.mod
+        ignore:
+        - config
+        - vendor
+deploy:
+  kustomize:
+    paths:
+    - config/controller
+    - config/crd

@@ -1,0 +1,35 @@
+FROM golang:1.14 as builder
+
+FROM builder AS runc
+
+RUN apt-get update && apt-get install -y libseccomp-dev
+WORKDIR /go/src/github.com/opencontainers/runc
+RUN git clone https://github.com/opencontainers/runc.git . \
+    && git checkout 7cb3cde1f49eae53fb8fff5012c0750a64eb928b
+RUN make static BUILDTAGS="seccomp apparmor" \
+    && cp runc /usr/bin/
+
+FROM builder AS idmap
+
+RUN apt-get update && apt-get install -y autoconf automake autopoint build-essential byacc gettext libcap-dev libtool libxslt1.1
+WORKDIR /shadow
+RUN git clone https://github.com/shadow-maint/shadow.git . \
+    && git checkout 59c2dabb264ef7b3137f5edb52c0b31d5af0cf76
+RUN ./autogen.sh --disable-nls --disable-man --without-audit --without-selinux --without-acl --without-attr --without-tcb --without-nscd \
+    && make \
+    && cp src/newuidmap src/newgidmap /usr/bin/
+
+FROM gcr.io/buildpacks/gcp/run
+USER root
+RUN apt-get update && apt-get install -y git && apt-get clean
+COPY --from=runc /usr/bin/runc /usr/bin/runc
+COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
+COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
+RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap \
+  && mkdir -p /run/cnb/1000 \
+  && chown -R cnb /run/cnb/1000 \
+  && echo cnb:100000:65536 | tee /etc/subuid | tee /etc/subgid
+USER cnb
+ENV USER cnb
+ENV HOME /home/cnb
+ENV XDG_RUNTIME_DIR /run/cnb/1000
