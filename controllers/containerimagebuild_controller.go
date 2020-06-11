@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	bkclient "github.com/moby/buildkit/client"
+	"github.com/pkg/errors"
 	"strings"
 	"time"
 
@@ -52,6 +54,8 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 	spec := build.Spec
 
+	log = log.WithValues("annotations", build.Annotations)
+
 	// ignore resources that have been processed on start
 	if build.Status.State != "" {
 		log.Info("Skipping resource", "state", build.Status.State)
@@ -96,9 +100,11 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// dispatch build operation
-	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
+	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, outputProgressToJSON(log))
+
 	if err != nil {
-		log.Error(err, "Build process failed")
+		cause := errors.Cause(errors.Unwrap(err))
+		log.Error(err, cause.Error())
 
 		build.Status.SetState(forgev1alpha1.Failed)
 		build.Status.ErrorMessage = err.Error()
@@ -122,6 +128,22 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	// reconcile result will ensure this event is not enqueued again
 	return result, nil
+}
+
+func outputProgressToJSON(log logr.Logger) func(chan *bkclient.SolveStatus) error {
+	return func(statusChannel chan *bkclient.SolveStatus) error {
+		for status := range statusChannel {
+			for _, statusVertex := range status.Vertexes {
+				log.Info(statusVertex.Name)
+			}
+
+			for _, statusLog := range status.Logs {
+				log.Info(string(statusLog.Data))
+			}
+		}
+
+		return nil
+	}
 }
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {

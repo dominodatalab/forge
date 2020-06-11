@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	bkclient "github.com/moby/buildkit/client"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
@@ -36,7 +37,7 @@ func NewDriver() (*driver, error) {
 	}, nil
 }
 
-func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([]string, error) {
+func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, progressFunc func(chan *bkclient.SolveStatus) error) ([]string, error) {
 	if len(opts.PushRegistries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
@@ -64,7 +65,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 		if idx == 0 { // Build, check image size, and set ref to head image
 			headImg = image
 
-			if err := d.build(ctx, headImg, opts); err != nil {
+			if err := d.build(ctx, headImg, opts, progressFunc); err != nil {
 				return nil, err
 			}
 			if opts.ImageSizeLimit != 0 {
@@ -89,7 +90,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 	return images, nil
 }
 
-func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
+func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions, progressFunc func(chan *bkclient.SolveStatus) error) error {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.ContextURL)
 	if err != nil {
@@ -130,9 +131,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		defer sess.Close()
 		return d.bk.Solve(ctx, solveReq, ch)
 	})
-	eg.Go(func() error {
-		return showProgress(ch, false)
-	})
+	eg.Go(func() error { return displayProgress(ch, progressFunc) })
 
 	// return error when one occurs
 	return eg.Wait()

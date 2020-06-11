@@ -3,19 +3,18 @@ package embedded
 import (
 	"context"
 	"fmt"
+	"github.com/containerd/console"
+	"github.com/moby/buildkit/util/progress/progressui"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/console"
+	"github.com/dominodatalab/forge/internal/builder/config"
+	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
 	"github.com/moby/buildkit/identity"
-	"github.com/moby/buildkit/util/progress/progressui"
-
-	"github.com/dominodatalab/forge/internal/builder/config"
-	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 )
 
 func getStateDir() string {
@@ -72,11 +71,15 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 	return req, nil
 }
 
-func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
-	displayCh := make(chan *bkclient.SolveStatus)
+func displayProgress(ch chan *controlapi.StatusResponse, progressFunc func(chan *bkclient.SolveStatus) error) error {
+	progressCh := make(chan *bkclient.SolveStatus)
+
 	go func() {
+		defer close(progressCh)
+
 		for resp := range ch {
 			s := bkclient.SolveStatus{}
+
 			for _, v := range resp.Vertexes {
 				s.Vertexes = append(s.Vertexes, &bkclient.Vertex{
 					Digest:    v.Digest,
@@ -108,17 +111,20 @@ func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
 					Timestamp: v.Timestamp,
 				})
 			}
-			displayCh <- &s
+
+			progressCh <- &s
 		}
-		close(displayCh)
 	}()
+
+	return progressFunc(progressCh)
+}
+
+func OutputProgressToConsole(displayChannel chan *bkclient.SolveStatus) error {
 	var c console.Console
-	if !noConsole {
-		if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
-			c = cf
-		}
+	if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
+		c = cf
 	}
-	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
+	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayChannel)
 }
 
 func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {
