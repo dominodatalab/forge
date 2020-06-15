@@ -112,6 +112,10 @@ type ContainerImageBuildSpec struct {
 	// an image of any size will be pushed.
 	// +kubebuilder:validation:Optional
 	ImageSizeLimit uint64 `json:"imageSizeLimit"`
+
+	// Provide arbitrary data for use in plugins that extend default capabilities.
+	// +kubebuilder:validation:Optional
+	PluginData map[string]string `json:"pluginData"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild

@@ -74,6 +74,12 @@ spec:
             noCache:
               description: Disable the use of cache layers for a build.
               type: boolean
+            pluginData:
+              additionalProperties:
+                type: string
+              description: Provide arbitrary data for use in plugins that extend default
+                capabilities.
+              type: object
             pushTo:
               description: Push to one or more registries.
               items:
