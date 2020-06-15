@@ -19,6 +19,8 @@ var (
 	amqpURI       string
 	amqpQueue     string
 
+	preparerPluginsPath string
+
 	brokerOpts *message.Options
 
 	rootCmd = &cobra.Command{
@@ -26,7 +28,7 @@ var (
 		Short:   "Kubernetes-native OCI image builder.",
 		PreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
-			controllers.StartManager(metricsAddr, enableLeaderElection, brokerOpts)
+			controllers.StartManager(metricsAddr, enableLeaderElection, brokerOpts, preparerPluginsPath)
 		},
 	}
 )
@@ -59,4 +61,5 @@ func init() {
 	rootCmd.Flags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
 	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
 	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
+	rootCmd.Flags().StringVar(&preparerPluginsPath, "preparer-plugins-path", "", "Path to specific preparer plugins or directory to load them from")
 }

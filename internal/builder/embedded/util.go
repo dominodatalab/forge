@@ -3,6 +3,7 @@ package embedded
 import (
 	"context"
 	"fmt"
+	"github.com/dominodatalab/forge/internal/config"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/util/progress/progressui"
 
-	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 )
 

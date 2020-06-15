@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dominodatalab/forge/internal/config"
+	"github.com/dominodatalab/forge/plugins/preparer"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
@@ -14,17 +16,17 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dominodatalab/forge/internal/archive"
-	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
 )
 
 type driver struct {
 	bk               *bkimage.Client
+	preparerPlugins  []*preparer.Plugin
 	contextExtractor archive.Extractor
 }
 
-func NewDriver() (*driver, error) {
+func NewDriver(preparerPlugins []*preparer.Plugin) (*driver, error) {
 	client, err := bkimage.NewClient(getStateDir(), types.AutoBackend)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create buildkit client: %w", err)
@@ -32,6 +34,7 @@ func NewDriver() (*driver, error) {
 
 	return &driver{
 		bk:               client,
+		preparerPlugins:  preparerPlugins,
 		contextExtractor: archive.FetchAndExtract,
 	}, nil
 }
@@ -96,6 +99,13 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		return err
 	}
 	defer os.RemoveAll(extract.RootDir)
+
+	for _, preparerPlugin := range d.preparerPlugins {
+		defer preparerPlugin.Cleanup()
+		if err := preparerPlugin.Prepare(extract.ContentsDir, opts.PluginData); err != nil {
+			return err
+		}
+	}
 
 	// assume Dockerfile lives inside context root
 	localDirs := map[string]string{

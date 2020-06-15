@@ -1,23 +1,23 @@
 package controllers
 
 import (
+	"github.com/dominodatalab/forge/plugins/preparer"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"syscall"
 
+	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/builder"
+	"github.com/dominodatalab/forge/internal/message"
+	_ "github.com/dominodatalab/forge/internal/unshare"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
-	"github.com/dominodatalab/forge/internal/builder"
-	"github.com/dominodatalab/forge/internal/message"
-	_ "github.com/dominodatalab/forge/internal/unshare"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -26,12 +26,24 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options) {
+func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string) {
 	reexec()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
 		o.Development = true
 	}))
+
+	preparerPlugins, err := preparer.LoadPlugins(preparerPluginsPath)
+	if err != nil {
+		setupLog.Error(err, "Unable to load preparer plugins path")
+		os.Exit(1)
+	}
+
+	defer func() {
+		for _, preparerPlugin := range preparerPlugins {
+			preparerPlugin.Kill()
+		}
+	}()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             newScheme,
@@ -45,7 +57,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	bldr, err := builder.New()
+	bldr, err := builder.New(preparerPlugins)
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
