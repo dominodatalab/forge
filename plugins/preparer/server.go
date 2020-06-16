@@ -1,17 +1,17 @@
 package preparer
 
-type rpcServer struct {
+type preparerServer struct {
 	Preparer
 }
 
-func (p *rpcServer) Prepare(args *Arguments, errStr *string) error {
+func (p *preparerServer) Prepare(args *Arguments, errStr *string) error {
 	if err := p.Preparer.Prepare(args.ContextPath, args.PluginData); err != nil {
 		*errStr = err.Error()
 	}
 	return nil
 }
 
-func (p *rpcServer) Cleanup(_ *Arguments, errStr *string) error {
+func (p *preparerServer) Cleanup(_ *Arguments, errStr *string) error {
 	if err := p.Preparer.Cleanup(); err != nil {
 		*errStr = err.Error()
 	}

@@ -5,7 +5,13 @@ import (
 	"path/filepath"
 )
 
+type pluginLoader = func(string) (*Plugin, error)
+
 func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err error) {
+	return loadPlugins(preparerPluginsPath, NewPreparerPlugin)
+}
+
+func loadPlugins(preparerPluginsPath string, loader pluginLoader) (preparerPlugins []*Plugin, err error) {
 	if preparerPluginsPath == "" {
 		return
 	}
@@ -21,7 +27,7 @@ func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err err
 		}
 
 		if !info.IsDir() {
-			preparerPlugin, err := NewPreparerPlugin(path)
+			preparerPlugin, err := loader(path)
 			if err != nil {
 				return err
 			}

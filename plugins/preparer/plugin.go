@@ -12,11 +12,11 @@ type Plugin struct {
 }
 
 func (p *Plugin) Server(*plugin.MuxBroker) (interface{}, error) {
-	return &rpcServer{p.Preparer}, nil
+	return &preparerServer{p.Preparer}, nil
 }
 
 func (p *Plugin) Client(b *plugin.MuxBroker, c *rpc.Client) (interface{}, error) {
-	return &rpcClient{client: c}, nil
+	return &preparerClient{client: c}, nil
 }
 
 func (p *Plugin) Kill() {

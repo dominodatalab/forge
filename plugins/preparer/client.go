@@ -1,23 +1,25 @@
 package preparer
 
 import (
-	"net/rpc"
-
 	"github.com/pkg/errors"
 )
 
-var _ Preparer = &rpcClient{}
+var _ Preparer = &preparerClient{}
 
 const (
 	prepareServiceMethod = "Plugin.Prepare"
 	cleanupServiceMethod = "Plugin.Cleanup"
 )
 
-type rpcClient struct {
-	client *rpc.Client
+type rpcClient interface {
+	Call(serviceMethod string, args interface{}, reply interface{}) error
 }
 
-func (p *rpcClient) Prepare(contextPath string, pluginData map[string]string) error {
+type preparerClient struct {
+	client rpcClient
+}
+
+func (p *preparerClient) Prepare(contextPath string, pluginData map[string]string) error {
 	var errStr string
 
 	err := p.client.Call(prepareServiceMethod, &Arguments{contextPath, pluginData}, &errStr)
@@ -28,7 +30,7 @@ func (p *rpcClient) Prepare(contextPath string, pluginData map[string]string) er
 	return errors.Wrapf(err, "failed to prepare %s with %v", contextPath, pluginData)
 }
 
-func (p *rpcClient) Cleanup() error {
+func (p *preparerClient) Cleanup() error {
 	var errStr string
 
 	err := p.client.Call(cleanupServiceMethod, &Arguments{}, &errStr)
