@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 )
 
-func LoadPlugins(preparerPluginsPath string) ([]*Plugin, error) {
-	var preparerPlugins []*Plugin
+func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err error) {
+	if preparerPluginsPath == "" {
+		return
+	}
 
-	err := filepath.Walk(preparerPluginsPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(preparerPluginsPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -24,5 +26,5 @@ func LoadPlugins(preparerPluginsPath string) ([]*Plugin, error) {
 		return nil
 	})
 
-	return preparerPlugins, err
+	return
 }
