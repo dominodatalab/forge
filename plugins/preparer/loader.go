@@ -11,7 +11,7 @@ func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err err
 	}
 
 	// If the default path does not exist, just return and continue
-	if _, err := os.Stat(preparerPluginsPath); os.IsNotExist(err) {
+	if _, pathErr := os.Stat(preparerPluginsPath); os.IsNotExist(pathErr) {
 		return
 	}
 
