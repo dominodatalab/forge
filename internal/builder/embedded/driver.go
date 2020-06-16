@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	bkclient "github.com/moby/buildkit/client"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
+	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
 	"golang.org/x/sync/errgroup"
