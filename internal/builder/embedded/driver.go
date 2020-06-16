@@ -27,7 +27,7 @@ type driver struct {
 }
 
 func NewDriver(preparerPlugins []*preparer.Plugin) (*driver, error) {
-	client, err := bkimage.NewClient(getStateDir(), types.AutoBackend)
+	client, err := bkimage.NewClient(config.GetStateDir(), types.AutoBackend)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create buildkit client: %w", err)
 	}

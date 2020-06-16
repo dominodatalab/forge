@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/containerd/console"
 	controlapi "github.com/moby/buildkit/api/services/control"
@@ -17,20 +15,6 @@ import (
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	"github.com/dominodatalab/forge/internal/config"
 )
-
-func getStateDir() string {
-	//  pam_systemd sets XDG_RUNTIME_DIR but not other dirs.
-	if xdgDataHome := os.Getenv("XDG_DATA_HOME"); xdgDataHome != "" {
-		dir := strings.Split(xdgDataHome, ":")[0]
-		return filepath.Join(dir)
-	}
-
-	if home := os.Getenv("HOME"); home != "" {
-		return filepath.Join(home, ".local", "share", "forge")
-	}
-
-	return "/tmp/forge"
-}
 
 func solveRequestWithContext(sessionID string, image string, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
