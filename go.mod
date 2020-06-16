@@ -31,6 +31,7 @@ require (
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/bbolt v1.3.3
+	go.uber.org/zap v1.9.1
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/grpc v1.27.1
 	k8s.io/api v0.0.0-20190918155943-95b840bb6a1f

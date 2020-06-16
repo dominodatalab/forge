@@ -8,11 +8,12 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/builder"
@@ -26,10 +27,16 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options) {
+func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, debug bool) {
 	reexec()
 
-	ctrl.SetLogger(zap.New())
+	atom := zap.NewAtomicLevel()
+	if debug {
+		atom.SetLevel(zap.DebugLevel)
+	}
+	ctrl.SetLogger(ctrlzap.New(func(opts *ctrlzap.Options) {
+		opts.Level = &atom
+	}))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             newScheme,

@@ -12,6 +12,8 @@ import (
 )
 
 var (
+	debug bool
+
 	metricsAddr          string
 	enableLeaderElection bool
 
@@ -26,7 +28,7 @@ var (
 		Short:   "Kubernetes-native OCI image builder.",
 		PreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
-			controllers.StartManager(metricsAddr, enableLeaderElection, brokerOpts)
+			controllers.StartManager(metricsAddr, enableLeaderElection, brokerOpts, debug)
 		},
 	}
 )
@@ -59,4 +61,6 @@ func init() {
 	rootCmd.Flags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
 	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
 	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
+
+	rootCmd.Flags().BoolVar(&debug, "debug", false, "Enabled verbose logging")
 }
