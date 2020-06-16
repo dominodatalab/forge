@@ -1,10 +1,12 @@
 package preparer
 
 import (
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 	"os"
 	"os/exec"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
+	"github.com/pkg/errors"
 )
 
 var handshakeConfig = plugin.HandshakeConfig{
@@ -32,12 +34,12 @@ func NewPreparerPlugin(location string) (*Plugin, error) {
 
 	rpcClient, err := client.Client()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "rpc client create failed for %q", location)
 	}
 
 	raw, err := rpcClient.Dispense("preparer")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "cannot dispense rpc client for %q", location)
 	}
 
 	return &Plugin{

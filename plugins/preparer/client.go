@@ -1,38 +1,40 @@
 package preparer
 
 import (
-	"errors"
 	"net/rpc"
+
+	"github.com/pkg/errors"
+)
+
+var _ Preparer = &rpcClient{}
+
+const (
+	prepareServiceMethod = "Plugin.Prepare"
+	cleanupServiceMethod = "Plugin.Cleanup"
 )
 
 type rpcClient struct {
 	client *rpc.Client
 }
 
-var _ Preparer = &rpcClient{}
-
 func (p *rpcClient) Prepare(contextPath string, pluginData map[string]string) error {
 	var errStr string
-	if rpcError := p.client.Call("Plugin.Prepare", &Arguments{contextPath, pluginData}, &errStr); rpcError != nil {
-		return rpcError
+
+	err := p.client.Call(prepareServiceMethod, &Arguments{contextPath, pluginData}, &errStr)
+	if err == nil && errStr != "" {
+		err = errors.New(errStr)
 	}
 
-	if errStr != "" {
-		return errors.New(errStr)
-	}
-
-	return nil
+	return errors.Wrapf(err, "failed to prepare %s with %v", contextPath, pluginData)
 }
 
 func (p *rpcClient) Cleanup() error {
 	var errStr string
-	if rpcError := p.client.Call("Plugin.Cleanup", &Arguments{}, &errStr); rpcError != nil {
-		return rpcError
+
+	err := p.client.Call(cleanupServiceMethod, &Arguments{}, &errStr)
+	if err == nil && errStr != "" {
+		err = errors.New(errStr)
 	}
 
-	if errStr != "" {
-		return errors.New(errStr)
-	}
-
-	return nil
+	return errors.Wrap(err, "failed to cleanup")
 }

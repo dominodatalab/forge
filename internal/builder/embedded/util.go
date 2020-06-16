@@ -3,7 +3,6 @@ package embedded
 import (
 	"context"
 	"fmt"
-	"github.com/dominodatalab/forge/internal/config"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
+	"github.com/dominodatalab/forge/internal/config"
 )
 
 func getStateDir() string {

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dominodatalab/forge/internal/config"
-	"github.com/dominodatalab/forge/plugins/preparer"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
@@ -18,6 +16,8 @@ import (
 	"github.com/dominodatalab/forge/internal/archive"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
+	"github.com/dominodatalab/forge/internal/config"
+	"github.com/dominodatalab/forge/plugins/preparer"
 )
 
 type driver struct {
