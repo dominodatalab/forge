@@ -13,12 +13,12 @@ This functionality is built with the [go-plugin](https://github.com/hashicorp/go
 [example/preparer_plugin.go](./docs/example/preparer_plugin.go) has the necessary structure for creating a new preparer plugin.
 Functionality is implemented through two primary functions:
 
-**Prepare(contextPath string, pluginData map[string]string) error**
+`Prepare(contextPath string, pluginData map[string]string) error`
 
-Runs between the context creation and image build starting. `contextPath` is an absolute path to the context for the build.
+Prepare runs between the context creation and image build starting. `contextPath` is an absolute path to the context for the build.
 `pluginData` is the key-value data passed through the [ContainerImageBuild](./config/crd/bases/forge.dominodatalab.com_containerimagebuilds.yaml#L77-L82).
 
-**Cleanup() error**
+`Cleanup() error`
 
 Cleanup runs after the build has finished (successfully or otherwise).
 
