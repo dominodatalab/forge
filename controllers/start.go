@@ -81,7 +81,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 }
 
 func reexec() {
-	if len(os.Getenv("IMG_RUNNING_TESTS")) <= 0 && len(os.Getenv("IMG_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
+	if len(os.Getenv("FORGE_RUNNING_TESTS")) <= 0 && len(os.Getenv("FORGE_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
 		setupLog.Info("Preparing to unshare process namespace")
 
 		var (
@@ -110,7 +110,7 @@ func reexec() {
 
 		// Initialize and re-exec with our unshare.
 		cmd := exec.Command("/proc/self/exe", os.Args[1:]...)
-		cmd.Env = append(os.Environ(), "IMG_DO_UNSHARE=1")
+		cmd.Env = append(os.Environ(), "FORGE_DO_UNSHARE=1")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
