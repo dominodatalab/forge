@@ -2,10 +2,10 @@ package builder
 
 import (
 	"context"
-	"github.com/dominodatalab/forge/internal/config"
-	"github.com/dominodatalab/forge/plugins/preparer"
 
 	"github.com/dominodatalab/forge/internal/builder/embedded"
+	"github.com/dominodatalab/forge/internal/config"
+	"github.com/dominodatalab/forge/plugins/preparer"
 )
 
 type OCIImageBuilder interface {
