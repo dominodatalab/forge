@@ -92,6 +92,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		BuildArgs:      spec.BuildArgs,
 		CpuQuota:       spec.CpuQuota,
 		Memory:         spec.Memory,
+		PluginData:     spec.PluginData,
 		Timeout:        time.Duration(build.Spec.TimeoutSeconds) * time.Second,
 	}
 

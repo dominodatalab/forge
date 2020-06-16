@@ -19,6 +19,7 @@ type BuildOptions struct {
 	Timeout        time.Duration
 	Registries     []Registry
 	PushRegistries []string
+	PluginData     map[string]string
 
 	// NOTE: these are not currently used, should we remove them?
 	CpuQuota uint16
