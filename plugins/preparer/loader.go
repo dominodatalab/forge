@@ -10,6 +10,11 @@ func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err err
 		return
 	}
 
+	// If the default path does not exist, just return and continue
+	if _, err := os.Stat(preparerPluginsPath); os.IsNotExist(err) {
+		return
+	}
+
 	err = filepath.Walk(preparerPluginsPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
