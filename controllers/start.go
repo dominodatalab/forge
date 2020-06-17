@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"github.com/dominodatalab/forge/internal/builder"
 	"github.com/dominodatalab/forge/internal/message"
 	_ "github.com/dominodatalab/forge/internal/unshare"
+	"github.com/dominodatalab/forge/plugins/preparer"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -26,12 +28,24 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options) {
+func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string) {
 	reexec()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
 		o.Development = true
 	}))
+
+	preparerPlugins, err := preparer.LoadPlugins(preparerPluginsPath)
+	if err != nil {
+		setupLog.Error(err, fmt.Sprintf("Unable to load preparer plugins path %q", preparerPluginsPath))
+		os.Exit(1)
+	}
+
+	defer func() {
+		for _, preparerPlugin := range preparerPlugins {
+			preparerPlugin.Kill()
+		}
+	}()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             newScheme,
@@ -45,7 +59,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	bldr, err := builder.New()
+	bldr, err := builder.New(preparerPlugins)
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)

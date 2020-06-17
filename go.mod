@@ -17,6 +17,8 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/h2non/filetype v1.0.12
+	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
+	github.com/hashicorp/go-plugin v1.3.0
 	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/moby/buildkit v0.7.1
 	github.com/onsi/ginkgo v1.11.0
@@ -25,6 +27,7 @@ require (
 	github.com/opencontainers/runc v1.0.0-rc9.0.20200221051241-688cf6d43cc4
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20180702182724-07a764486eb1 // indirect
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
