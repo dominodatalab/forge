@@ -105,7 +105,7 @@ func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
 	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
 }
 
-func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {
+func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn, string) {
 	rHostMap := map[string]config.Registry{}
 	for _, reg := range registries {
 		rHostMap[reg.Host] = reg
@@ -127,5 +127,6 @@ func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, 
 		return false, nil
 	}
 
-	return hostCredentials, matchNonSSL
+	certs := os.Getenv("CERT_DIR")
+	return hostCredentials, matchNonSSL, fmt.Sprintf("%s/tls.crt", certs)
 }

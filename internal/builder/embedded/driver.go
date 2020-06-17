@@ -45,7 +45,9 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 	}
 
 	// configure registry hosts for every run and reset afterwards
-	d.bk.ConfigureHosts(generateRegistryFunc(opts.Registries))
+	if err := d.bk.ConfigureHosts(generateRegistryFunc(opts.Registries)); err != nil {
+		return nil, err
+	}
 	defer func() { d.bk.ResetHostConfigurations() }()
 
 	var headImg string
