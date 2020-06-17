@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
-	bkclient "github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +24,7 @@ import (
 	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/internal/message"
+	"github.com/dominodatalab/forge/internal/util"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
@@ -103,7 +101,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// dispatch build operation
-	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, outputProgressToJSON(&logWriter{log}))
+	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, &util.LogrWriter{Logger: log})
 
 	if err != nil {
 		cause := errors.Cause(errors.Unwrap(err))
@@ -131,23 +129,6 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	// reconcile result will ensure this event is not enqueued again
 	return result, nil
-}
-
-type logWriter struct {
-	logger logr.Logger
-}
-
-var _ io.Writer = &logWriter{}
-
-func (l *logWriter) Write(output []byte) (int, error) {
-	l.logger.Info(string(output))
-	return len(output), nil
-}
-
-func outputProgressToJSON(log io.Writer) func(chan *bkclient.SolveStatus) error {
-	return func(statusChannel chan *bkclient.SolveStatus) error {
-		return progressui.DisplaySolveStatus(context.TODO(), "", nil, log, statusChannel)
-	}
 }
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {

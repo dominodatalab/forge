@@ -3,11 +3,11 @@ package embedded
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/console"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -72,7 +72,7 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 	return req, nil
 }
 
-func displayProgress(ch chan *controlapi.StatusResponse, progressFunc func(chan *bkclient.SolveStatus) error) error {
+func displayProgress(ch chan *controlapi.StatusResponse, logWriter io.Writer) error {
 	progressCh := make(chan *bkclient.SolveStatus)
 
 	go func() {
@@ -117,15 +117,7 @@ func displayProgress(ch chan *controlapi.StatusResponse, progressFunc func(chan 
 		}
 	}()
 
-	return progressFunc(progressCh)
-}
-
-func OutputProgressToConsole(displayChannel chan *bkclient.SolveStatus) error {
-	var c console.Console
-	if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
-		c = cf
-	}
-	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayChannel)
+	return progressui.DisplaySolveStatus(context.TODO(), "", nil, logWriter, progressCh)
 }
 
 func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {
