@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
-	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
 	"golang.org/x/sync/errgroup"
@@ -37,7 +37,7 @@ func NewDriver() (*driver, error) {
 	}, nil
 }
 
-func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, progressFunc func(chan *bkclient.SolveStatus) error) ([]string, error) {
+func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, logWriter io.Writer) ([]string, error) {
 	if len(opts.PushRegistries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
@@ -65,7 +65,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, pr
 		if idx == 0 { // Build, check image size, and set ref to head image
 			headImg = image
 
-			if err := d.build(ctx, headImg, opts, progressFunc); err != nil {
+			if err := d.build(ctx, headImg, opts, logWriter); err != nil {
 				return nil, err
 			}
 			if opts.ImageSizeLimit != 0 {
@@ -90,7 +90,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, pr
 	return images, nil
 }
 
-func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions, progressFunc func(chan *bkclient.SolveStatus) error) error {
+func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions, logWriter io.Writer) error {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.ContextURL)
 	if err != nil {
@@ -131,7 +131,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		defer sess.Close()
 		return d.bk.Solve(ctx, solveReq, ch)
 	})
-	eg.Go(func() error { return displayProgress(ch, progressFunc) })
+	eg.Go(func() error { return displayProgress(ch, logWriter) })
 
 	// return error when one occurs
 	return eg.Wait()
