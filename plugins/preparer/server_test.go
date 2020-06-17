@@ -11,6 +11,7 @@ type testPreparer struct {
 	err               error
 	calledContextPath string
 	calledPluginData  map[string]string
+	calledCleanup     bool
 }
 
 func (t *testPreparer) Prepare(contextPath string, pluginData map[string]string) error {
@@ -20,6 +21,7 @@ func (t *testPreparer) Prepare(contextPath string, pluginData map[string]string)
 }
 
 func (t *testPreparer) Cleanup() error {
+	t.calledCleanup = true
 	return t.err
 }
 
@@ -29,8 +31,7 @@ func Test_preparerServer_Prepare(t *testing.T) {
 
 	contextPath := "/test/path"
 	pluginData := map[string]string{"test": "data"}
-
-	arguments := &Arguments{"/test/path", map[string]string{"test": "data"}}
+	arguments := &Arguments{contextPath, pluginData}
 
 	var errStr string
 	err := server.Prepare(arguments, &errStr)
@@ -72,6 +73,11 @@ func Test_preparerServer_Cleanup(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("preparer returned an error unexpectedly: %v", err)
+		return
+	}
+
+	if !testPreparer.calledCleanup {
+		t.Error("preparer Cleanup() did not get called")
 		return
 	}
 

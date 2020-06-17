@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,7 +37,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 
 	preparerPlugins, err := preparer.LoadPlugins(preparerPluginsPath)
 	if err != nil {
-		setupLog.Error(err, "Unable to load preparer plugins path")
+		setupLog.Error(err, fmt.Sprintf("Unable to load preparer plugins path %q", preparerPluginsPath))
 		os.Exit(1)
 	}
 

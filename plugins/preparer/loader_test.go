@@ -58,13 +58,14 @@ func TestLoadPlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// called := false
-			loaderFunc := func(path string) (*Plugin, error) {
-				// called = true
+			DefaultPluginLoader = func(path string) (*Plugin, error) {
 				return &Plugin{}, nil
 			}
+			defer func() {
+				DefaultPluginLoader = NewPreparerPlugin
+			}()
 
-			gotPreparerPlugins, err := loadPlugins(tt.path, loaderFunc)
+			gotPreparerPlugins, err := LoadPlugins(tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadPlugins() error = %v, wantErr %v", err, tt.wantErr)
 				return

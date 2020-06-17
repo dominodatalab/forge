@@ -7,8 +7,10 @@ import (
 
 type pluginLoader = func(string) (*Plugin, error)
 
+var DefaultPluginLoader = NewPreparerPlugin
+
 func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err error) {
-	return loadPlugins(preparerPluginsPath, NewPreparerPlugin)
+	return loadPlugins(preparerPluginsPath, DefaultPluginLoader)
 }
 
 func loadPlugins(preparerPluginsPath string, loader pluginLoader) (preparerPlugins []*Plugin, err error) {
