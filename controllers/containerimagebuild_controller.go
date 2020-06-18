@@ -22,7 +22,7 @@ import (
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/builder"
-	"github.com/dominodatalab/forge/internal/builder/config"
+	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/internal/message"
 )
