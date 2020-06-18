@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/moby/buildkit/util/push"
-	log "github.com/sirupsen/logrus"
 )
 
 func (c *Client) PushImage(ctx context.Context, image string) error {
@@ -25,7 +24,9 @@ func (c *Client) PushImage(ctx context.Context, image string) error {
 		return err
 	}
 
-	log.Infof("Pushing image %q", image)
+	// TODO figure out if / how buildkit & containerd convey progress during the push
+	c.logger.Info(fmt.Sprintf("Pushing image %q", image))
+	defer c.logger.Info(fmt.Sprintf("Pushed image %q", image))
 
 	// push with context absent session to avoid authorizer override
 	// see github.com/moby/buildkit@v0.7.1/util/resolver/resolver.go:158 for more details

@@ -1,13 +1,13 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/system"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,9 +34,12 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	if debug {
 		atom.SetLevel(zap.DebugLevel)
 	}
-	ctrl.SetLogger(ctrlzap.New(func(opts *ctrlzap.Options) {
+
+	logger := ctrlzap.New(func(opts *ctrlzap.Options) {
 		opts.Level = &atom
-	}))
+	})
+
+	ctrl.SetLogger(logger)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             newScheme,
@@ -50,7 +53,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	bldr, err := builder.New()
+	bldr, err := builder.New(logger)
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
@@ -101,10 +104,10 @@ func reexec() {
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			for sig := range c {
-				logrus.Infof("Received %s, exiting.", sig.String())
+				setupLog.Info(fmt.Sprintf("Received %s, exiting.", sig.String()))
 				if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-					logrus.Fatalf("syscall.Kill %d error: %v", pgid, err)
-					continue
+					setupLog.Error(err, fmt.Sprintf("syscall.Kill %d error: %v", pgid, err))
+					os.Exit(1)
 				}
 				os.Exit(0)
 			}
@@ -112,7 +115,7 @@ func reexec() {
 
 		// If newuidmap is not present re-exec will fail
 		if _, err := exec.LookPath("newuidmap"); err != nil {
-			logrus.Fatalf("newuidmap not found (install uidmap package?): %v", err)
+			setupLog.Error(err, fmt.Sprintf("newuidmap not found (install uidmap package?): %v", err))
 		}
 
 		// Initialize and re-exec with our unshare.
@@ -125,12 +128,14 @@ func reexec() {
 			Setpgid: true,
 		}
 		if err := cmd.Start(); err != nil {
-			logrus.Fatalf("cmd.Start error: %v", err)
+			setupLog.Error(err, fmt.Sprintf("cmd.Start error: %v", err))
+			os.Exit(1)
 		}
 
 		pgid, err = syscall.Getpgid(cmd.Process.Pid)
 		if err != nil {
-			logrus.Fatalf("getpgid error: %v", err)
+			setupLog.Error(err, fmt.Sprintf("getpgid error: %v", err))
+			os.Exit(1)
 		}
 
 		var (
@@ -148,7 +153,8 @@ func reexec() {
 					os.Exit(exitCode)
 				}
 
-				logrus.Fatalf("wait4 error: %v", err)
+				setupLog.Error(err, fmt.Sprintf("wait4 error: %v", err))
+				os.Exit(1)
 			}
 		}
 	}

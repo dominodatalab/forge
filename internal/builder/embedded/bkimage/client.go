@@ -10,10 +10,10 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/snapshots/overlay"
+	"github.com/go-logr/logr"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/worker/base"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
 )
@@ -36,9 +36,11 @@ type Client struct {
 	// dynamic elements
 	registryHosts   docker.RegistryHosts
 	hostCredentials CredentialsFn
+
+	logger logr.Logger
 }
 
-func NewClient(rootDir, backend string) (*Client, error) {
+func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	// select appropriate system backend
 	if backend == types.AutoBackend {
 		if overlay.Supported(rootDir) == nil {
@@ -47,7 +49,7 @@ func NewClient(rootDir, backend string) (*Client, error) {
 			backend = types.NativeBackend
 		}
 	}
-	log.Infof("Using filesystem as backend: %s", backend)
+	logger.Info(fmt.Sprintf("Using filesystem as backend: %s", backend))
 
 	// create working directory
 	workDir := filepath.Join(rootDir, ociRuntime, string(backend))
@@ -59,6 +61,7 @@ func NewClient(rootDir, backend string) (*Client, error) {
 	client := &Client{
 		backend: backend,
 		rootDir: rootDir,
+		logger:  logger,
 	}
 	client.ResetHostConfigurations()
 
@@ -67,4 +70,8 @@ func NewClient(rootDir, backend string) (*Client, error) {
 	}
 
 	return client, nil
+}
+
+func (c *Client) SetLogger(logger logr.Logger) {
+	c.logger = logger
 }

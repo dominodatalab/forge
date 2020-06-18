@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +25,6 @@ import (
 	"github.com/dominodatalab/forge/internal/builder/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/internal/message"
-	"github.com/dominodatalab/forge/internal/util"
 )
 
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
@@ -101,11 +101,13 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// dispatch build operation
-	imageURLs, err := r.Builder.BuildAndPush(ctx, opts, &util.LogrWriter{Logger: log})
+	r.Builder.SetLogger(log)
+	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
 
 	if err != nil {
-		cause := errors.Cause(errors.Unwrap(err))
-		log.Error(err, cause.Error())
+		log.V(1).Info("received error during build and push", "error", err)
+
+		logUnknownInstructionError(log, err)
 
 		build.Status.SetState(forgev1alpha1.Failed)
 		build.Status.ErrorMessage = err.Error()
@@ -234,4 +236,15 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 		}
 	}
 	return nil
+}
+
+// This logs the underlying error from a build when the display channels inside builder.embedded have not yet been initialized.
+func logUnknownInstructionError(log logr.Logger, err error) {
+	if unwrappedError := errors.Unwrap(err); unwrappedError != nil {
+		err = unwrappedError
+	}
+	cause := errors.Cause(err)
+	if instructions.IsUnknownInstruction(cause) {
+		log.Error(err, cause.Error())
+	}
 }

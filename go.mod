@@ -10,7 +10,7 @@ replace (
 )
 
 require (
-	github.com/containerd/console v0.0.0-20191219165238-8375c3424e4d
+	github.com/containerd/console v0.0.0-20191219165238-8375c3424e4d // indirect
 	github.com/containerd/containerd v1.4.0-0
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd // indirect
@@ -26,7 +26,7 @@ require (
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20180702182724-07a764486eb1 // indirect
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.4.0

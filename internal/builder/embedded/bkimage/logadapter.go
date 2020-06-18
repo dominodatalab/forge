@@ -1,9 +1,8 @@
-package util
+package bkimage
 
 import "github.com/go-logr/logr"
 
-// logr.Logger writer interface adapter
-// LogrWriter is an
+// LogrWriter is an interface adapter for logr.Logger and io.Writer
 type LogrWriter struct {
 	Logger logr.Logger
 }

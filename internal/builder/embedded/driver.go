@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/distribution/reference"
+	"github.com/go-logr/logr"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
@@ -22,22 +22,29 @@ import (
 
 type driver struct {
 	bk               *bkimage.Client
+	logger           logr.Logger
 	contextExtractor archive.Extractor
 }
 
-func NewDriver() (*driver, error) {
-	client, err := bkimage.NewClient(getStateDir(), types.AutoBackend)
+func NewDriver(logger logr.Logger) (*driver, error) {
+	client, err := bkimage.NewClient(getStateDir(), types.AutoBackend, logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create buildkit client: %w", err)
 	}
 
 	return &driver{
 		bk:               client,
+		logger:           logger,
 		contextExtractor: archive.FetchAndExtract,
 	}, nil
 }
 
-func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, logWriter io.Writer) ([]string, error) {
+func (d *driver) SetLogger(logger logr.Logger) {
+	d.logger = logger
+	d.bk.SetLogger(logger)
+}
+
+func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([]string, error) {
 	if len(opts.PushRegistries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
@@ -65,7 +72,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, lo
 		if idx == 0 { // Build, check image size, and set ref to head image
 			headImg = image
 
-			if err := d.build(ctx, headImg, opts, logWriter); err != nil {
+			if err := d.build(ctx, headImg, opts); err != nil {
 				return nil, err
 			}
 			if opts.ImageSizeLimit != 0 {
@@ -90,7 +97,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions, lo
 	return images, nil
 }
 
-func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions, logWriter io.Writer) error {
+func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.ContextURL)
 	if err != nil {
@@ -131,7 +138,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		defer sess.Close()
 		return d.bk.Solve(ctx, solveReq, ch)
 	})
-	eg.Go(func() error { return displayProgress(ch, logWriter) })
+	eg.Go(func() error { return displayProgress(ch, &bkimage.LogrWriter{Logger: d.logger}) })
 
 	// return error when one occurs
 	return eg.Wait()
