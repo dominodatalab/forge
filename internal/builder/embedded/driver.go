@@ -51,11 +51,10 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 
 	// configure registry hosts for every run and reset afterwards
 	d.bk.ConfigureHosts(generateRegistryFunc(opts.Registries))
-	defer func() { d.bk.ResetHostConfigurations() }()
+	defer d.bk.ResetHostConfigurations()
 
-	var headImg string
 	var images []string
-	for idx, registry := range opts.PushRegistries {
+	for _, registry := range opts.PushRegistries {
 		// Build fully-qualified image name
 		image := fmt.Sprintf("%s/%s", registry, opts.ImageName)
 
@@ -69,35 +68,25 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 		named = reference.TagNameOnly(named)
 		image = named.String()
 
-		if idx == 0 { // Build, check image size, and set ref to head image
-			headImg = image
+		images = append(images, image)
+	}
 
-			if err := d.build(ctx, headImg, opts); err != nil {
-				return nil, err
-			}
-			if opts.ImageSizeLimit != 0 {
-				if err := d.validateImageSize(ctx, headImg, opts.ImageSizeLimit); err != nil {
-					return nil, err
-				}
-			}
-		} else { // Tag tail images
-			if err := d.tag(ctx, headImg, image); err != nil {
-				return nil, err
-			}
-		}
+	if err := d.build(ctx, images, opts); err != nil {
+		return nil, err
+	}
 
-		// Push image into registry
-		if err := d.push(ctx, image); err != nil {
+	if opts.ImageSizeLimit != 0 {
+		//noinspection GoNilness
+		if err := d.validateImageSize(ctx, images[0], opts.ImageSizeLimit); err != nil {
 			return nil, err
 		}
-		images = append(images, image)
 	}
 
 	// Return a list of every registry image
 	return images, nil
 }
 
-func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
+func (d *driver) build(ctx context.Context, images []string, opts *config.BuildOptions) error {
 	// download and extract remote OCI context
 	extract, err := archive.FetchAndExtract(opts.ContextURL)
 	if err != nil {
@@ -118,7 +107,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 	}
 
 	// prepare build parameters
-	solveReq, err := solveRequestWithContext(sess.ID(), image, opts)
+	solveReq, err := solveRequestWithContext(sess.ID(), images, opts)
 	if err != nil {
 		sess.Close()
 		return err
@@ -142,38 +131,6 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 
 	// return error when one occurs
 	return eg.Wait()
-}
-
-func (d *driver) tag(ctx context.Context, image, target string) error {
-	id := identity.NewID()
-	ctx = session.NewContext(ctx, id)
-	ctx = namespaces.WithNamespace(ctx, "buildkit")
-
-	return d.bk.TagImage(ctx, image, target)
-}
-
-func (d *driver) push(ctx context.Context, image string) error {
-	sess, sessDialer, err := d.bk.Session(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	ctx = session.NewContext(ctx, sess.ID())
-	ctx = namespaces.WithNamespace(ctx, "buildkit")
-	eg, ctx := errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		return sess.Run(ctx, sessDialer)
-	})
-	eg.Go(func() error {
-		defer sess.Close()
-		return d.bk.PushImage(ctx, image)
-	})
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (d *driver) validateImageSize(ctx context.Context, name string, limit uint64) error {

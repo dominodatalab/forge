@@ -32,7 +32,7 @@ func getStateDir() string {
 	return "/tmp/forge"
 }
 
-func solveRequestWithContext(sessionID string, image string, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
+func solveRequestWithContext(sessionID string, images []string, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
 		Session:  sessionID,
@@ -42,7 +42,8 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 		},
 		Exporter: "image",
 		ExporterAttrs: map[string]string{
-			"name": image,
+			"name": strings.Join(images, ","),
+			"push": "true",
 		},
 	}
 
