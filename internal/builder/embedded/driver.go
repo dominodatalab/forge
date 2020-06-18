@@ -2,7 +2,6 @@ package embedded
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -12,6 +11,7 @@ import (
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dominodatalab/forge/internal/archive"
@@ -29,7 +29,7 @@ type driver struct {
 func NewDriver(logger logr.Logger) (*driver, error) {
 	client, err := bkimage.NewClient(getStateDir(), types.AutoBackend, logger)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create buildkit client: %w", err)
+		return nil, errors.Wrap(err, "cannot create buildkit client")
 	}
 
 	return &driver{

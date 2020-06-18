@@ -1,16 +1,15 @@
 package bkimage
 
 import (
-	"fmt"
-
 	"github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
 )
 
 func parseImageName(image string) (string, error) {
 	// parse the image name and tag
 	named, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", fmt.Errorf("parsing image name %q failed: %w", image, err)
+		return "", errors.Wrapf(err, "parsing image name %q failed", image)
 	}
 
 	// Add "latest" tag if tag is missing.

@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/overlay"
 	containerdsnapshot "github.com/moby/buildkit/snapshot/containerd"
+	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
@@ -39,7 +40,7 @@ func (c *Client) initDataStores() error {
 		return fmt.Errorf("%s is not a valid snapshotter", c.backend)
 	}
 	if err != nil {
-		return fmt.Errorf("creating %s snapshotter failed: %w", c.backend, err)
+		return errors.Wrapf(err, "creating %s snapshotter failed", c.backend)
 	}
 
 	metadataDB := ctdmetadata.NewDB(db, cs, map[string]snapshots.Snapshotter{
