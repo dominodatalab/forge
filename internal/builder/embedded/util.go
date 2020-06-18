@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
