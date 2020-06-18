@@ -1,7 +1,6 @@
 package bkimage
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/moby/buildkit/cache/remotecache"
@@ -15,37 +14,38 @@ import (
 	"github.com/moby/buildkit/solver/bboltcachestorage"
 	"github.com/moby/buildkit/worker"
 	"github.com/moby/buildkit/worker/base"
+	"github.com/pkg/errors"
 )
 
 func (c *Client) createController() error {
 	// grab the session manager
 	sm, err := c.getSessionManager()
 	if err != nil {
-		return fmt.Errorf("creating session manager failed: %w", err)
+		return errors.Wrap(err, "creating session manager failed")
 	}
 
 	// create the worker opts
 	opt, err := c.createWorkerOpt()
 	if err != nil {
-		return fmt.Errorf("creating worker opt failed: %w", err)
+		return errors.Wrap(err, "creating worker opt failed")
 	}
 
 	// create a new worker
 	w, err := base.NewWorker(opt)
 	if err != nil {
-		return fmt.Errorf("creating worker failed: %w", err)
+		return errors.Wrap(err, "creating worker failed")
 	}
 
 	// create a worker controller and add the worker
 	wc := &worker.Controller{}
 	if err := wc.Add(w); err != nil {
-		return fmt.Errorf("adding worker to worker controller failed: %w", err)
+		return errors.Wrap(err, "adding worker to worker controller failed")
 	}
 
 	// create the cache store
 	cacheStore, err := bboltcachestorage.NewStore(filepath.Join(c.rootDir, "cache.db"))
 	if err != nil {
-		return fmt.Errorf("creating cache store failed: %w", err)
+		return errors.Wrap(err, "creating cache store failed")
 	}
 
 	// create the controller
@@ -69,7 +69,7 @@ func (c *Client) createController() error {
 		Entitlements:              nil,
 	})
 	if err != nil {
-		return fmt.Errorf("creating controller failed: %w", err)
+		return errors.Wrap(err, "creating controller failed")
 	}
 
 	c.controller = controller

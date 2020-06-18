@@ -2,11 +2,11 @@ package bkimage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/filesync"
 	"github.com/moby/buildkit/session/testutil"
+	"github.com/pkg/errors"
 )
 
 const sessionName = "forge"
@@ -24,7 +24,7 @@ func (c *Client) Session(ctx context.Context, localDirs map[string]string) (*ses
 	// create and configure a new session
 	sess, err := session.NewSession(ctx, sessionName, "")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, nil, errors.Wrap(err, "failed to create session")
 	}
 
 	var syncedDirs []filesync.SyncedDir
@@ -50,7 +50,7 @@ func (c *Client) getSessionManager() (*session.Manager, error) {
 		var err error
 		c.sessionManager, err = session.NewManager()
 		if err != nil {
-			return nil, fmt.Errorf("cannot create session manager: %w", err)
+			return nil, errors.Wrap(err, "cannot create session manager")
 		}
 	}
 

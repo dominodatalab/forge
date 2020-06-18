@@ -14,6 +14,7 @@ import (
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/worker/base"
+	"github.com/pkg/errors"
 
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
 )
@@ -66,7 +67,7 @@ func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	client.ResetHostConfigurations()
 
 	if err := client.initDataStores(); err != nil {
-		return nil, fmt.Errorf("initializing data stores failed: %w", err)
+		return nil, errors.Wrap(err, "initializing data stores failed")
 	}
 
 	return client, nil

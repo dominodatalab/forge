@@ -2,10 +2,10 @@ package bkimage
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	controlapi "github.com/moby/buildkit/api/services/control"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -32,7 +32,7 @@ func (c *Client) Solve(ctx context.Context, req *controlapi.SolveRequest, ch cha
 
 		_, err := c.controller.Solve(ctx, req)
 		if err != nil {
-			err = fmt.Errorf("failed to solve: %w", err)
+			err = errors.Wrap(err, "failed to solve")
 		}
 		return err
 	})

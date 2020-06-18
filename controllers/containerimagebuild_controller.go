@@ -113,7 +113,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		build.Status.ErrorMessage = err.Error()
 
 		if uErr := r.updateResourceStatus(ctx, log, &build); uErr != nil {
-			err = fmt.Errorf("multiple failures occurred: %w: followed by %v", err, uErr)
+			err = errors.Wrapf(uErr, "status update failed: triggered by %v", err)
 			return result, err
 		}
 
@@ -162,7 +162,7 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 
 		// NOTE: move BasicAuth validation into an admission webhook at a later time
 		if err := apiReg.BasicAuth.Validate(); err != nil {
-			return nil, fmt.Errorf("basic auth validation failed: %w", err)
+			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
 		switch {
@@ -186,7 +186,7 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
 	var secret corev1.Secret
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); err != nil {
-		return "", "", fmt.Errorf("cannot find registry auth secret: %w", err)
+		return "", "", errors.Wrap(err, "cannot find registry auth secret")
 	}
 
 	if secret.Type != corev1.SecretTypeDockerConfigJson {
@@ -196,7 +196,7 @@ func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Cont
 	input := secret.Data[corev1.DockerConfigJsonKey]
 	var output credentials.DockerConfigJSON
 	if err := json.Unmarshal(input, &output); err != nil {
-		return "", "", fmt.Errorf("cannot parse docker config in registry secret: %w", err)
+		return "", "", errors.Wrap(err, "cannot parse docker config in registry secret")
 	}
 
 	auth, ok := output.Auths[host]
