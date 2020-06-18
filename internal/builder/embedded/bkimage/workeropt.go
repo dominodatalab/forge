@@ -1,6 +1,7 @@
 package bkimage
 
 import (
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"syscall"
@@ -19,7 +20,6 @@ import (
 	"github.com/moby/buildkit/worker/base"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/system"
-	log "github.com/sirupsen/logrus"
 )
 
 func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
@@ -30,12 +30,12 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 
 	// worker executor
 	unprivileged := system.GetParentNSeuid() != 0
-	log.Infof("Executor running unprivileged: %t", unprivileged)
+	c.logger.V(1).Info(fmt.Sprintf("Executor running unprivileged: %t", unprivileged))
 
 	exeOpt := runcexecutor.Opt{
 		Root:        filepath.Join(c.rootDir, "executor"),
 		Rootless:    unprivileged,
-		ProcessMode: getProcessMode(),
+		ProcessMode: c.getProcessMode(),
 	}
 
 	np, err := netproviders.Providers(netproviders.Opt{Mode: "auto"})
@@ -87,7 +87,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 	return
 }
 
-func getProcessMode() oci.ProcessMode {
+func (c *Client) getProcessMode() oci.ProcessMode {
 	mountArgs := []string{"-t", "proc", "none", "/proc"}
 	cmd := exec.Command("mount", mountArgs...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -97,7 +97,7 @@ func getProcessMode() oci.ProcessMode {
 	}
 
 	if bs, err := cmd.CombinedOutput(); err != nil {
-		log.Warnf("Process sandbox is not available, consider unmasking procfs: %v", string(bs))
+		c.logger.V(1).Info(fmt.Sprintf("Process sandbox is not available, consider unmasking procfs: %v", string(bs)))
 		return oci.NoProcessSandbox
 	}
 	return oci.ProcessSandbox

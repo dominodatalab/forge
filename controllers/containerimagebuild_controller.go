@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,6 +60,8 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return result, nil
 	}
 
+	log = log.WithValues("annotations", build.Annotations)
+
 	// mark resource status and update before launching build
 	build.Status.SetState(forgev1alpha1.Building)
 	build.Status.BuildStartedAt = &metav1.Time{Time: time.Now()}
@@ -97,15 +101,19 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	// dispatch build operation
+	r.Builder.SetLogger(log)
 	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
+
 	if err != nil {
-		log.Error(err, "Build process failed")
+		log.V(1).Info("received error during build and push", "error", err)
+
+		logUnknownInstructionError(log, err)
 
 		build.Status.SetState(forgev1alpha1.Failed)
 		build.Status.ErrorMessage = err.Error()
 
 		if uErr := r.updateResourceStatus(ctx, log, &build); uErr != nil {
-			err = fmt.Errorf("multiple failures occurred: %w: followed by %v", err, uErr)
+			err = errors.Wrapf(uErr, "status update failed: triggered by %v", err)
 			return result, err
 		}
 
@@ -154,7 +162,7 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 
 		// NOTE: move BasicAuth validation into an admission webhook at a later time
 		if err := apiReg.BasicAuth.Validate(); err != nil {
-			return nil, fmt.Errorf("basic auth validation failed: %w", err)
+			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
 		switch {
@@ -178,7 +186,7 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
 	var secret corev1.Secret
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); err != nil {
-		return "", "", fmt.Errorf("cannot find registry auth secret: %w", err)
+		return "", "", errors.Wrap(err, "cannot find registry auth secret")
 	}
 
 	if secret.Type != corev1.SecretTypeDockerConfigJson {
@@ -188,7 +196,7 @@ func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Cont
 	input := secret.Data[corev1.DockerConfigJsonKey]
 	var output credentials.DockerConfigJSON
 	if err := json.Unmarshal(input, &output); err != nil {
-		return "", "", fmt.Errorf("cannot parse docker config in registry secret: %w", err)
+		return "", "", errors.Wrap(err, "cannot parse docker config in registry secret")
 	}
 
 	auth, ok := output.Auths[host]
@@ -228,4 +236,15 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 		}
 	}
 	return nil
+}
+
+// This logs the underlying error from a build when the display channels inside builder.embedded have not yet been initialized.
+func logUnknownInstructionError(log logr.Logger, err error) {
+	if unwrappedError := errors.Unwrap(err); unwrappedError != nil {
+		err = unwrappedError
+	}
+	cause := errors.Cause(err)
+	if instructions.IsUnknownInstruction(cause) {
+		log.Error(err, cause.Error())
+	}
 }

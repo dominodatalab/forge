@@ -2,10 +2,10 @@ package bkimage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/pkg/errors"
 )
 
 func (c *Client) TagImage(ctx context.Context, src, dest string) error {
@@ -22,7 +22,7 @@ func (c *Client) TagImage(ctx context.Context, src, dest string) error {
 	// grab reference to local image object
 	imgObj, err := c.imageStore.Get(ctx, src)
 	if err != nil {
-		return fmt.Errorf("getting image %q from image store failed: %w", src, err)
+		return errors.Wrapf(err, "getting image %q from image store failed", src)
 	}
 
 	img := images.Image{
@@ -32,11 +32,11 @@ func (c *Client) TagImage(ctx context.Context, src, dest string) error {
 	}
 	if _, err := c.imageStore.Update(ctx, img); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("updating image store with %q failed: %w", dest, err)
+			return errors.Wrapf(err, "updating image store with %q failed", dest)
 		}
 
 		if _, err := c.imageStore.Create(ctx, img); err != nil {
-			return fmt.Errorf("creating image %q in image store failed: %w", dest, err)
+			return errors.Wrapf(err, "creating image %q in image store failed", dest)
 		}
 	}
 

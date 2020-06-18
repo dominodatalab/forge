@@ -2,10 +2,10 @@ package bkimage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -24,7 +24,7 @@ func (ap *dynamicAuthProvider) Credentials(ctx context.Context, req *auth.Creden
 
 	username, password, err := ap.credFn(req.Host)
 	if err != nil {
-		return nil, fmt.Errorf("credential fetch failed for %q: %w", req.Host, err)
+		return nil, errors.Wrapf(err, "credential fetch failed for %q", req.Host)
 	}
 
 	return &auth.CredentialsResponse{

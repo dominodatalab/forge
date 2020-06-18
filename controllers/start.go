@@ -8,12 +8,12 @@ import (
 	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/system"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/builder"
@@ -28,12 +28,19 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string) {
+func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string, debug bool) {
 	reexec()
 
-	ctrl.SetLogger(zap.New(func(o *zap.Options) {
-		o.Development = true
-	}))
+	atom := zap.NewAtomicLevel()
+	if debug {
+		atom.SetLevel(zap.DebugLevel)
+	}
+
+	logger := ctrlzap.New(func(opts *ctrlzap.Options) {
+		opts.Level = &atom
+	})
+
+	ctrl.SetLogger(logger)
 
 	preparerPlugins, err := preparer.LoadPlugins(preparerPluginsPath)
 	if err != nil {
@@ -59,7 +66,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	bldr, err := builder.New(preparerPlugins)
+	bldr, err := builder.New(preparerPlugins, logger)
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
@@ -97,7 +104,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 }
 
 func reexec() {
-	if len(os.Getenv("IMG_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
+	if len(os.Getenv("FORGE_RUNNING_TESTS")) <= 0 && len(os.Getenv("FORGE_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
 		setupLog.Info("Preparing to unshare process namespace")
 
 		var (
@@ -110,10 +117,10 @@ func reexec() {
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			for sig := range c {
-				logrus.Infof("Received %s, exiting.", sig.String())
+				setupLog.Info(fmt.Sprintf("Received %s, exiting.", sig.String()))
 				if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-					logrus.Fatalf("syscall.Kill %d error: %v", pgid, err)
-					continue
+					setupLog.Error(err, fmt.Sprintf("syscall.Kill %d error: %v", pgid, err))
+					os.Exit(1)
 				}
 				os.Exit(0)
 			}
@@ -121,12 +128,12 @@ func reexec() {
 
 		// If newuidmap is not present re-exec will fail
 		if _, err := exec.LookPath("newuidmap"); err != nil {
-			logrus.Fatalf("newuidmap not found (install uidmap package?): %v", err)
+			setupLog.Error(err, fmt.Sprintf("newuidmap not found (install uidmap package?): %v", err))
 		}
 
 		// Initialize and re-exec with our unshare.
 		cmd := exec.Command("/proc/self/exe", os.Args[1:]...)
-		cmd.Env = append(os.Environ(), "IMG_DO_UNSHARE=1")
+		cmd.Env = append(os.Environ(), "FORGE_DO_UNSHARE=1")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -134,12 +141,14 @@ func reexec() {
 			Setpgid: true,
 		}
 		if err := cmd.Start(); err != nil {
-			logrus.Fatalf("cmd.Start error: %v", err)
+			setupLog.Error(err, fmt.Sprintf("cmd.Start error: %v", err))
+			os.Exit(1)
 		}
 
 		pgid, err = syscall.Getpgid(cmd.Process.Pid)
 		if err != nil {
-			logrus.Fatalf("getpgid error: %v", err)
+			setupLog.Error(err, fmt.Sprintf("getpgid error: %v", err))
+			os.Exit(1)
 		}
 
 		var (
@@ -157,7 +166,8 @@ func reexec() {
 					os.Exit(exitCode)
 				}
 
-				logrus.Fatalf("wait4 error: %v", err)
+				setupLog.Error(err, fmt.Sprintf("wait4 error: %v", err))
+				os.Exit(1)
 			}
 		}
 	}

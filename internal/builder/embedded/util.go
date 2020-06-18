@@ -3,9 +3,8 @@ package embedded
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 
-	"github.com/containerd/console"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -56,11 +55,15 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 	return req, nil
 }
 
-func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
-	displayCh := make(chan *bkclient.SolveStatus)
+func displayProgress(ch chan *controlapi.StatusResponse, logWriter io.Writer) error {
+	progressCh := make(chan *bkclient.SolveStatus)
+
 	go func() {
+		defer close(progressCh)
+
 		for resp := range ch {
 			s := bkclient.SolveStatus{}
+
 			for _, v := range resp.Vertexes {
 				s.Vertexes = append(s.Vertexes, &bkclient.Vertex{
 					Digest:    v.Digest,
@@ -92,17 +95,12 @@ func showProgress(ch chan *controlapi.StatusResponse, noConsole bool) error {
 					Timestamp: v.Timestamp,
 				})
 			}
-			displayCh <- &s
+
+			progressCh <- &s
 		}
-		close(displayCh)
 	}()
-	var c console.Console
-	if !noConsole {
-		if cf, err := console.ConsoleFromFile(os.Stderr); err == nil {
-			c = cf
-		}
-	}
-	return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
+
+	return progressui.DisplaySolveStatus(context.TODO(), "", nil, logWriter, progressCh)
 }
 
 func generateRegistryFunc(registries []config.Registry) (bkimage.CredentialsFn, bkimage.TLSEnabledFn) {

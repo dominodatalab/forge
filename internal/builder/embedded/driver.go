@@ -2,15 +2,16 @@ package embedded
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/distribution/reference"
+	"github.com/go-logr/logr"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dominodatalab/forge/internal/archive"
@@ -22,21 +23,28 @@ import (
 
 type driver struct {
 	bk               *bkimage.Client
+	logger           logr.Logger
 	preparerPlugins  []*preparer.Plugin
 	contextExtractor archive.Extractor
 }
 
-func NewDriver(preparerPlugins []*preparer.Plugin) (*driver, error) {
-	client, err := bkimage.NewClient(config.GetStateDir(), types.AutoBackend)
+func NewDriver(preparerPlugins []*preparer.Plugin, logger logr.Logger) (*driver, error) {
+	client, err := bkimage.NewClient(config.GetStateDir(), types.AutoBackend, logger)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create buildkit client: %w", err)
+		return nil, errors.Wrap(err, "cannot create buildkit client")
 	}
 
 	return &driver{
 		bk:               client,
+		logger:           logger,
 		preparerPlugins:  preparerPlugins,
 		contextExtractor: archive.FetchAndExtract,
 	}, nil
+}
+
+func (d *driver) SetLogger(logger logr.Logger) {
+	d.logger = logger
+	d.bk.SetLogger(logger)
 }
 
 func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([]string, error) {
@@ -140,9 +148,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 		defer sess.Close()
 		return d.bk.Solve(ctx, solveReq, ch)
 	})
-	eg.Go(func() error {
-		return showProgress(ch, false)
-	})
+	eg.Go(func() error { return displayProgress(ch, &bkimage.LogrWriter{Logger: d.logger}) })
 
 	// return error when one occurs
 	return eg.Wait()

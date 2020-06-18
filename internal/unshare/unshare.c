@@ -301,7 +301,7 @@ void nsexec(void)
 	/*
 	 * Return early if we are just running the tests.
 	 */
-	const char* running_tests = getenv("IMG_RUNNING_TESTS");
+	const char* running_tests = getenv("FORGE_RUNNING_TESTS");
 	if (running_tests){
 		return;
 	}
@@ -309,7 +309,7 @@ void nsexec(void)
 	/*
 	 * Return early if we are not told to do the unshare.
 	 */
-	const char* do_unshare = getenv("IMG_DO_UNSHARE");
+	const char* do_unshare = getenv("FORGE_DO_UNSHARE");
 	if (!do_unshare){
 		return;
 	}
