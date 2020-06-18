@@ -54,13 +54,13 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 	spec := build.Spec
 
-	log = log.WithValues("annotations", build.Annotations)
-
 	// ignore resources that have been processed on start
 	if build.Status.State != "" {
 		log.Info("Skipping resource", "state", build.Status.State)
 		return result, nil
 	}
+
+	log = log.WithValues("annotations", build.Annotations)
 
 	// mark resource status and update before launching build
 	build.Status.SetState(forgev1alpha1.Building)
