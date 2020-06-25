@@ -6,6 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// BasicAuthConfig contains credentials either inline or a reference to a dockerconfigjson secret.
 type BasicAuthConfig struct {
 	// Inline basic auth username.
 	// +kubebuilder:validation:Optional
@@ -51,6 +52,7 @@ func (auth BasicAuthConfig) Validate() error {
 	return nil
 }
 
+// Registry contains the parameters required to pull and/or push from an OCI distribution registry.
 type Registry struct {
 	// Registry hostname.
 	// +kubebuilder:validation:MinLength=1
@@ -128,6 +130,8 @@ type ContainerImageBuildStatus struct {
 	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`
 }
 
+// SetStatus will set a new build state and preserve the previous state in a transient field.
+// An initialized state will be set when no state is provided.
 func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 	// NOTE: try to leverage kubebuilder default values on State later; currently doesn't work
 	if s.State == "" {
