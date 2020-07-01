@@ -42,7 +42,7 @@ type ContainerImageBuildReconciler struct {
 
 func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("containerimagebuild", req.Name)
+	log := r.Log.WithValues("containerimagebuild", req.NamespacedName)
 
 	var result ctrl.Result
 	var build forgev1alpha1.ContainerImageBuild

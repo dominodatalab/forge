@@ -16,7 +16,7 @@ spec:
     shortNames:
     - cib
     singular: containerimagebuild
-  scope: Cluster
+  scope: Namespaced
   subresources:
     status: {}
   validation:
@@ -89,6 +89,8 @@ spec:
             registries:
               description: Configure one or more registry hosts with special requirements.
               items:
+                description: Registry contains the parameters required to pull and/or
+                  push from an OCI distribution registry.
                 properties:
                   basicAuth:
                     description: Configure basic authentication credentials for a

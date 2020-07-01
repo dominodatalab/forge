@@ -143,7 +143,7 @@ func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster,shortName=cib
+// +kubebuilder:resource:scope=Namespaced,shortName=cib
 // +kubebuilder:subresource:status
 
 // ContainerImageBuild is the Schema for the containerimagebuilds API

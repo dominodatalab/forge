@@ -28,7 +28,7 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string, debug bool) {
+func StartManager(namespace string, metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string, debug bool) {
 	reexec()
 
 	atom := zap.NewAtomicLevel()
@@ -59,6 +59,7 @@ func StartManager(metricsAddr string, enableLeaderElection bool, brokerOpts *mes
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		Port:               9443,
+		Namespace:          namespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "Unable to start manager")
