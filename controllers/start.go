@@ -23,6 +23,8 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const leaderElectionID = "forge-leader-election"
+
 var (
 	newScheme = runtime.NewScheme()
 	setupLog  = ctrl.Log.WithName("setup")
@@ -58,6 +60,7 @@ func StartManager(namespace string, metricsAddr string, enableLeaderElection boo
 		Scheme:             newScheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   leaderElectionID,
 		Port:               9443,
 		Namespace:          namespace,
 	})
