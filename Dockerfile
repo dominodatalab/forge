@@ -1,20 +1,3 @@
-FROM golang:1.13-alpine3.11 AS forge
-RUN apk add --no-cache \
-        bash \
-        build-base \
-        git \
-        libseccomp-dev \
-        linux-headers
-WORKDIR /forge
-COPY . .
-RUN make static && \
-    mv bin/forge /usr/bin/
-WORKDIR /go/src/github.com/opencontainers/runc
-RUN git clone -c advice.detachedHead=false https://github.com/opencontainers/runc.git . && \
-    git checkout 56aca5aa50d07548d5db8fd33e9dc562f70f3208
-RUN make static BUILDTAGS="seccomp apparmor" && \
-    cp runc /usr/bin/
-
 FROM alpine:3.11 AS base
 
 FROM base AS idmap
@@ -43,13 +26,34 @@ RUN curl -sSL -o fuse-overlayfs https://github.com/containers/fuse-overlayfs/rel
     chmod +x fuse-overlayfs && \
     cp fuse-overlayfs /usr/bin/
 
+FROM golang:1.13-alpine3.11 AS gobase
+RUN apk add --no-cache \
+        bash \
+        build-base \
+        git \
+        libseccomp-dev \
+        linux-headers
+
+FROM gobase AS runc
+WORKDIR /go/src/github.com/opencontainers/runc
+RUN git clone -c advice.detachedHead=false https://github.com/opencontainers/runc.git . && \
+    git checkout 56aca5aa50d07548d5db8fd33e9dc562f70f3208
+RUN make static BUILDTAGS="seccomp apparmor" && \
+    cp runc /usr/bin/
+
+FROM gobase AS forge
+WORKDIR /forge
+COPY . .
+RUN make static && \
+    mv bin/forge /usr/bin/
+
 FROM base
 RUN apk add --no-cache fuse3 git pigz
-COPY --from=forge /usr/bin/forge /usr/bin/forge
-COPY --from=forge /usr/bin/runc /usr/bin/runc
-COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
 COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
 COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
+COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
+COPY --from=runc /usr/bin/runc /usr/bin/runc
+COPY --from=forge /usr/bin/forge /usr/bin/forge
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap && \
     adduser -D -u 1000 user && \
     mkdir -p /run/user/1000 && \
