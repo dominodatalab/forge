@@ -37,10 +37,17 @@ RUN ./autogen.sh --disable-nls --disable-man --without-audit --without-selinux -
     make && \
     cp src/newuidmap src/newgidmap /usr/bin/
 
+FROM base AS fuse-overlayfs
+RUN apk add --no-cache curl
+RUN curl -sSL -o fuse-overlayfs https://github.com/containers/fuse-overlayfs/releases/download/v1.1.2/fuse-overlayfs-x86_64 && \
+    chmod +x fuse-overlayfs && \
+    cp fuse-overlayfs /usr/bin/
+
 FROM base
-RUN apk add --no-cache git pigz
+RUN apk add --no-cache fuse3 git pigz
 COPY --from=forge /usr/bin/forge /usr/bin/forge
 COPY --from=forge /usr/bin/runc /usr/bin/runc
+COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
 COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
 COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap && \

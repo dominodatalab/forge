@@ -10,6 +10,7 @@ replace (
 )
 
 require (
+	github.com/AkihiroSuda/containerd-fuse-overlayfs v0.0.0-20200220082720-bb896865146c
 	github.com/containerd/containerd v1.4.0-0
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd // indirect

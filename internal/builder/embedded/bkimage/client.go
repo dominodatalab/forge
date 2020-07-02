@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	fuseoverlayfs "github.com/AkihiroSuda/containerd-fuse-overlayfs"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
@@ -44,12 +45,16 @@ type Client struct {
 func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	// select appropriate system backend
 	if backend == types.AutoBackend {
-		if overlay.Supported(rootDir) == nil {
+		switch {
+		case overlay.Supported(rootDir) == nil:
 			backend = types.OverlayFSBackend
-		} else {
+		case fuseoverlayfs.Supported(rootDir) == nil:
+			backend = types.FuseOverlayFSBackend
+		default:
 			backend = types.NativeBackend
 		}
 	}
+
 	logger.Info(fmt.Sprintf("Using filesystem as backend: %s", backend))
 
 	// create working directory
