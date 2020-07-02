@@ -45,13 +45,13 @@ type Client struct {
 func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	autoSelectFn := func() string {
 		if err := overlay.Supported(rootDir); err != nil {
-			logger.V(2).Info("overlayfs not unsupported", "error", err)
+			logger.Info("overlayfs not unsupported", "error", err)
 		} else {
 			return types.OverlayFSBackend
 		}
 
 		if err := fuseoverlayfs.Supported(rootDir); err != nil {
-			logger.V(2).Info("fuse-overlayfs not supported", "error", err)
+			logger.Info("fuse-overlayfs not supported", "error", err)
 		} else {
 			return types.OverlayFSBackend
 		}
