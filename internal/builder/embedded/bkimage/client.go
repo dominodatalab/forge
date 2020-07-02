@@ -53,7 +53,7 @@ func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 		if err := fuseoverlayfs.Supported(rootDir); err != nil {
 			logger.Info("fuse-overlayfs not supported", "error", err)
 		} else {
-			return types.OverlayFSBackend
+			return types.FuseOverlayFSBackend
 		}
 
 		return types.NativeBackend
