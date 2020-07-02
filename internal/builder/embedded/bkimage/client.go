@@ -43,16 +43,25 @@ type Client struct {
 }
 
 func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
+	autoSelectFn := func() string {
+		if err := overlay.Supported(rootDir); err != nil {
+			logger.V(2).Info("overlayfs not unsupported", "error", err)
+		} else {
+			return types.OverlayFSBackend
+		}
+
+		if err := fuseoverlayfs.Supported(rootDir); err != nil {
+			logger.V(2).Info("fuse-overlayfs not supported", "error", err)
+		} else {
+			return types.OverlayFSBackend
+		}
+
+		return types.NativeBackend
+	}
+
 	// select appropriate system backend
 	if backend == types.AutoBackend {
-		switch {
-		case overlay.Supported(rootDir) == nil:
-			backend = types.OverlayFSBackend
-		case fuseoverlayfs.Supported(rootDir) == nil:
-			backend = types.FuseOverlayFSBackend
-		default:
-			backend = types.NativeBackend
-		}
+		backend = autoSelectFn()
 	}
 
 	logger.Info(fmt.Sprintf("Using filesystem as backend: %s", backend))
