@@ -2,6 +2,7 @@ apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
   name: example-build
+  namespace: default
 spec:
   # tag is optional (e.g. multi-stage-app:v1.0.0)
   imageName: multi-stage-app
