@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/distribution/reference"
@@ -110,9 +111,12 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 
 	for _, preparerPlugin := range d.preparerPlugins {
 		defer preparerPlugin.Cleanup()
+		d.logger.Info("Preparing resources for image build context")
 		if err := preparerPlugin.Prepare(extract.ContentsDir, opts.PluginData); err != nil {
 			return err
 		}
+		d.logger.Info("Resource preparation complete")
+		d.logger.Info(strings.Repeat("=", 70))
 	}
 
 	// assume Dockerfile lives inside context root
