@@ -3,17 +3,20 @@ package preparer
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/go-logr/logr"
+	"github.com/hashicorp/go-hclog"
 )
 
-type pluginLoader = func(string) (*Plugin, error)
+type pluginLoader = func(string, hclog.Logger) (*Plugin, error)
 
 var DefaultPluginLoader = NewPreparerPlugin
 
-func LoadPlugins(preparerPluginsPath string) (preparerPlugins []*Plugin, err error) {
-	return loadPlugins(preparerPluginsPath, DefaultPluginLoader)
+func LoadPlugins(preparerPluginsPath string, logger logr.Logger) (preparerPlugins []*Plugin, err error) {
+	return loadPlugins(preparerPluginsPath, &logrLogger{logger}, DefaultPluginLoader)
 }
 
-func loadPlugins(preparerPluginsPath string, loader pluginLoader) (preparerPlugins []*Plugin, err error) {
+func loadPlugins(preparerPluginsPath string, logger hclog.Logger, loader pluginLoader) (preparerPlugins []*Plugin, err error) {
 	if preparerPluginsPath == "" {
 		return
 	}
@@ -29,7 +32,7 @@ func loadPlugins(preparerPluginsPath string, loader pluginLoader) (preparerPlugi
 		}
 
 		if !info.IsDir() {
-			preparerPlugin, err := loader(path)
+			preparerPlugin, err := loader(path, logger)
 			if err != nil {
 				return err
 			}

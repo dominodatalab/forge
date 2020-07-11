@@ -15,14 +15,7 @@ var handshakeConfig = plugin.HandshakeConfig{
 	MagicCookieValue: os.Getenv("FORGE_PREPARER_PLUGIN_MAGIC_VALUE"),
 }
 
-func NewPreparerPlugin(location string) (*Plugin, error) {
-	logger := hclog.New(&hclog.LoggerOptions{
-		Name:   "plugins",
-		Output: os.Stdout,
-		// TODO configurable level, from LOG_LEVEL?
-		Level: hclog.Debug,
-	})
-
+func NewPreparerPlugin(location string, logger hclog.Logger) (*Plugin, error) {
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins: map[string]plugin.Plugin{

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 func TestLoadPlugins(t *testing.T) {
@@ -58,14 +60,14 @@ func TestLoadPlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			DefaultPluginLoader = func(path string) (*Plugin, error) {
+			DefaultPluginLoader = func(path string, logger hclog.Logger) (*Plugin, error) {
 				return &Plugin{}, nil
 			}
 			defer func() {
 				DefaultPluginLoader = NewPreparerPlugin
 			}()
 
-			gotPreparerPlugins, err := LoadPlugins(tt.path)
+			gotPreparerPlugins, err := LoadPlugins(tt.path, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadPlugins() error = %v, wantErr %v", err, tt.wantErr)
 				return
