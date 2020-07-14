@@ -14,6 +14,6 @@ type OCIImageBuilder interface {
 	BuildAndPush(context.Context, *config.BuildOptions) ([]string, error)
 }
 
-func New(preparerPlugins []*preparer.Plugin, logger logr.Logger) (OCIImageBuilder, error) {
-	return embedded.NewDriver(preparerPlugins, logger)
+func New(preparerPlugins []*preparer.Plugin, cacheImageLayers bool, logger logr.Logger) (OCIImageBuilder, error) {
+	return embedded.NewDriver(preparerPlugins, cacheImageLayers, logger)
 }

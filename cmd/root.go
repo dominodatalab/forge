@@ -26,7 +26,12 @@ plugins. This allows users to hook into the build process and add/modify/delete 
 workflows.
 
 Ideally, state change consumers should set a watch on their ContainerImageBuild resources for updates. When this is not
-possible, this controller can be configured to push state updates to any AMQP message broker.`
+possible, this controller can be configured to push state updates to any AMQP message broker.
+
+Image layers can be exported and stored inside the target registry after a build. This shared cache will then be used by
+all controller workers. By default, the embedded image builder uses a "max" mode to ensure all intermediate and final
+image layers are exported. You can override this behavior using the EMBEDDED_BUILDER_CACHE_MODE environment variable.
+Acceptable values include "min" and "max".`
 
 	examples = `
 # Watch for ContainerImageBuild resources in your namespace
@@ -36,7 +41,10 @@ forge --namespace <my-ns>
 forge --message-broker amqp --amqp-uri amqp://<user>:<pass>@<host>:<port/<path> --amqp-queue <queue-name>
 
 # Leverage one or more plugins for pre-processing a context prior to build
-forge --preparer-plugins-path /plugins/installed/here`
+forge --preparer-plugins-path /plugins/installed/here
+
+# Enable image build layer caching
+forge --enable-layer-caching`
 )
 
 var (
@@ -49,6 +57,7 @@ var (
 	amqpURI              string
 	amqpQueue            string
 	preparerPluginsPath  string
+	enableLayerCaching   bool
 	brokerOpts           *message.Options
 
 	rootCmd = &cobra.Command{
@@ -57,7 +66,7 @@ var (
 		Example: examples,
 		PreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
-			controllers.StartManager(namespace, metricsAddr, enableLeaderElection, brokerOpts, preparerPluginsPath, debug)
+			controllers.StartManager(namespace, metricsAddr, enableLeaderElection, brokerOpts, preparerPluginsPath, enableLayerCaching, debug)
 		},
 	}
 )
@@ -92,5 +101,6 @@ func init() {
 	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
 	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
 	rootCmd.Flags().StringVar(&preparerPluginsPath, "preparer-plugins-path", path.Join(config.GetStateDir(), "plugins"), "Path to specific preparer plugins or directory to load them from")
+	rootCmd.Flags().BoolVar(&enableLayerCaching, "enable-layer-caching", false, "Enable image layer caching")
 	rootCmd.Flags().BoolVar(&debug, "debug", false, "Enabled verbose logging")
 }

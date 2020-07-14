@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -15,7 +17,7 @@ import (
 	"github.com/dominodatalab/forge/internal/config"
 )
 
-func solveRequestWithContext(sessionID string, image string, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
+func solveRequestWithContext(sessionID string, image string, cacheImageLayers bool, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
 		Session:  sessionID,
@@ -27,6 +29,46 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 		ExporterAttrs: map[string]string{
 			"name": image,
 		},
+	}
+
+	if cacheImageLayers {
+		imageName, err := reference.ParseNormalizedNamed(image)
+		if err != nil {
+			return nil, err
+		}
+		cacheTaggedName, err := reference.WithTag(imageName, "buildcache")
+		if err != nil {
+			return nil, err
+		}
+		cacheTagRef := cacheTaggedName.String()
+
+		// default exports all intermediate layers
+		cacheMode := os.Getenv("EMBEDDED_BUILDER_CACHE_MODE")
+		if cacheMode == "" {
+			cacheMode = "max"
+		} else if cacheMode != "min" && cacheMode != "max" {
+			return nil, fmt.Errorf("invalid embedded builder cache mode: %s", cacheMode)
+		}
+
+		registryExport := &controlapi.CacheOptionsEntry{
+			Type: "registry",
+			Attrs: map[string]string{
+				"mode": cacheMode,
+				"ref":  cacheTagRef,
+			},
+		}
+		registryImport := &controlapi.CacheOptionsEntry{
+			Type: "registry",
+			Attrs: map[string]string{
+				"ref": cacheTagRef,
+			},
+		}
+
+		req.Cache = controlapi.CacheOptions{
+			Exports: []*controlapi.CacheOptionsEntry{registryExport},
+			Imports: []*controlapi.CacheOptionsEntry{registryImport},
+		}
+		req.FrontendAttrs["cache-from"] = cacheTagRef
 	}
 
 	if opts.NoCache {
