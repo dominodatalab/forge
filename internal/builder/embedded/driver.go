@@ -27,9 +27,10 @@ type driver struct {
 	logger           logr.Logger
 	preparerPlugins  []*preparer.Plugin
 	contextExtractor archive.Extractor
+	cacheImageLayers bool
 }
 
-func NewDriver(preparerPlugins []*preparer.Plugin, logger logr.Logger) (*driver, error) {
+func NewDriver(preparerPlugins []*preparer.Plugin, cacheImageLayers bool, logger logr.Logger) (*driver, error) {
 	client, err := bkimage.NewClient(config.GetStateDir(), types.AutoBackend, logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create buildkit client")
@@ -40,6 +41,7 @@ func NewDriver(preparerPlugins []*preparer.Plugin, logger logr.Logger) (*driver,
 		logger:           logger,
 		preparerPlugins:  preparerPlugins,
 		contextExtractor: archive.FetchAndExtract,
+		cacheImageLayers: cacheImageLayers,
 	}, nil
 }
 
@@ -132,7 +134,7 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 	}
 
 	// prepare build parameters
-	solveReq, err := solveRequestWithContext(sess.ID(), image, opts)
+	solveReq, err := solveRequestWithContext(sess.ID(), image, d.cacheImageLayers, opts)
 	if err != nil {
 		sess.Close()
 		return err
