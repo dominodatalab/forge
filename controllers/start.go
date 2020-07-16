@@ -10,8 +10,10 @@ import (
 	"github.com/opencontainers/runc/libcontainer/system"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -87,13 +89,27 @@ func StartManager(namespace string, metricsAddr string, enableLeaderElection boo
 		defer publisher.Close()
 	}
 
+	// Create a globally-scoped Kubernetes client. mgr.GetClient() can only
+	// refer to resources in the same-namespace when one is provided.
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		setupLog.Error(err, "Could not initialize in-cluster Kubernetes config")
+		os.Exit(1)
+	}
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		setupLog.Error(err, "Could not initialize Kubernetes client")
+		os.Exit(1)
+	}
+
 	if err = (&ContainerImageBuildReconciler{
-		Log:      ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("containerimagebuild-controller"),
-		Builder:  bldr,
-		Producer: publisher,
+		Log:       ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("containerimagebuild-controller"),
+		Builder:   bldr,
+		Producer:  publisher,
+		Clientset: clientset,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)

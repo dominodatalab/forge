@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +30,7 @@ import (
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
 type ContainerImageBuildReconciler struct {
 	client.Client
+	*kubernetes.Clientset
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
@@ -191,8 +192,9 @@ func (r *ContainerImageBuildReconciler) buildRegistryConfig(ctx context.Context,
 }
 
 func (r *ContainerImageBuildReconciler) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
-	var secret corev1.Secret
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); err != nil {
+	// ctx is currently unused: https://github.com/kubernetes/kubernetes/pull/87299
+	secret, err := r.Clientset.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
 		return "", "", errors.Wrap(err, "cannot find registry auth secret")
 	}
 
