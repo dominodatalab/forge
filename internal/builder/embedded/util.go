@@ -17,6 +17,14 @@ import (
 	"github.com/dominodatalab/forge/internal/config"
 )
 
+const (
+	// common tag name that will be used when registry image caching is enabled.
+	cacheTag = "buildcache"
+
+	// cache mode used when override envvar is not set
+	defaultCacheMode = "max"
+)
+
 func solveRequestWithContext(sessionID string, image string, cacheImageLayers bool, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
@@ -36,18 +44,15 @@ func solveRequestWithContext(sessionID string, image string, cacheImageLayers bo
 		if err != nil {
 			return nil, err
 		}
-		cacheTaggedName, err := reference.WithTag(imageName, "buildcache")
+		cacheTaggedName, err := reference.WithTag(imageName, cacheTag)
 		if err != nil {
 			return nil, err
 		}
 		cacheTagRef := cacheTaggedName.String()
 
-		// default exports all intermediate layers
-		cacheMode := os.Getenv("EMBEDDED_BUILDER_CACHE_MODE")
-		if cacheMode == "" {
-			cacheMode = "max"
-		} else if cacheMode != "min" && cacheMode != "max" {
-			return nil, fmt.Errorf("invalid embedded builder cache mode: %s", cacheMode)
+		cacheMode, err := getExportMode()
+		if err != nil {
+			return nil, err
 		}
 
 		registryExport := &controlapi.CacheOptionsEntry{
@@ -95,6 +100,23 @@ func solveRequestWithContext(sessionID string, image string, cacheImageLayers bo
 	}
 
 	return req, nil
+}
+
+// returns the mode used when pushing cached layers to the registry.
+//
+// "min" only pushes the layers for the final image (no intermediate layers for multi-stage builds)
+// "max" pushes all layers into the cache
+func getExportMode() (string, error) {
+	mode := os.Getenv("EMBEDDED_BUILDER_CACHE_MODE")
+
+	switch {
+	case mode == "":
+		return defaultCacheMode, nil
+	case mode != "min" && mode != "max":
+		return "", fmt.Errorf("invalid embedded builder cache mode: %s", mode)
+	default:
+		return mode, nil
+	}
 }
 
 func displayProgress(ch chan *controlapi.StatusResponse, logWriter io.Writer) error {
