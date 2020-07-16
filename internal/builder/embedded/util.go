@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/docker/distribution/reference"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/cmd/buildctl/build"
@@ -15,7 +17,15 @@ import (
 	"github.com/dominodatalab/forge/internal/config"
 )
 
-func solveRequestWithContext(sessionID string, image string, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
+const (
+	// common tag name that will be used when registry image caching is enabled.
+	cacheTag = "buildcache"
+
+	// cache mode used when override envvar is not set
+	defaultCacheMode = "max"
+)
+
+func solveRequestWithContext(sessionID string, image string, cacheImageLayers bool, opts *config.BuildOptions) (*controlapi.SolveRequest, error) {
 	req := &controlapi.SolveRequest{
 		Ref:      identity.NewID(),
 		Session:  sessionID,
@@ -27,6 +37,43 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 		ExporterAttrs: map[string]string{
 			"name": image,
 		},
+	}
+
+	if cacheImageLayers {
+		imageName, err := reference.ParseNormalizedNamed(image)
+		if err != nil {
+			return nil, err
+		}
+		cacheTaggedName, err := reference.WithTag(imageName, cacheTag)
+		if err != nil {
+			return nil, err
+		}
+		cacheTagRef := cacheTaggedName.String()
+
+		cacheMode, err := getExportMode()
+		if err != nil {
+			return nil, err
+		}
+
+		registryExport := &controlapi.CacheOptionsEntry{
+			Type: "registry",
+			Attrs: map[string]string{
+				"mode": cacheMode,
+				"ref":  cacheTagRef,
+			},
+		}
+		registryImport := &controlapi.CacheOptionsEntry{
+			Type: "registry",
+			Attrs: map[string]string{
+				"ref": cacheTagRef,
+			},
+		}
+
+		req.Cache = controlapi.CacheOptions{
+			Exports: []*controlapi.CacheOptionsEntry{registryExport},
+			Imports: []*controlapi.CacheOptionsEntry{registryImport},
+		}
+		req.FrontendAttrs["cache-from"] = cacheTagRef
 	}
 
 	if opts.NoCache {
@@ -53,6 +100,23 @@ func solveRequestWithContext(sessionID string, image string, opts *config.BuildO
 	}
 
 	return req, nil
+}
+
+// returns the mode used when pushing cached layers to the registry.
+//
+// "min" only pushes the layers for the final image (no intermediate layers for multi-stage builds)
+// "max" pushes all layers into the cache
+func getExportMode() (string, error) {
+	mode := os.Getenv("EMBEDDED_BUILDER_CACHE_MODE")
+
+	switch {
+	case mode == "":
+		return defaultCacheMode, nil
+	case mode != "min" && mode != "max":
+		return "", fmt.Errorf("invalid embedded builder cache mode: %s", mode)
+	default:
+		return mode, nil
+	}
 }
 
 func displayProgress(ch chan *controlapi.StatusResponse, logWriter io.Writer) error {

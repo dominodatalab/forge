@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 
 	"github.com/moby/buildkit/cache/remotecache"
-	inlineremotecache "github.com/moby/buildkit/cache/remotecache/inline"
 	registryremotecache "github.com/moby/buildkit/cache/remotecache/registry"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/frontend"
@@ -54,7 +53,7 @@ func (c *Client) createController() error {
 		"gateway.v0":    gateway.NewGatewayFrontend(wc),
 	}
 	remoteCacheExporterFuncs := map[string]remotecache.ResolveCacheExporterFunc{
-		"inline": inlineremotecache.ResolveCacheExporterFunc(),
+		"registry": registryremotecache.ResolveCacheExporterFunc(sm, c.getRegistryHosts()),
 	}
 	remoteCacheImporterFuncs := map[string]remotecache.ResolveCacheImporterFunc{
 		"registry": registryremotecache.ResolveCacheImporterFunc(sm, opt.ContentStore, c.getRegistryHosts()),

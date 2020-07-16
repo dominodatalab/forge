@@ -30,7 +30,7 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
-func StartManager(namespace string, metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string, debug bool) {
+func StartManager(namespace string, metricsAddr string, enableLeaderElection bool, brokerOpts *message.Options, preparerPluginsPath string, enableLayerCaching bool, debug bool) {
 	reexec()
 
 	atom := zap.NewAtomicLevel()
@@ -70,7 +70,7 @@ func StartManager(namespace string, metricsAddr string, enableLeaderElection boo
 	}
 
 	setupLog.Info("Initializing OCI builder")
-	bldr, err := builder.New(preparerPlugins, logger)
+	bldr, err := builder.New(preparerPlugins, enableLayerCaching, logger)
 	if err != nil {
 		setupLog.Error(err, "Image builder initialization failed")
 		os.Exit(1)
