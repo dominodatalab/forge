@@ -3,6 +3,7 @@ package bkimage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/moby/buildkit/util/push"
 	"github.com/pkg/errors"
@@ -26,6 +27,7 @@ func (c *Client) PushImage(ctx context.Context, image string) error {
 	}
 
 	// TODO figure out if / how buildkit & containerd convey progress during the push
+	c.logger.Info(strings.Repeat("=", 70))
 	c.logger.Info(fmt.Sprintf("Pushing image %q", image))
 	defer c.logger.Info(fmt.Sprintf("Pushed image %q", image))
 
