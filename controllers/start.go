@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -91,7 +90,7 @@ func StartManager(namespace string, metricsAddr string, enableLeaderElection boo
 
 	// Create a globally-scoped Kubernetes client. mgr.GetClient() can only
 	// refer to resources in the same-namespace when one is provided.
-	cfg, err := rest.InClusterConfig()
+	cfg, err := ctrl.GetConfig()
 	if err != nil {
 		setupLog.Error(err, "Could not initialize in-cluster Kubernetes config")
 		os.Exit(1)
