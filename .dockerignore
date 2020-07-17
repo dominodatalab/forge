@@ -1,1 +1,6 @@
-Dockerfile
+.circleci/
+.git/
+.github/
+.gitignore
+.idea/
+Dockerfile*
