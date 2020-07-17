@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,14 +106,10 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	r.Builder.SetLogger(log)
 	imageURLs, err := r.Builder.BuildAndPush(ctx, opts)
 
-	log.Info(strings.Repeat("=", 70))
-
 	if err != nil {
 		log.V(1).Info("received error during build and push", "error", err)
 
-		if !logUnknownInstructionError(log, err) {
-			log.Info(fmt.Sprintf("Error during image build and push: %s", err.Error()))
-		}
+		logError(log, err)
 
 		build.Status.SetState(forgev1alpha1.Failed)
 		build.Status.ErrorMessage = err.Error()
@@ -243,18 +238,4 @@ func (r *ContainerImageBuildReconciler) updateResourceStatus(ctx context.Context
 		}
 	}
 	return nil
-}
-
-// This logs the underlying error from a build when the display channels inside builder.embedded have not yet been initialized.
-func logUnknownInstructionError(log logr.Logger, err error) bool {
-	if unwrappedError := errors.Unwrap(err); unwrappedError != nil {
-		err = unwrappedError
-	}
-	cause := errors.Cause(err)
-	if instructions.IsUnknownInstruction(cause) {
-		log.Error(err, cause.Error())
-		return true
-	}
-
-	return false
 }
