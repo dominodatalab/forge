@@ -50,6 +50,7 @@ forge --enable-layer-caching`
 var (
 	debug bool
 
+	buildJobImage        string
 	namespace            string
 	metricsAddr          string
 	enableLeaderElection bool
@@ -66,7 +67,17 @@ var (
 		Example: examples,
 		PreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
-			controllers.StartManager(namespace, metricsAddr, enableLeaderElection, brokerOpts, preparerPluginsPath, enableLayerCaching, debug)
+			cfg := controllers.Config{
+				BuildJobImage:        buildJobImage,
+				Namespace:            namespace,
+				MetricsAddr:          metricsAddr,
+				EnableLeaderElection: enableLeaderElection,
+				BrokerOpts:           brokerOpts,
+				PreparerPluginsPath:  preparerPluginsPath,
+				EnableLayerCaching:   enableLayerCaching,
+				Debug:                debug,
+			}
+			controllers.StartManager(cfg)
 		},
 	}
 )
@@ -93,6 +104,9 @@ func processBrokerOpts(cmd *cobra.Command, args []string) error {
 
 func init() {
 	rootCmd.Flags().SortFlags = false
+
+	// NOTE: we can probably pass this image/tag in as a build flag
+	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", "quay.io/domino/forge:v0.1.0-rc9-replicator", "Image used to launch build jobs. This typically should be the same as the controller.")
 
 	rootCmd.Flags().StringVar(&namespace, "namespace", "default", "Watch for objects in desired namespace")
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
