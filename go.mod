@@ -28,7 +28,7 @@ require (
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20180702182724-07a764486eb1 // indirect
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/cobra v0.0.5
+	github.com/spf13/cobra v1.0.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/bbolt v1.3.3
