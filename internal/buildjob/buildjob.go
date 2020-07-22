@@ -123,7 +123,8 @@ func (j *Job) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
 	}
-	if err := j.transitionToBuilding(cib); err != nil {
+
+	if cib, err = j.transitionToBuilding(cib); err != nil {
 		return err
 	}
 
@@ -133,10 +134,10 @@ func (j *Job) Run() error {
 	opts, err := j.generateBuildOptions(ctx, cib)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate build options")
+
 		if iErr := j.transitionToFailure(cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
-
 		return err
 	}
 
@@ -245,32 +246,35 @@ func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace
 	return auth.Username, auth.Password, nil
 }
 
-func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) error {
-	cib.Status.State = apiv1alpha1.BuildStateBuilding
+func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.ContainerImageBuild, error) {
+	cib.Status.SetState(apiv1alpha1.BuildStateBuilding)
 	cib.Status.BuildStartedAt = &metav1.Time{Time: time.Now()}
 
 	return j.updateStatus(cib)
 }
 
 func (j *Job) transitionToComplete(cib *apiv1alpha1.ContainerImageBuild, images []string) error {
-	cib.Status.State = apiv1alpha1.BuildStateCompleted
+	cib.Status.SetState(apiv1alpha1.BuildStateCompleted)
 	cib.Status.ImageURLs = images
 	cib.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
 
-	return j.updateStatus(cib)
+	_, err := j.updateStatus(cib)
+	return err
 }
 
 func (j *Job) transitionToFailure(cib *apiv1alpha1.ContainerImageBuild, err error) error {
-	cib.Status.State = apiv1alpha1.BuildStateFailed
+	cib.Status.SetState(apiv1alpha1.BuildStateFailed)
 	cib.Status.ErrorMessage = err.Error()
 	cib.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
 
-	return j.updateStatus(cib)
+	_, err = j.updateStatus(cib)
+	return err
 }
 
-func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) error {
-	if _, err := j.clientforge.ContainerImageBuilds(j.namespace).UpdateStatus(cib); err != nil {
-		return errors.Wrap(err, "unable to update status")
+func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.ContainerImageBuild, error) {
+	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).UpdateStatus(cib)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to update status")
 	}
 
 	if j.producer != nil {
@@ -284,9 +288,9 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) error {
 			ErrorMessage:  cib.Status.ErrorMessage,
 		}
 		if err := j.producer.Publish(update); err != nil {
-			return errors.Wrap(err, "unable to publish message")
+			return nil, errors.Wrap(err, "unable to publish message")
 		}
 	}
 
-	return nil
+	return cib, nil
 }
