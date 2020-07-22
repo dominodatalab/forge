@@ -135,7 +135,7 @@ type ContainerImageBuildStatus struct {
 func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 	// NOTE: try to leverage kubebuilder default values on State later; currently doesn't work
 	if s.State == "" {
-		s.State = Initialized
+		s.State = BuildStateInitialized
 	}
 
 	s.PreviousState = s.State

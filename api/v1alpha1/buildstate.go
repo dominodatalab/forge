@@ -4,15 +4,15 @@ package v1alpha1
 type BuildState string
 
 const (
-	// Initialized indicates that a new build has been intercepted by the controller.
-	Initialized BuildState = "Initialized"
+	// BuildStateInitialized indicates that a new build has been intercepted by the controller.
+	BuildStateInitialized BuildState = "BuildStateInitialized"
 
-	// Building indicates that a build that is currently running.
-	Building BuildState = "Building"
+	// BuildStateBuilding indicates that a build that is currently running.
+	BuildStateBuilding BuildState = "BuildStateBuilding"
 
-	// Completed indicates that a build has finished successfully.
-	Completed BuildState = "Completed"
+	// BuildStateCompleted indicates that a build has finished successfully.
+	BuildStateCompleted BuildState = "BuildStateCompleted"
 
-	// Failed indicates that a build encountered an error during the build process.
-	Failed BuildState = "Failed"
+	// BuildStateFailed indicates that a build encountered an error during the build process.
+	BuildStateFailed BuildState = "BuildStateFailed"
 )

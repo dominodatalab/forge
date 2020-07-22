@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -23,10 +24,8 @@ import (
 	_ "github.com/dominodatalab/forge/internal/unshare"
 )
 
-// NOTE: do we need/want a type here?
-
 type Job struct {
-	logger logr.Logger
+	log logr.Logger
 
 	clientk8s   kubernetes.Interface
 	clientforge clientv1alpha1.Interface
@@ -37,17 +36,21 @@ type Job struct {
 
 	builder builder.OCIImageBuilder
 
-	name string
+	name      string
+	namespace string
 
 	cleanupSteps []func()
 }
 
 func New(cfg Config) (*Job, error) {
-	reexec()
-
 	log := NewLogger()
 
+	// unshare user, mount namespace and re-exec ourselves
+	reexec(log)
+
 	// initialize kubernetes clients
+	log.Info("Initializing Kubernetes clients")
+
 	restCfg, err := loadKubernetesConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot load k8s config")
@@ -66,6 +69,8 @@ func New(cfg Config) (*Job, error) {
 	// setup message publisher
 	var producer message.Producer
 	if cfg.BrokerOpts != nil {
+		log.Info("Initializing status update message publisher")
+
 		if producer, err = message.NewProducer(cfg.BrokerOpts); err != nil {
 			return nil, err
 		}
@@ -76,6 +81,8 @@ func New(cfg Config) (*Job, error) {
 	}
 
 	// setup preparer plugins
+	log.Info("Loading configured preparer plugins")
+
 	preparerPlugins, err := preparer.LoadPlugins(cfg.PreparerPluginsPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load preparer plugins path %q", cfg.PreparerPluginsPath)
@@ -88,14 +95,17 @@ func New(cfg Config) (*Job, error) {
 	})
 
 	// instantiate the image builder
+	log.Info("Initializing OCI image builder")
+
 	ociBuilder, err := builder.New(preparerPlugins, cfg.EnableLayerCaching, log)
 	if err != nil {
 		return nil, errors.Wrap(err, "image builder initialization failed")
 	}
 
 	return &Job{
+		log:          log,
 		name:         cfg.ResourceName,
-		logger:       log,
+		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
 		clientforge:  clientforge,
 		producer:     producer,
@@ -106,26 +116,42 @@ func New(cfg Config) (*Job, error) {
 }
 
 func (j *Job) Run() error {
-	// fetch the build resource from k8s
-	cib, err := j.clientforge.ContainerImageBuilds("default").Get(j.name) // NOTE: maybe we want to build two separate cibs???
+	ctx := context.TODO()
+
+	j.log.Info("Fetching ContainerImageBuild resource", "Name", j.name, "Namespace", j.namespace)
+	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(j.name)
 	if err != nil {
 		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
 	}
-
-	opts, err := j.generateBuildOptions(cib)
-	if err != nil {
-		return errors.Wrapf(err, "failed to generate build options")
-	}
-	fmt.Printf("%+v\n", opts)
-
-	ctx := context.Background()
-	images, err := j.builder.BuildAndPush(ctx, opts)
-	if err != nil {
+	if err := j.transitionToBuilding(cib); err != nil {
 		return err
 	}
-	fmt.Println(images) // NOTE: this should be applied to the cib status
 
-	return nil
+	j.log = j.log.WithValues("annotations", cib.Annotations)
+
+	j.log.Info("Creating build options using custom resource fields")
+	opts, err := j.generateBuildOptions(ctx, cib)
+	if err != nil {
+		err = errors.Wrap(err, "failed to generate build options")
+		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+			err = errors.Wrap(err, iErr.Error())
+		}
+
+		return err
+	}
+
+	j.builder.SetLogger(j.log)
+	images, err := j.builder.BuildAndPush(ctx, opts)
+	if err != nil {
+		logError(j.log, err)
+
+		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+			err = errors.Wrap(err, iErr.Error())
+		}
+		return err
+	}
+
+	return j.transitionToComplete(cib, images)
 }
 
 func (j *Job) Cleanup() {
@@ -138,8 +164,8 @@ func (j *Job) addCleanupStep(fn func()) {
 	j.cleanupSteps = append(j.cleanupSteps, fn)
 }
 
-func (j *Job) generateBuildOptions(cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
-	registries, err := j.buildRegistryConfig(context.TODO(), cib.Spec.Registries)
+func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
+	registries, err := j.buildRegistryConfig(ctx, cib.Spec.Registries)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build registry config")
 	}
@@ -217,4 +243,50 @@ func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace
 	}
 
 	return auth.Username, auth.Password, nil
+}
+
+func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) error {
+	cib.Status.State = apiv1alpha1.BuildStateBuilding
+	cib.Status.BuildStartedAt = &metav1.Time{Time: time.Now()}
+
+	return j.updateStatus(cib)
+}
+
+func (j *Job) transitionToComplete(cib *apiv1alpha1.ContainerImageBuild, images []string) error {
+	cib.Status.State = apiv1alpha1.BuildStateCompleted
+	cib.Status.ImageURLs = images
+	cib.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
+
+	return j.updateStatus(cib)
+}
+
+func (j *Job) transitionToFailure(cib *apiv1alpha1.ContainerImageBuild, err error) error {
+	cib.Status.State = apiv1alpha1.BuildStateFailed
+	cib.Status.ErrorMessage = err.Error()
+	cib.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
+
+	return j.updateStatus(cib)
+}
+
+func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) error {
+	if _, err := j.clientforge.ContainerImageBuilds(j.namespace).UpdateStatus(cib); err != nil {
+		return errors.Wrap(err, "unable to update status")
+	}
+
+	if j.producer != nil {
+		update := &StatusUpdate{
+			Name:          cib.Name,
+			Annotations:   cib.Annotations,
+			ObjectLink:    strings.TrimSuffix(cib.GetSelfLink(), "/status"),
+			PreviousState: string(cib.Status.PreviousState),
+			CurrentState:  string(cib.Status.State),
+			ImageURLs:     cib.Status.ImageURLs,
+			ErrorMessage:  cib.Status.ErrorMessage,
+		}
+		if err := j.producer.Publish(update); err != nil {
+			return errors.Wrap(err, "unable to publish message")
+		}
+	}
+
+	return nil
 }

@@ -9,19 +9,19 @@ import (
 	"syscall"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var setupLog = NewLogger()
-
 func NewLogger() logr.Logger {
-	zapLog, _ := zap.NewDevelopment()
-	return zapr.NewLogger(zapLog)
+	atom := zap.NewAtomicLevel()
+	return ctrlzap.New(func(options *ctrlzap.Options) {
+		options.Level = &atom
+	})
 }
 
 // These are not informative errors and are captured by the progressui display in a better way
@@ -59,9 +59,9 @@ func loadKubernetesConfig() (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
-func reexec() {
+func reexec(log logr.Logger) {
 	if len(os.Getenv("FORGE_RUNNING_TESTS")) <= 0 && len(os.Getenv("FORGE_DO_UNSHARE")) <= 0 && system.GetParentNSeuid() != 0 {
-		setupLog.Info("Preparing to unshare process namespace")
+		log.Info("Preparing to unshare process namespace")
 
 		var (
 			pgid int
@@ -73,9 +73,9 @@ func reexec() {
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			for sig := range c {
-				setupLog.Info(fmt.Sprintf("Received %s, exiting.", sig.String()))
+				log.Info(fmt.Sprintf("Received %s, exiting.", sig.String()))
 				if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-					setupLog.Error(err, fmt.Sprintf("syscall.Kill %d error: %v", pgid, err))
+					log.Error(err, fmt.Sprintf("syscall.Kill %d error: %v", pgid, err))
 					os.Exit(1)
 				}
 				os.Exit(0)
@@ -84,7 +84,7 @@ func reexec() {
 
 		// If newuidmap is not present re-exec will fail
 		if _, err := exec.LookPath("newuidmap"); err != nil {
-			setupLog.Error(err, fmt.Sprintf("newuidmap not found (install uidmap package?): %v", err))
+			log.Error(err, fmt.Sprintf("newuidmap not found (install uidmap package?): %v", err))
 		}
 
 		// Initialize and re-exec with our unshare.
@@ -97,13 +97,13 @@ func reexec() {
 			Setpgid: true,
 		}
 		if err := cmd.Start(); err != nil {
-			setupLog.Error(err, fmt.Sprintf("cmd.Start error: %v", err))
+			log.Error(err, fmt.Sprintf("cmd.Start error: %v", err))
 			os.Exit(1)
 		}
 
 		pgid, err = syscall.Getpgid(cmd.Process.Pid)
 		if err != nil {
-			setupLog.Error(err, fmt.Sprintf("getpgid error: %v", err))
+			log.Error(err, fmt.Sprintf("getpgid error: %v", err))
 			os.Exit(1)
 		}
 
@@ -122,7 +122,7 @@ func reexec() {
 					os.Exit(exitCode)
 				}
 
-				setupLog.Error(err, fmt.Sprintf("wait4 error: %v", err))
+				log.Error(err, fmt.Sprintf("wait4 error: %v", err))
 				os.Exit(1)
 			}
 		}
