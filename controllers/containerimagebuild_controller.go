@@ -77,11 +77,15 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			return ctrl.Result{}, err
 		}
 
-		job := r.jobForBuild(build)
-		log.Info("Creating new build job", "Name", build.Name, "Namespace", build.Namespace)
+		job, err := r.jobForBuild(build)
+		if err != nil {
+			log.Error(err, "Failed to create job", "Name", build.Name, "Namespace", build.Namespace)
+			return ctrl.Result{}, err
+		}
 
-		// requeue when create job fails
+		log.Info("Creating new build job", "Name", build.Name, "Namespace", build.Namespace)
 		if err := r.Create(ctx, job); err != nil {
+			// requeue when create job fails
 			log.Error(err, "Failed to create build job", "Name", build.Name, "Namespace", build.Namespace)
 			return ctrl.Result{}, err
 		}

@@ -128,7 +128,7 @@ func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, ci
 	return r.Create(ctx, binding)
 }
 
-func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.ContainerImageBuild) *batchv1.Job {
+func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.ContainerImageBuild) (*batchv1.Job, error) {
 	commonMeta := metav1.ObjectMeta{
 		Name:      cib.Name,
 		Namespace: cib.Namespace,
@@ -137,7 +137,6 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 	job := &batchv1.Job{
 		ObjectMeta: commonMeta,
 		Spec: batchv1.JobSpec{
-
 			BackoffLimit:            pointer.Int32Ptr(0),
 			ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
@@ -158,8 +157,8 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		},
 	}
 
-	controllerutil.SetControllerReference(cib, job, r.Scheme)
-	return job
+	err := controllerutil.SetControllerReference(cib, job, r.Scheme)
+	return job, err
 }
 
 func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.ContainerImageBuild) []string {
