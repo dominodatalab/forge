@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,6 +22,27 @@ var setupLog = NewLogger()
 func NewLogger() logr.Logger {
 	zapLog, _ := zap.NewDevelopment()
 	return zapr.NewLogger(zapLog)
+}
+
+// These are not informative errors and are captured by the progressui display in a better way
+var ignoredErrors = map[string]interface{}{
+	"runc did not terminate successfully": nil,
+}
+
+// This logs the underlying error from a build when the display channels inside builder.embedded have not yet been initialized
+// or the error comes after the embedded driver has been run (e.g. image size limit has been hit)
+func logError(log logr.Logger, err error) {
+	if unwrappedError := errors.Unwrap(err); unwrappedError != nil {
+		err = unwrappedError
+	}
+
+	cause := errors.Cause(err)
+	if _, ok := ignoredErrors[cause.Error()]; ok {
+		return
+	}
+
+	log.Info(strings.Repeat("=", 70))
+	log.Info(fmt.Sprintf("Error during image build and push: %s", cause.Error()))
 }
 
 // set up standard and custom k8s clients
