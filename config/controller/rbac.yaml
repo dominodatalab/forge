@@ -19,11 +19,37 @@ rules:
       - get
       - update
   - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - list
+      - watch
+      - create
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - roles
+      - rolebindings
+    verbs:
+      - list
+      - watch
+      - create
+
+  - apiGroups:
       - batch
     resources:
       - jobs
     verbs:
       - get
+      - list
+      - watch
       - create
       - update
 ---
