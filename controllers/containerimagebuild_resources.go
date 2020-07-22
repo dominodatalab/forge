@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -77,6 +78,11 @@ func (r *ContainerImageBuildReconciler) checkRole(ctx context.Context, cib *forg
 				APIGroups: []string{forgev1alpha1.GroupVersion.Group},
 				Resources: []string{"containerimagebuilds/status"},
 				Verbs:     []string{"update"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+				Verbs:     []string{"get"},
 			},
 		},
 	}
@@ -159,8 +165,18 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.ContainerImageBuild) []string {
 	args := []string{
 		"build",
-		"--resource",
-		cib.Name,
+		fmt.Sprintf("--resource=%s", cib.Name),
+		fmt.Sprintf("--enable-layer-caching=%t", r.EnableLayerCaching),
+		fmt.Sprintf("--preparer-plugins-path=%s", r.PreparerPluginPath),
+	}
+
+	if r.BrokerOpts != nil {
+		bs := []string{
+			fmt.Sprintf("--broker=%s", r.BrokerOpts.Broker),
+			fmt.Sprintf("--amqp-queue=%s", r.BrokerOpts.AmqpQueue),
+			fmt.Sprintf("--amqp-uri=%s", r.BrokerOpts.AmqpURI),
+		}
+		args = append(args, bs...)
 	}
 
 	return args

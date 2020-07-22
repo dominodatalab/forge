@@ -62,10 +62,10 @@ var (
 	brokerOpts           *message.Options
 
 	rootCmd = &cobra.Command{
-		Use:     "forge",
-		Long:    description,
-		Example: examples,
-		PreRunE: processBrokerOpts,
+		Use:               "forge",
+		Long:              description,
+		Example:           examples,
+		PersistentPreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := controllers.Config{
 				BuildJobImage:        buildJobImage,
@@ -105,16 +105,18 @@ func processBrokerOpts(cmd *cobra.Command, args []string) error {
 func init() {
 	rootCmd.Flags().SortFlags = false
 
-	// NOTE: we can probably pass this image/tag in as a build flag
-	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", "quay.io/domino/forge:v0.1.0-rc9-replicator", "Image used to launch build jobs. This typically should be the same as the controller.")
-
+	// main command flags
 	rootCmd.Flags().StringVar(&namespace, "namespace", "default", "Watch for objects in desired namespace")
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
+	// NOTE: we can probably pass this image/tag in as a build flag
+	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", "quay.io/domino/forge:v0.1.0-rc9-replicator", "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	rootCmd.Flags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
-	rootCmd.Flags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
-	rootCmd.Flags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
-	rootCmd.Flags().StringVar(&preparerPluginsPath, "preparer-plugins-path", path.Join(config.GetStateDir(), "plugins"), "Path to specific preparer plugins or directory to load them from")
-	rootCmd.Flags().BoolVar(&enableLayerCaching, "enable-layer-caching", false, "Enable image layer caching")
-	rootCmd.Flags().BoolVar(&debug, "debug", false, "Enabled verbose logging")
+
+	// leveraged by both main and build commands
+	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
+	rootCmd.PersistentFlags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
+	rootCmd.PersistentFlags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
+	rootCmd.PersistentFlags().StringVar(&preparerPluginsPath, "preparer-plugins-path", path.Join(config.GetStateDir(), "plugins"), "Path to specific preparer plugins or directory to load them from")
+	rootCmd.PersistentFlags().BoolVar(&enableLayerCaching, "enable-layer-caching", false, "Enable image layer caching")
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enabled verbose logging")
 }

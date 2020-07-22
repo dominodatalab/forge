@@ -3,8 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/dominodatalab/forge/internal/config"
-	"github.com/dominodatalab/forge/internal/steve"
+	"github.com/dominodatalab/forge/internal/buildjob"
 )
 
 var (
@@ -15,17 +14,34 @@ var (
 		Short: "Launch a single OCI image build",
 		Long:  "fill in the details",
 		Run: func(cmd *cobra.Command, args []string) {
-			opts := &config.BuildOptions{}
-			if err := steve.GoBuildSomething(resourceName, opts); err != nil {
+			cfg := buildjob.Config{
+				ResourceName:        resourceName,
+				BrokerOpts:          brokerOpts,
+				PreparerPluginsPath: preparerPluginsPath,
+				EnableLayerCaching:  enableLayerCaching,
+				Debug:               debug,
+			}
+
+			job, err := buildjob.New(cfg)
+			if err != nil {
 				panic(err)
 			}
+
+			if err := job.Run(); err != nil {
+				panic(err)
+			}
+			job.Cleanup()
 		},
 	}
 )
 
 func init() {
+	rootCmd.Flags().SortFlags = false
+
 	buildCmd.Flags().StringVar(&resourceName, "resource", "", "Name of the ContainerImageBuild resource to process")
-	buildCmd.MarkFlagRequired("resource")
+	if err := buildCmd.MarkFlagRequired("resource"); err != nil {
+		panic(err)
+	}
 
 	rootCmd.AddCommand(buildCmd)
 }

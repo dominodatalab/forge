@@ -1,4 +1,4 @@
-package steve
+package buildjob
 
 // NOTE: taken from original Reconcile func
 //spec := build.Spec

@@ -23,12 +23,9 @@ import (
 type ContainerImageBuildReconciler struct {
 	client.Client
 	*kubernetes.Clientset
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	//Builder  builder.OCIImageBuilder
-	//Producer message.Producer
-
+	Log                logr.Logger
+	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
 	BuildJobImage      string
 	BrokerOpts         *message.Options
 	PreparerPluginPath string
@@ -76,7 +73,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		}
 
 		if err := r.checkPrerequisites(ctx, build); err != nil {
-			log.Error(err, "Failed to create build job", "Name", build.Name, "Namespace", build.Namespace)
+			log.Error(err, "Failed to create job prerequisites", "Name", build.Name, "Namespace", build.Namespace)
 			return ctrl.Result{}, err
 		}
 
@@ -90,7 +87,7 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		}
 	}
 
-	// update containerimagebuild status with pod name
+	// TODO: add a back reference on CIB to the build pod
 
 	return ctrl.Result{}, nil
 }

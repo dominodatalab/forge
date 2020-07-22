@@ -8,6 +8,10 @@ import (
 	"github.com/dominodatalab/forge/api/v1alpha1"
 )
 
+type Interface interface {
+	ContainerImageBuilds(string) ContainerImageBuildInterface
+}
+
 type Client struct {
 	restClient rest.Interface
 }
