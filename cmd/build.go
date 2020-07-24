@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"errors"
 	"io/ioutil"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -15,10 +13,21 @@ var (
 	resourceNamespace string
 
 	buildCmd = &cobra.Command{
-		Use:     "build",
-		Short:   "Launch a single OCI image build",
-		Long:    "fill in the details",
-		PreRunE: processResourceArgs,
+		Use:   "build",
+		Short: "Launch a single OCI image build",
+		Long:  "fill in the details",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			// attempt to load "current namespace" when running inside k8s
+			bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+			if err != nil {
+				return
+			}
+
+			// set that value as the ns where the build job should search for containerimagebuild resources
+			if err := cmd.Flags().Set("resource-namespace", string(bs)); err != nil {
+				panic(err)
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := buildjob.Config{
 				ResourceName:        resourceName,
@@ -42,31 +51,14 @@ var (
 	}
 )
 
-func processResourceArgs(cmd *cobra.Command, args []string) error {
-	var errMsgs []string
-
-	if resourceName == "" {
-		errMsgs = append(errMsgs, "'--resource' is required")
-	}
-	if resourceNamespace == "" {
-		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-		if err != nil {
-			errMsgs = append(errMsgs, "'--resource-namespace' is required")
-		}
-		resourceNamespace = string(bs)
-	}
-
-	if errMsgs != nil {
-		return errors.New(strings.Join(errMsgs, ", "))
-	}
-	return nil
-}
-
 func init() {
 	rootCmd.Flags().SortFlags = false
 
 	buildCmd.Flags().StringVar(&resourceName, "resource", "", "Name of the ContainerImageBuild resource to process")
 	buildCmd.Flags().StringVar(&resourceNamespace, "resource-namespace", "", "Name of the namespace containing the ContainerImageBuild resource")
+
+	buildCmd.MarkFlagRequired("resource")
+	buildCmd.MarkFlagRequired("resource-namespace")
 
 	rootCmd.AddCommand(buildCmd)
 }
