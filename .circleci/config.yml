@@ -53,7 +53,7 @@ jobs:
             if [[ ${CIRCLE_BRANCH} != "master" && -z ${CIRCLE_TAG} ]]; then
               ARGS="$ARGS --label quay.expires-after='4w'"
             fi
-            ARGS="$ARGS --build-arg BUILD_FLAGS=\"${BUILD_FLAGS}\""
+            ARGS="$ARGS --build-arg BUILD_FLAGS="\"${BUILD_FLAGS}\""
 
             make docker-build ARGS="${ARGS}"
       - run:
