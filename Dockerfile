@@ -41,7 +41,7 @@ COPY go.mod go.sum ./
 COPY vendor vendor
 COPY . .
 ARG BUILD_FLAGS
-RUN make static BUILD_FLAGS="\"$BUILD_FLAGS\"" && \
+RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
 
 FROM base
