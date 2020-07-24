@@ -108,8 +108,7 @@ func init() {
 	// main command flags
 	rootCmd.Flags().StringVar(&namespace, "namespace", "default", "Watch for objects in desired namespace")
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
-	// NOTE: we can probably pass this image/tag in as a build flag
-	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", "quay.io/domino/forge:v0.1.0-rc9-replicator", "Image used to launch build jobs. This typically should be the same as the controller.")
+	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
 	// leveraged by both main and build commands

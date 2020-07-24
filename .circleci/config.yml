@@ -12,6 +12,7 @@ commands:
             [[ -z $CIRCLE_TAG ]] && IMAGE_TAG=${CIRCLE_BRANCH//\//-}.${CIRCLE_SHA1:0:7} || IMAGE_TAG=${CIRCLE_TAG}
             echo "export IMG='quay.io/domino/forge:${IMAGE_TAG}'" >> $BASH_ENV
             echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
+            echo "export BUILD_FLAGS=\"-ldflags='-X github.com/dominodatalab/forge/cmd.version=${VERSION} -X github.com/dominodatalab/forge/cmd.buildJobImage=${IMG}'\"" >> $BASH_ENV
 jobs:
   build:
     executor: golang
@@ -33,7 +34,7 @@ jobs:
             - go-modules-v1-{{ checksum "go.sum" }}
       - run:
           name: Run Unit Tests
-          command: make all test BUILD_FLAGS="-ldflags='-X github.com/dominodatalab/forge/cmd.version=${VERSION}'"
+          command: make all test BUILD_FLAGS="${BUILD_FLAGS}"
       - run:
           name: Prepare Artifacts
           command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
@@ -49,6 +50,8 @@ jobs:
             if [[ ${CIRCLE_BRANCH} != "master" && -z ${CIRCLE_TAG} ]]; then
               ARGS="$ARGS --label quay.expires-after='4w'"
             fi
+            ARGS="$ARGS --build-arg BUILD_FLAGS='${BUILD_FLAGS}'"
+
             make docker-build ARGS="${ARGS}"
       - run:
           name: Push Docker Image

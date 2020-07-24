@@ -15,7 +15,7 @@ endif
 all: manager
 
 static:
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor $(BUILD_FLAGS)
 
 # Run tests
 test: generate fmt vet manifests
