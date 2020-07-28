@@ -14,9 +14,10 @@ function run_test {
   local test_name="$1"
   local yaml_file="$2"
   local resource_name="$3"
+  local namespace="$4"
 
   info "Running test case: $test_name"
-  kubectl apply -f "$yaml_file"
+  kubectl apply -f "$yaml_file" -n "$namespace"
 
   local counter=0
   while true; do
@@ -146,9 +147,11 @@ kubectl wait pod --for=condition=ready \
 
 run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
-          test-tls-with-basic-auth
+          test-tls-with-basic-auth \
+          "$namespace"
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
-          test-private-base-image
+          test-private-base-image \
+          "$namespace"
 
 info "All tests ran successfully"
