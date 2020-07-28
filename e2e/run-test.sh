@@ -30,7 +30,7 @@ function run_test {
     sleep 10
 
     local state
-    state="$(kubectl get cib "$resource_name" -o jsonpath='{.status.state}')"
+    state="$(kubectl get cib "$resource_name" -n "$namespace" -o jsonpath='{.status.state}')"
     info "Current build state: '$state'"
 
     if [[ $state == "Completed" ]]; then

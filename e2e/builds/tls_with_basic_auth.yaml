@@ -9,6 +9,7 @@ spec:
     - docker-registry:5000
   registries:
     - server: docker-registry:5000
+      nonSSL: true
       basicAuth:
         username: homer
         password: simpson
