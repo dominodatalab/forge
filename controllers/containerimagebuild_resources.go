@@ -177,19 +177,26 @@ func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, ci
 
 // generates build job definition using container image build spec
 func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.ContainerImageBuild) (*batchv1.Job, error) {
-	commonMeta := metav1.ObjectMeta{
+	baseMeta := metav1.ObjectMeta{
 		Name:      cib.Name,
 		Namespace: cib.Namespace,
 		Labels:    cib.Labels,
 	}
+	specMeta := baseMeta.DeepCopy()
+	specMeta.Annotations = map[string]string{
+		"logKey": "forge",
+		"container.apparmor.security.beta.kubernetes.io/forge-build": "unconfined",
+		"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
+	}
+
 	job := &batchv1.Job{
-		ObjectMeta: commonMeta,
+		ObjectMeta: baseMeta,
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            pointer.Int32Ptr(0),
 			ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: commonMeta,
+				ObjectMeta: *specMeta,
 				Spec: corev1.PodSpec{
 					ServiceAccountName: cib.Name,
 					RestartPolicy:      corev1.RestartPolicyNever,
