@@ -43,4 +43,4 @@ spec:
         secretNamespace: your-ns
     # registry w/o tls encryption and basic auth
     - server: my-docker-registry:5000
-      noSSL: true
+      nonSSL: true
