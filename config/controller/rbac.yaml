@@ -41,7 +41,6 @@ rules:
       - list
       - watch
       - create
-
   - apiGroups:
       - batch
     resources:
@@ -52,6 +51,16 @@ rules:
       - watch
       - create
       - update
+  - apiGroups:
+      - policy
+    resources:
+      - podsecuritypolicies
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - use
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

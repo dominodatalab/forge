@@ -129,7 +129,7 @@ func (r *ContainerImageBuildReconciler) checkRole(ctx context.Context, cib *forg
 					Verbs:     []string{"get"},
 				},
 				{
-					APIGroups:     []string{"extensions"},
+					APIGroups:     []string{"policy"},
 					Resources:     []string{"podsecuritypolicies"},
 					ResourceNames: []string{cib.Name},
 					Verbs:         []string{"use"},
