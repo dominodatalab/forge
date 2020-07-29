@@ -23,13 +23,14 @@ import (
 type ContainerImageBuildReconciler struct {
 	client.Client
 	*kubernetes.Clientset
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	Recorder           record.EventRecorder
-	BuildJobImage      string
-	BrokerOpts         *message.Options
-	PreparerPluginPath string
-	EnableLayerCaching bool
+	Log                   logr.Logger
+	Scheme                *runtime.Scheme
+	Recorder              record.EventRecorder
+	BuildJobImage         string
+	BuildJobFullPrivilege bool
+	BrokerOpts            *message.Options
+	PreparerPluginPath    string
+	EnableLayerCaching    bool
 }
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {

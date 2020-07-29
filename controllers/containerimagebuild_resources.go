@@ -52,7 +52,7 @@ func (r *ContainerImageBuildReconciler) checkServiceAccount(ctx context.Context,
 // creates build job pod security policy when missing
 func (r *ContainerImageBuildReconciler) checkPodSecurityPolicy(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
 	return r.withOwnedResource(ctx, cib, &policyv1beta1.PodSecurityPolicy{}, func() interface{} {
-		return &policyv1beta1.PodSecurityPolicy{
+		psp := &policyv1beta1.PodSecurityPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cib.Name,
 				Namespace: cib.Namespace,
@@ -100,6 +100,15 @@ func (r *ContainerImageBuildReconciler) checkPodSecurityPolicy(ctx context.Conte
 				},
 			},
 		}
+
+		if r.BuildJobFullPrivilege {
+			psp.Spec.Privileged = true
+			psp.Spec.RunAsUser = policyv1beta1.RunAsUserStrategyOptions{
+				Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
+			}
+		}
+
+		return psp
 	})
 }
 
@@ -189,6 +198,12 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
 	}
 
+	secCtx := &corev1.SecurityContext{}
+	if r.BuildJobFullPrivilege {
+		secCtx.RunAsUser = pointer.Int64Ptr(0)
+		secCtx.Privileged = pointer.BoolPtr(true)
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: baseMeta,
 		Spec: batchv1.JobSpec{
@@ -202,9 +217,10 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 					RestartPolicy:      corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:  "forge-build",
-							Image: r.BuildJobImage,
-							Args:  r.prepareJobArgs(cib),
+							Name:            "forge-build",
+							Image:           r.BuildJobImage,
+							Args:            r.prepareJobArgs(cib),
+							SecurityContext: secCtx,
 						},
 					},
 				},

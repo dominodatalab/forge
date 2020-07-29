@@ -47,14 +47,15 @@ func StartManager(cfg Config) {
 	}
 
 	if err = (&ContainerImageBuildReconciler{
-		Log:                ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		Recorder:           mgr.GetEventRecorderFor("containerimagebuild-controller"),
-		BuildJobImage:      cfg.BuildJobImage,
-		BrokerOpts:         cfg.BrokerOpts,
-		PreparerPluginPath: cfg.PreparerPluginsPath,
-		EnableLayerCaching: cfg.EnableLayerCaching,
+		Log:                   ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Recorder:              mgr.GetEventRecorderFor("containerimagebuild-controller"),
+		BuildJobImage:         cfg.BuildJobImage,
+		BuildJobFullPrivilege: cfg.BuildJobFullPrivilege,
+		BrokerOpts:            cfg.BrokerOpts,
+		PreparerPluginPath:    cfg.PreparerPluginsPath,
+		EnableLayerCaching:    cfg.EnableLayerCaching,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)

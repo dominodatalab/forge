@@ -60,6 +60,7 @@ var (
 	preparerPluginsPath  string
 	enableLayerCaching   bool
 	brokerOpts           *message.Options
+	grantFullPrivilege   bool
 
 	rootCmd = &cobra.Command{
 		Use:               "forge",
@@ -68,14 +69,15 @@ var (
 		PersistentPreRunE: processBrokerOpts,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := controllers.Config{
-				BuildJobImage:        buildJobImage,
-				Namespace:            namespace,
-				MetricsAddr:          metricsAddr,
-				EnableLeaderElection: enableLeaderElection,
-				BrokerOpts:           brokerOpts,
-				PreparerPluginsPath:  preparerPluginsPath,
-				EnableLayerCaching:   enableLayerCaching,
-				Debug:                debug,
+				BuildJobImage:         buildJobImage,
+				BuildJobFullPrivilege: grantFullPrivilege,
+				Namespace:             namespace,
+				MetricsAddr:           metricsAddr,
+				EnableLeaderElection:  enableLeaderElection,
+				BrokerOpts:            brokerOpts,
+				PreparerPluginsPath:   preparerPluginsPath,
+				EnableLayerCaching:    enableLayerCaching,
+				Debug:                 debug,
 			}
 			controllers.StartManager(cfg)
 		},
@@ -110,6 +112,7 @@ func init() {
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
 	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	rootCmd.Flags().BoolVar(&grantFullPrivilege, "full-privilege", false, "Run builds jobs using a privileged root user")
 
 	// leveraged by both main and build commands
 	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
