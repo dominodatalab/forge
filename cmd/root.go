@@ -61,6 +61,7 @@ var (
 	enableLayerCaching   bool
 	brokerOpts           *message.Options
 	grantFullPrivilege   bool
+	customCASecret       string
 
 	rootCmd = &cobra.Command{
 		Use:               "forge",
@@ -71,6 +72,7 @@ var (
 			cfg := controllers.Config{
 				BuildJobImage:         buildJobImage,
 				BuildJobFullPrivilege: grantFullPrivilege,
+				CustomCASecret:        customCASecret,
 				Namespace:             namespace,
 				MetricsAddr:           metricsAddr,
 				EnableLeaderElection:  enableLeaderElection,
@@ -113,6 +115,7 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobImage, "builder-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	rootCmd.Flags().BoolVar(&grantFullPrivilege, "full-privilege", false, "Run builds jobs using a privileged root user")
+	rootCmd.Flags().StringVar(&customCASecret, "custom-ca-secret", "", "Secret container custom CA certificates for distribution registries")
 
 	// leveraged by both main and build commands
 	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))

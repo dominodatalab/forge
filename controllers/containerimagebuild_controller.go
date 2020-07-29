@@ -28,6 +28,7 @@ type ContainerImageBuildReconciler struct {
 	Recorder              record.EventRecorder
 	BuildJobImage         string
 	BuildJobFullPrivilege bool
+	CustomCASecret        string
 	BrokerOpts            *message.Options
 	PreparerPluginPath    string
 	EnableLayerCaching    bool

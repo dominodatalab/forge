@@ -53,6 +53,7 @@ func StartManager(cfg Config) {
 		Recorder:              mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		BuildJobImage:         cfg.BuildJobImage,
 		BuildJobFullPrivilege: cfg.BuildJobFullPrivilege,
+		CustomCASecret:        cfg.CustomCASecret,
 		BrokerOpts:            cfg.BrokerOpts,
 		PreparerPluginPath:    cfg.PreparerPluginsPath,
 		EnableLayerCaching:    cfg.EnableLayerCaching,

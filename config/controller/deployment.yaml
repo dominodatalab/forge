@@ -15,32 +15,6 @@ spec:
         app.kubernetes.io/name: forge
     spec:
       serviceAccountName: forge
-      volumes:
-        - name: ca-tls
-          secret:
-            secretName: docker-registry-tls
-        - name: ssl-certs
-          emptyDir: {}
-      initContainers:
-        - name: init-ca
-          image: debian:latest
-          command:
-            - sh
-            - -c
-            - |
-              set -ex
-              apt update
-              apt install -y ca-certificates
-              cp /tmp/forge/ca-tls/ca.crt /usr/local/share/ca-certificates/custom.crt
-              update-ca-certificates
-          env:
-            - name: CERT_DIR
-              value: /tmp/forge/ca-tls
-          volumeMounts:
-            - name: ca-tls
-              mountPath: /tmp/forge/ca-tls
-            - name: ssl-certs
-              mountPath: /etc/ssl/certs
       containers:
         - name: controller
           image: quay.io/domino/forge:latest
@@ -48,6 +22,8 @@ spec:
           args:
             - --namespace
             - $(WATCH_NAMESPACE)
+            - --custom-ca-secret
+            - docker-registry-tls
           env:
             - name: WATCH_NAMESPACE
               valueFrom:
@@ -57,10 +33,4 @@ spec:
             requests:
               cpu: 1
               memory: 20Mi
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /etc/ssl/certs
-              readOnly: true
-          securityContext:
-            privileged: true # TODO: figure out why this is required for k3s testing in CircleCI and then remove
       terminationGracePeriodSeconds: 10

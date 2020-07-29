@@ -193,7 +193,7 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 	}
 	specMeta := baseMeta.DeepCopy()
 	specMeta.Annotations = map[string]string{
-		"logKey": "forge",
+		"logKey": "forge", // TODO: this should probably be configurable, no?
 		"container.apparmor.security.beta.kubernetes.io/forge-build": "unconfined",
 		"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
 	}
@@ -202,6 +202,52 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 	if r.BuildJobFullPrivilege {
 		secCtx.RunAsUser = pointer.Int64Ptr(0)
 		secCtx.Privileged = pointer.BoolPtr(true)
+	}
+
+	var volumes []corev1.Volume
+	var volumeMounts []corev1.VolumeMount
+	var initContainers []corev1.Container
+	if r.CustomCASecret != "" {
+		caTLSVol := corev1.Volume{
+			Name: "ca-tls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: r.CustomCASecret,
+				},
+			},
+		}
+		sslCertsVol := corev1.Volume{
+			Name: "ssl-certs",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+		volumes = append(volumes, caTLSVol, sslCertsVol)
+
+		caTLSVolMount := corev1.VolumeMount{
+			Name:      caTLSVol.Name,
+			MountPath: "/tmp/forge/ca-tls",
+		}
+		sslCertsVolMount := corev1.VolumeMount{
+			Name:      sslCertsVol.Name,
+			MountPath: "/etc/ssl/certs",
+		}
+
+		initContainers = append(initContainers, corev1.Container{
+			Name:  "init-ca-certs",
+			Image: "quay.io/domino/forge-init-ca:v1.0.0",
+			Env: []corev1.EnvVar{
+				{
+					Name:  "CERT_DIR",
+					Value: "/tmp/forge/ca-tls",
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{caTLSVolMount, sslCertsVolMount},
+		})
+
+		forgeBuildMount := sslCertsVolMount.DeepCopy()
+		forgeBuildMount.ReadOnly = true
+		volumeMounts = append(volumeMounts, *forgeBuildMount)
 	}
 
 	job := &batchv1.Job{
@@ -215,14 +261,17 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 				Spec: corev1.PodSpec{
 					ServiceAccountName: cib.Name,
 					RestartPolicy:      corev1.RestartPolicyNever,
+					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
 							Image:           r.BuildJobImage,
 							Args:            r.prepareJobArgs(cib),
 							SecurityContext: secCtx,
+							VolumeMounts:    volumeMounts,
 						},
 					},
+					Volumes: volumes,
 				},
 			},
 		},
