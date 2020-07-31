@@ -98,6 +98,9 @@ func (r *ContainerImageBuildReconciler) checkPodSecurityPolicy(ctx context.Conte
 				SELinux: policyv1beta1.SELinuxStrategyOptions{
 					Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 				},
+				Volumes: []policyv1beta1.FSType{
+					"secrets",
+				},
 			},
 		}
 
@@ -250,6 +253,19 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		volumeMounts = append(volumeMounts, *forgeBuildMount)
 	}
 
+	// TODO: add preparer volumes/path/etc....
+	/*
+	     - name: XDG_DATA_HOME
+	       value: "{{ .Values.xdgDataHome }}"
+	   {{- with .Values.preparerPlugins.env }}
+	     {{- toYaml . | nindent 12 }}
+	   {{- end }}
+	   {{- with .Values.layerCaching.mode }}
+	     - name: EMBEDDED_BUILDER_CACHE_MODE
+	       value: {{ . }}
+	   {{- end }}
+	*/
+
 	job := &batchv1.Job{
 		ObjectMeta: baseMeta,
 		Spec: batchv1.JobSpec{
@@ -264,9 +280,17 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						{
-							Name:            "forge-build",
-							Image:           r.BuildJobImage,
-							Args:            r.prepareJobArgs(cib),
+							Name:  "forge-build",
+							Image: r.BuildJobImage,
+							Args:  r.prepareJobArgs(cib),
+							Env: []corev1.EnvVar{
+								// TODO: remove once forge includes the following commit:
+								// 	https://github.com/moby/buildkit/commit/ec5d112053221b41602536cdaa6cc958d7183e2b
+								{
+									Name:  "PROGRESS_NO_TRUNC",
+									Value: "1",
+								},
+							},
 							SecurityContext: secCtx,
 							VolumeMounts:    volumeMounts,
 						},
