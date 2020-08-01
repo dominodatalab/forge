@@ -99,7 +99,8 @@ func (r *ContainerImageBuildReconciler) checkPodSecurityPolicy(ctx context.Conte
 					Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 				},
 				Volumes: []policyv1beta1.FSType{
-					"secrets",
+					policyv1beta1.PersistentVolumeClaim,
+					policyv1beta1.Secret,
 				},
 			},
 		}
@@ -201,7 +202,9 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
 	}
 
-	secCtx := &corev1.SecurityContext{}
+	secCtx := &corev1.SecurityContext{
+		RunAsUser: pointer.Int64Ptr(1000),
+	}
 	if r.BuildJobFullPrivilege {
 		secCtx.RunAsUser = pointer.Int64Ptr(0)
 		secCtx.Privileged = pointer.BoolPtr(true)
