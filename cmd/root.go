@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -72,7 +73,8 @@ var (
 	preparerPluginsPath  string
 	enableLayerCaching   bool
 	brokerOpts           *message.Options
-	advCfg               *advancedConfig
+
+	advCfg = &advancedConfig{}
 
 	rootCmd = &cobra.Command{
 		Use:               "forge",
@@ -121,20 +123,18 @@ type advancedConfig struct {
 }
 
 func processAdvancedConfig(cmd *cobra.Command, args []string) error {
-	advCfg = &advancedConfig{}
-
 	if buildAdvancedConfigFilename == "" {
 		return nil
 	}
 
-	f, err := ioutil.ReadFile(buildAdvancedConfigFilename)
+	bs, err := ioutil.ReadFile(buildAdvancedConfigFilename)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(f, advCfg); err != nil {
-		return err
-	}
-	return nil
+
+	dec := json.NewDecoder(bytes.NewBuffer(bs))
+	dec.DisallowUnknownFields()
+	return dec.Decode(advCfg)
 }
 
 func processBrokerOpts(cmd *cobra.Command, args []string) error {
