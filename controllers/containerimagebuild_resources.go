@@ -99,13 +99,14 @@ func (r *ContainerImageBuildReconciler) checkPodSecurityPolicy(ctx context.Conte
 					Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 				},
 				Volumes: []policyv1beta1.FSType{
+					policyv1beta1.EmptyDir,
 					policyv1beta1.PersistentVolumeClaim,
 					policyv1beta1.Secret,
 				},
 			},
 		}
 
-		if r.BuildJobFullPrivilege {
+		if r.JobConfig.GrantFullPrivilege {
 			psp.Spec.Privileged = true
 			psp.Spec.RunAsUser = policyv1beta1.RunAsUserStrategyOptions{
 				Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
@@ -190,35 +191,67 @@ func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, ci
 
 // generates build job definition using container image build spec
 func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.ContainerImageBuild) (*batchv1.Job, error) {
-	baseMeta := metav1.ObjectMeta{
+	// setup pod metadata
+	podMeta := metav1.ObjectMeta{
 		Name:      cib.Name,
 		Namespace: cib.Namespace,
 		Labels:    cib.Labels,
+		Annotations: map[string]string{
+			"container.apparmor.security.beta.kubernetes.io/forge-build": "unconfined",
+			"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
+		},
 	}
-	specMeta := baseMeta.DeepCopy()
-	specMeta.Annotations = map[string]string{
-		"logKey": "forge", // TODO: this should probably be configurable, no?
-		"container.apparmor.security.beta.kubernetes.io/forge-build": "unconfined",
-		"container.seccomp.security.alpha.kubernetes.io/forge-build": "unconfined",
+	if podMeta.Labels == nil {
+		podMeta.Labels = make(map[string]string)
+	}
+	for k, v := range r.JobConfig.Labels {
+		podMeta.Labels[k] = v
+	}
+	for k, v := range r.JobConfig.Annotations {
+		podMeta.Annotations[k] = v
 	}
 
+	// setup pod environment variables
+	env := []corev1.EnvVar{
+		// TODO: remove once forge includes the following commit:
+		// 	https://github.com/moby/buildkit/commit/ec5d112053221b41602536cdaa6cc958d7183e2b
+		{
+			Name:  "PROGRESS_NO_TRUNC",
+			Value: "1",
+		},
+	}
+	for _, ev := range r.JobConfig.EnvVar {
+		env = append(env, ev)
+	}
+
+	// setup security context
 	secCtx := &corev1.SecurityContext{
 		RunAsUser: pointer.Int64Ptr(1000),
 	}
-	if r.BuildJobFullPrivilege {
+	if r.JobConfig.GrantFullPrivilege {
 		secCtx.RunAsUser = pointer.Int64Ptr(0)
 		secCtx.Privileged = pointer.BoolPtr(true)
 	}
 
+	// setup volumes and mounts used by main container
 	var volumes []corev1.Volume
+	for _, volume := range r.JobConfig.Volumes {
+		volumes = append(volumes, volume)
+	}
+
 	var volumeMounts []corev1.VolumeMount
+	for _, mount := range r.JobConfig.VolumeMounts {
+		volumeMounts = append(volumeMounts, mount)
+	}
+
+	// optionally configure the custom CA init container w/ additional volumes/mounts
 	var initContainers []corev1.Container
-	if r.CustomCASecret != "" {
+	if r.JobConfig.CustomCASecret != "" {
 		caTLSVol := corev1.Volume{
 			Name: "ca-tls",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: r.CustomCASecret,
+					SecretName: r.JobConfig.CustomCASecret,
 				},
 			},
 		}
@@ -241,7 +274,7 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 
 		initContainers = append(initContainers, corev1.Container{
 			Name:  "init-ca-certs",
-			Image: "quay.io/domino/forge-init-ca:v1.0.0",
+			Image: r.JobConfig.CAImage,
 			Env: []corev1.EnvVar{
 				{
 					Name:  "CERT_DIR",
@@ -256,44 +289,29 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		volumeMounts = append(volumeMounts, *forgeBuildMount)
 	}
 
-	// TODO: add preparer volumes/path/etc....
-	/*
-	     - name: XDG_DATA_HOME
-	       value: "{{ .Values.xdgDataHome }}"
-	   {{- with .Values.preparerPlugins.env }}
-	     {{- toYaml . | nindent 12 }}
-	   {{- end }}
-	   {{- with .Values.layerCaching.mode }}
-	     - name: EMBEDDED_BUILDER_CACHE_MODE
-	       value: {{ . }}
-	   {{- end }}
-	*/
-
+	// construct final job object
 	job := &batchv1.Job{
-		ObjectMeta: baseMeta,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cib.Name,
+			Namespace: cib.Namespace,
+			Labels:    cib.Labels,
+		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            pointer.Int32Ptr(0),
 			ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: *specMeta,
+				ObjectMeta: podMeta,
 				Spec: corev1.PodSpec{
 					ServiceAccountName: cib.Name,
 					RestartPolicy:      corev1.RestartPolicyNever,
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						{
-							Name:  "forge-build",
-							Image: r.BuildJobImage,
-							Args:  r.prepareJobArgs(cib),
-							Env: []corev1.EnvVar{
-								// TODO: remove once forge includes the following commit:
-								// 	https://github.com/moby/buildkit/commit/ec5d112053221b41602536cdaa6cc958d7183e2b
-								{
-									Name:  "PROGRESS_NO_TRUNC",
-									Value: "1",
-								},
-							},
+							Name:            "forge-build",
+							Image:           r.JobConfig.Image,
+							Args:            r.prepareJobArgs(cib),
+							Env:             env,
 							SecurityContext: secCtx,
 							VolumeMounts:    volumeMounts,
 						},
@@ -313,15 +331,16 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 	args := []string{
 		"build",
 		fmt.Sprintf("--resource=%s", cib.Name),
-		fmt.Sprintf("--enable-layer-caching=%t", r.EnableLayerCaching),
-		fmt.Sprintf("--preparer-plugins-path=%s", r.PreparerPluginPath),
+		fmt.Sprintf("--enable-layer-caching=%t", r.JobConfig.EnableLayerCaching),
+		fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath),
 	}
 
-	if r.BrokerOpts != nil {
+	if r.JobConfig.BrokerOpts != nil {
+		opts := r.JobConfig.BrokerOpts
 		bs := []string{
-			fmt.Sprintf("--broker=%s", r.BrokerOpts.Broker),
-			fmt.Sprintf("--amqp-queue=%s", r.BrokerOpts.AmqpQueue),
-			fmt.Sprintf("--amqp-uri=%s", r.BrokerOpts.AmqpURI),
+			fmt.Sprintf("--broker=%s", opts.Broker),
+			fmt.Sprintf("--amqp-queue=%s", opts.AmqpQueue),
+			fmt.Sprintf("--amqp-uri=%s", opts.AmqpURI),
 		}
 		args = append(args, bs...)
 	}

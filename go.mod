@@ -15,7 +15,6 @@ require (
 	github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/go-logr/logr v0.1.0
-	github.com/go-logr/zapr v0.1.0
 	github.com/h2non/filetype v1.0.12
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v1.3.0

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,19 +20,39 @@ import (
 	"github.com/dominodatalab/forge/internal/message"
 )
 
+type BuildJobConfig struct {
+	Image              string
+	CAImage            string
+	CustomCASecret     string
+	PreparerPluginPath string
+	Labels             map[string]string
+	Annotations        map[string]string
+	GrantFullPrivilege bool
+	EnableLayerCaching bool
+	BrokerOpts         *message.Options
+	Volumes            []corev1.Volume
+	VolumeMounts       []corev1.VolumeMount
+	EnvVar             []corev1.EnvVar
+}
+
+type ControllerConfig struct {
+	Debug                bool
+	Namespace            string
+	MetricsAddr          string
+	EnableLeaderElection bool
+
+	JobConfig *BuildJobConfig
+}
+
 // ContainerImageBuildReconciler reconciles a ContainerImageBuild object
 type ContainerImageBuildReconciler struct {
 	client.Client
 	*kubernetes.Clientset
-	Log                   logr.Logger
-	Scheme                *runtime.Scheme
-	Recorder              record.EventRecorder
-	BuildJobImage         string
-	BuildJobFullPrivilege bool
-	CustomCASecret        string
-	BrokerOpts            *message.Options
-	PreparerPluginPath    string
-	EnableLayerCaching    bool
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+
+	JobConfig *BuildJobConfig
 }
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
