@@ -121,6 +121,8 @@ type advancedConfig struct {
 }
 
 func processAdvancedConfig(cmd *cobra.Command, args []string) error {
+	advCfg = &advancedConfig{}
+
 	if buildAdvancedConfigFilename == "" {
 		return nil
 	}
@@ -129,8 +131,6 @@ func processAdvancedConfig(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	advCfg = &advancedConfig{}
 	if err := json.Unmarshal(f, advCfg); err != nil {
 		return err
 	}

@@ -22,7 +22,7 @@ spec:
           args:
             - --namespace
             - $(WATCH_NAMESPACE)
-            - --custom-ca-secret
+            - --build-job-custom-ca
             - docker-registry-tls
           env:
             - name: WATCH_NAMESPACE
