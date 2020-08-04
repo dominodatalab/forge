@@ -155,38 +155,27 @@ func (r *ContainerImageBuildReconciler) checkRole(ctx context.Context, cib *forg
 
 // creates build job service role binding when missing
 func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
-	err := r.Get(ctx, types.NamespacedName{Name: cib.Name, Namespace: cib.Namespace}, &rbacv1.RoleBinding{})
-	if err == nil {
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	binding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cib.Name,
-			Namespace: cib.Namespace,
-			Labels:    cib.Labels,
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "Role",
-			Name:     cib.Name,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      rbacv1.ServiceAccountKind,
+	return r.withOwnedResource(ctx, cib, &rbacv1.RoleBinding{}, func() interface{} {
+		return &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      cib.Name,
 				Namespace: cib.Namespace,
+				Labels:    cib.Labels,
 			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(cib, binding, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.Create(ctx, binding)
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     cib.Name,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      cib.Name,
+					Namespace: cib.Namespace,
+				},
+			},
+		}
+	})
 }
 
 // generates build job definition using container image build spec
