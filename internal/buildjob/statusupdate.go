@@ -1,4 +1,4 @@
-package controllers
+package buildjob
 
 type StatusUpdate struct {
 	Name          string            `json:"name"`

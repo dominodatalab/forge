@@ -40,7 +40,8 @@ WORKDIR /forge
 COPY go.mod go.sum ./
 COPY vendor vendor
 COPY . .
-RUN make static && \
+ARG BUILD_FLAGS
+RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
 
 FROM base
