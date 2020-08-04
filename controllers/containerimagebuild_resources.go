@@ -327,7 +327,7 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 	if r.JobConfig.BrokerOpts != nil {
 		opts := r.JobConfig.BrokerOpts
 		bs := []string{
-			fmt.Sprintf("--broker=%s", opts.Broker),
+			fmt.Sprintf("--message-broker=%s", opts.Broker),
 			fmt.Sprintf("--amqp-queue=%s", opts.AmqpQueue),
 			fmt.Sprintf("--amqp-uri=%s", opts.AmqpURI),
 		}
