@@ -18,7 +18,7 @@ static:
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor $(BUILD_FLAGS)
 
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet golangci-lint manifests
 	go test ./... -coverprofile cover.out
 
 # Build manager binary
@@ -53,7 +53,6 @@ fmt:
 vet:
 	go vet ./...
 
-# Run golangci-lint
 golangci-lint:
 	golangci-lint run
 
