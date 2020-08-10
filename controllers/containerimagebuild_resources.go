@@ -8,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -161,7 +160,9 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	secCtx := &corev1.SecurityContext{
 		RunAsUser: pointer.Int64Ptr(1000),
 		SELinuxOptions: &corev1.SELinuxOptions{
-			// TODO: this requires something something
+			// TODO: this is currently required, because the default container SELinux rules
+			// do not seem to allow the remount,ro system calls that containerd uses. "spc_t"
+			// is a "special, super-privileged container" type (https://danwalsh.livejournal.com/74754.html)
 			Type: "spc_t",
 		},
 	}
@@ -247,8 +248,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			Labels:    cib.Labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: pointer.Int32Ptr(0),
-			// ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
+			BackoffLimit:            pointer.Int32Ptr(0),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: podMeta,
