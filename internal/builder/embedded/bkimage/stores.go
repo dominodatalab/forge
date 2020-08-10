@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	fuseoverlayfs "github.com/AkihiroSuda/containerd-fuse-overlayfs"
 	"github.com/containerd/containerd/content/local"
 	ctdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/snapshots"
@@ -36,6 +37,8 @@ func (c *Client) initDataStores() error {
 		snapshotter, err = native.NewSnapshotter(snapshotDir)
 	case types.OverlayFSBackend:
 		snapshotter, err = overlay.NewSnapshotter(snapshotDir)
+	case types.FuseOverlayFSBackend:
+		snapshotter, err = fuseoverlayfs.NewSnapshotter(snapshotDir)
 	default:
 		return fmt.Errorf("%s is not a valid snapshotter", c.backend)
 	}
