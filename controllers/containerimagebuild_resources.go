@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -228,6 +229,26 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		volumeMounts = append(volumeMounts, *forgeBuildMount)
 	}
 
+	resources := corev1.ResourceRequirements{
+		Limits:   corev1.ResourceList{},
+		Requests: corev1.ResourceList{},
+	}
+	if cib.Spec.CpuQuota > 0 {
+		quota := *resource.NewMilliQuantity(int64(cib.Spec.CpuQuota), resource.DecimalSI)
+		resources.Limits["cpu"] = quota
+		resources.Requests["cpu"] = quota
+	}
+
+	if cib.Spec.Memory != "" {
+		memory, err := resource.ParseQuantity(cib.Spec.Memory)
+		if err != nil {
+			return err
+		}
+
+		resources.Limits["memory"] = memory
+		resources.Requests["memory"] = memory
+	}
+
 	// construct final job object
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -254,6 +275,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
 							VolumeMounts:    volumeMounts,
+							Resources:       resources,
 						},
 					},
 					Volumes: volumes,
