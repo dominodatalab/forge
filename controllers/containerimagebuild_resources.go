@@ -134,6 +134,9 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	for k, v := range r.JobConfig.Labels {
 		podMeta.Labels[k] = v
 	}
+	for k, v := range cib.Annotations {
+		podMeta.Annotations[k] = v
+	}
 	for k, v := range r.JobConfig.Annotations {
 		podMeta.Annotations[k] = v
 	}
@@ -152,21 +155,41 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	}
 
 	// setup security context
+	podSecCtx := &corev1.PodSecurityContext{
+		FSGroup: pointer.Int64Ptr(1000),
+	}
 	secCtx := &corev1.SecurityContext{
 		RunAsUser: pointer.Int64Ptr(1000),
+		SELinuxOptions: &corev1.SELinuxOptions{
+			// TODO: this requires something something
+			Type: "spc_t",
+		},
 	}
 	if r.JobConfig.GrantFullPrivilege {
+		podSecCtx.FSGroup = nil
 		secCtx.RunAsUser = pointer.Int64Ptr(0)
 		secCtx.Privileged = pointer.BoolPtr(true)
 	}
 
 	// setup volumes and mounts used by main container
-	var volumes []corev1.Volume
+	volumes := []corev1.Volume{
+		{
+			Name: "state-dir",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
 	for _, volume := range r.JobConfig.Volumes {
 		volumes = append(volumes, volume)
 	}
 
-	var volumeMounts []corev1.VolumeMount
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "state-dir",
+			MountPath: config.GetStateDir(),
+		},
+	}
 	for _, mount := range r.JobConfig.VolumeMounts {
 		volumeMounts = append(volumeMounts, mount)
 	}
@@ -224,8 +247,8 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			Labels:    cib.Labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit:            pointer.Int32Ptr(0),
-			ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
+			BackoffLimit: pointer.Int32Ptr(0),
+			// ActiveDeadlineSeconds:   pointer.Int64Ptr(3600),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: podMeta,
@@ -233,6 +256,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					ServiceAccountName: cib.Name,
 					RestartPolicy:      corev1.RestartPolicyNever,
 					InitContainers:     initContainers,
+					SecurityContext:    podSecCtx,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
