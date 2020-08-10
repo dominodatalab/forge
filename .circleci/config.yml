@@ -92,6 +92,12 @@ jobs:
       - run:
           name: Run e2e tests
           command: ./e2e/run-test.sh ${IMG}
+      - run:
+          name: Debug Information
+          command: kubectl cluster-info dump --all-namespaces --output-directory=./cluster-state/
+          when: always
+      - store_artifacts:
+          path: cluster-state
   publish_release:
     executor: golang
     environment:
