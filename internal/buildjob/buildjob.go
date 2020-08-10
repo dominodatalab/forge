@@ -20,8 +20,6 @@ import (
 	"github.com/dominodatalab/forge/internal/credentials"
 	"github.com/dominodatalab/forge/internal/message"
 	"github.com/dominodatalab/forge/plugins/preparer"
-
-	_ "github.com/dominodatalab/forge/internal/unshare"
 )
 
 type Job struct {
@@ -44,9 +42,6 @@ type Job struct {
 
 func New(cfg Config) (*Job, error) {
 	log := NewLogger()
-
-	// unshare user, mount namespace and re-exec ourselves
-	reexec(log)
 
 	// initialize kubernetes clients
 	log.Info("Initializing Kubernetes clients")
