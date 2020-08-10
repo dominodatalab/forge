@@ -155,7 +155,11 @@ func (j *Job) Run() error {
 	return j.transitionToComplete(cib, images)
 }
 
-func (j *Job) Cleanup() {
+func (j *Job) Cleanup(forced bool) {
+	if forced {
+		j.log.Info("Caught kill signal, cleaning up")
+	}
+
 	for _, fn := range j.cleanupSteps {
 		fn()
 	}

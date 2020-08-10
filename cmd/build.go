@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"io/ioutil"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -38,11 +41,20 @@ var (
 				Debug:               debug,
 			}
 
+			stopper := make(chan os.Signal)
+			signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
+
 			job, err := buildjob.New(cfg)
 			if err != nil {
 				panic(err)
 			}
-			defer job.Cleanup()
+			defer job.Cleanup(false)
+
+			go func() {
+				<-stopper
+				job.Cleanup(true)
+				os.Exit(0)
+			}()
 
 			if err := job.Run(); err != nil {
 				panic(err)
