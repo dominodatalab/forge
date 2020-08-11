@@ -2,9 +2,9 @@ package bkimage
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
+	fuseoverlayfs "github.com/AkihiroSuda/containerd-fuse-overlayfs"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
@@ -43,20 +43,30 @@ type Client struct {
 
 func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	// select appropriate system backend
-	if backend == types.AutoBackend {
-		if overlay.Supported(rootDir) == nil {
-			backend = types.OverlayFSBackend
-		} else {
-			backend = types.NativeBackend
-		}
-	}
-	logger.Info(fmt.Sprintf("Using filesystem as backend: %s", backend))
+	workDir := filepath.Join(rootDir, ociRuntime, backend)
 
-	// create working directory
-	workDir := filepath.Join(rootDir, ociRuntime, string(backend))
-	if err := os.MkdirAll(workDir, 0700); err != nil {
-		return nil, err
+	autoSelectFn := func() string {
+		if err := overlay.Supported(workDir); err != nil {
+			logger.Info("overlayfs not unsupported", "error", err)
+		} else {
+			return types.OverlayFSBackend
+		}
+
+		if err := fuseoverlayfs.Supported(workDir); err != nil {
+			logger.Info("fuse-overlayfs not supported", "error", err)
+		} else {
+			return types.FuseOverlayFSBackend
+		}
+
+		return types.NativeBackend
 	}
+
+	// select appropriate system backend
+	if backend == types.AutoBackend {
+		backend = autoSelectFn()
+	}
+
+	logger.Info(fmt.Sprintf("Using filesystem as backend: %s", backend))
 
 	// create operational client
 	client := &Client{
