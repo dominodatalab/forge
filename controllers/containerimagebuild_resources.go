@@ -200,19 +200,6 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 		podMeta.Annotations[k] = v
 	}
 
-	// setup pod environment variables
-	env := []corev1.EnvVar{
-		// TODO: remove once forge includes the following commit:
-		// 	https://github.com/moby/buildkit/commit/ec5d112053221b41602536cdaa6cc958d7183e2b
-		{
-			Name:  "PROGRESS_NO_TRUNC",
-			Value: "1",
-		},
-	}
-	for _, ev := range r.JobConfig.EnvVar {
-		env = append(env, ev)
-	}
-
 	// setup security context
 	secCtx := &corev1.SecurityContext{
 		RunAsUser: pointer.Int64Ptr(1000),
@@ -300,7 +287,7 @@ func (r *ContainerImageBuildReconciler) jobForBuild(cib *forgev1alpha1.Container
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
 							Args:            r.prepareJobArgs(cib),
-							Env:             env,
+							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
 							VolumeMounts:    volumeMounts,
 						},
