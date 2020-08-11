@@ -57,12 +57,12 @@ COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
 COPY --from=runc /usr/bin/runc /usr/bin/runc
 COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
 COPY --from=forge /usr/bin/forge /usr/bin/forge
-RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap && \
-    adduser -D -u 1000 user && \
+RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
+RUN adduser -D -u 1000 user && \
     mkdir -p /run/user/1000 && \
     chown -R user /run/user/1000 /home/user && \
     echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
-USER user
+USER 1000
 ENV USER user
 ENV HOME /home/user
 ENV XDG_RUNTIME_DIR=/run/user/1000

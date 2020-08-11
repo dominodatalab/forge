@@ -4,11 +4,8 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,18 +18,20 @@ import (
 )
 
 type BuildJobConfig struct {
-	Image              string
-	CAImage            string
-	CustomCASecret     string
-	PreparerPluginPath string
-	Labels             map[string]string
-	Annotations        map[string]string
-	GrantFullPrivilege bool
-	EnableLayerCaching bool
-	BrokerOpts         *message.Options
-	Volumes            []corev1.Volume
-	VolumeMounts       []corev1.VolumeMount
-	EnvVar             []corev1.EnvVar
+	Image                      string
+	CAImage                    string
+	CustomCASecret             string
+	PreparerPluginPath         string
+	Labels                     map[string]string
+	Annotations                map[string]string
+	GrantFullPrivilege         bool
+	EnableLayerCaching         bool
+	PodSecurityPolicy          string
+	SecurityContextConstraints string
+	BrokerOpts                 *message.Options
+	Volumes                    []corev1.Volume
+	VolumeMounts               []corev1.VolumeMount
+	EnvVar                     []corev1.EnvVar
 }
 
 type ControllerConfig struct {
@@ -86,35 +85,17 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	existing := &batchv1.Job{}
-	err := r.Get(ctx, types.NamespacedName{Name: build.Name, Namespace: build.Namespace}, existing)
-	if err != nil {
-		// requeue when get job fails
-		if !apierrors.IsNotFound(err) {
-			log.Error(err, "Failed to get build job")
-			return ctrl.Result{}, err
-		}
+	log.Info("Reconciling build job", "Name", build.Name, "Namespace", build.Namespace)
 
-		if err := r.checkPrerequisites(ctx, build); err != nil {
-			log.Error(err, "Failed to create job prerequisites", "Name", build.Name, "Namespace", build.Namespace)
-			return ctrl.Result{}, err
-		}
-
-		job, err := r.jobForBuild(build)
-		if err != nil {
-			log.Error(err, "Failed to create job", "Name", build.Name, "Namespace", build.Namespace)
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Creating new build job", "Name", build.Name, "Namespace", build.Namespace)
-		if err := r.Create(ctx, job); err != nil {
-			// requeue when create job fails
-			log.Error(err, "Failed to create build job", "Name", build.Name, "Namespace", build.Namespace)
-			return ctrl.Result{}, err
-		}
+	if err := r.checkPrerequisites(ctx, build); err != nil {
+		log.Error(err, "Failed to create job prerequisites", "Name", build.Name, "Namespace", build.Namespace)
+		return ctrl.Result{}, err
 	}
 
-	// TODO: add a back reference on CIB to the build pod
+	if err := r.createJobForBuild(ctx, build); err != nil {
+		log.Error(err, "Failed to create job", "Name", build.Name, "Namespace", build.Namespace)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }

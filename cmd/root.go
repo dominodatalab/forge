@@ -56,13 +56,15 @@ forge --enable-layer-caching`
 var (
 	debug bool
 
-	buildJobImage               string
-	buildJobCAImage             string
-	buildJobLabels              map[string]string
-	buildJobAnnotations         map[string]string
-	buildJobCustomCASecret      string
-	buildJobGrantFullPrivilege  bool
-	buildAdvancedConfigFilename string
+	buildJobImage                      string
+	buildJobCAImage                    string
+	buildJobLabels                     map[string]string
+	buildJobAnnotations                map[string]string
+	buildJobCustomCASecret             string
+	buildJobPodSecurityPolicy          string
+	buildJobSecurityContextConstraints string
+	buildJobGrantFullPrivilege         bool
+	buildAdvancedConfigFilename        string
 
 	namespace            string
 	metricsAddr          string
@@ -90,18 +92,20 @@ var (
 				EnableLeaderElection: enableLeaderElection,
 
 				JobConfig: &controllers.BuildJobConfig{
-					Image:              buildJobImage,
-					CAImage:            buildJobCAImage,
-					CustomCASecret:     buildJobCustomCASecret,
-					PreparerPluginPath: preparerPluginsPath,
-					Labels:             buildJobLabels,
-					Annotations:        buildJobAnnotations,
-					GrantFullPrivilege: buildJobGrantFullPrivilege,
-					EnableLayerCaching: enableLayerCaching,
-					BrokerOpts:         brokerOpts,
-					EnvVar:             advCfg.Env,
-					Volumes:            advCfg.Volumes,
-					VolumeMounts:       advCfg.VolumeMounts,
+					Image:                      buildJobImage,
+					CAImage:                    buildJobCAImage,
+					CustomCASecret:             buildJobCustomCASecret,
+					PreparerPluginPath:         preparerPluginsPath,
+					Labels:                     buildJobLabels,
+					Annotations:                buildJobAnnotations,
+					PodSecurityPolicy:          buildJobPodSecurityPolicy,
+					SecurityContextConstraints: buildJobSecurityContextConstraints,
+					GrantFullPrivilege:         buildJobGrantFullPrivilege,
+					EnableLayerCaching:         enableLayerCaching,
+					BrokerOpts:                 brokerOpts,
+					EnvVar:                     advCfg.Env,
+					Volumes:                    advCfg.Volumes,
+					VolumeMounts:               advCfg.VolumeMounts,
 				},
 			}
 			controllers.StartManager(cfg)
@@ -163,6 +167,8 @@ func init() {
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
 	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
+	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")
+	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")
 	rootCmd.Flags().BoolVar(&buildJobGrantFullPrivilege, "build-job-full-privilege", false, "Run builds jobs using a privileged root user")
 	rootCmd.Flags().StringVar(&buildAdvancedConfigFilename, "build-job-advanced-config", "", "Add volumes, volume mounts and environment variables to your build jobs using a JSON file")
 
