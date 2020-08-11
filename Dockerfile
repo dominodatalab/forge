@@ -1,4 +1,4 @@
-FROM alpine:3.11 AS base
+FROM alpine:3.12 AS base
 
 FROM base AS idmap
 RUN apk add --no-cache \
@@ -20,13 +20,19 @@ RUN ./autogen.sh --disable-nls --disable-man --without-audit --without-selinux -
     make && \
     cp src/newuidmap src/newgidmap /usr/bin/
 
-FROM golang:1.13-alpine3.11 AS gobase
+FROM golang:1.13-alpine3.12 AS gobase
 RUN apk add --no-cache \
         bash \
         build-base \
         git \
         libseccomp-dev \
         linux-headers
+
+FROM gobase AS fuse-overlayfs
+RUN apk add --no-cache curl
+RUN curl -sSL -o fuse-overlayfs https://github.com/containers/fuse-overlayfs/releases/download/v1.1.2/fuse-overlayfs-x86_64 && \
+    chmod +x fuse-overlayfs && \
+    mv fuse-overlayfs /usr/bin/
 
 FROM gobase AS runc
 WORKDIR /go/src/github.com/opencontainers/runc
@@ -54,6 +60,7 @@ COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
 COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
 COPY --from=runc /usr/bin/runc /usr/bin/runc
 COPY --from=rootlesskit /go/bin/rootlesskit /usr/bin/rootlesskit
+COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
 COPY --from=forge /usr/bin/forge /usr/bin/forge
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap && \
     adduser -D -u 1000 user && \
