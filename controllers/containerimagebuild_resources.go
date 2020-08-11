@@ -248,6 +248,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
+							Command:         []string{"rootlesskit"},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
@@ -266,6 +267,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 // builds cli args required to launch forge in "build mode" inside a job
 func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.ContainerImageBuild) []string {
 	args := []string{
+		"/usr/bin/forge",
 		"build",
 		fmt.Sprintf("--resource=%s", cib.Name),
 		fmt.Sprintf("--enable-layer-caching=%t", r.JobConfig.EnableLayerCaching),
