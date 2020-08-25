@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,17 +47,30 @@ func StartManager(cfg ControllerConfig) {
 		os.Exit(1)
 	}
 
-	if err = (&ContainerImageBuildReconciler{
+	controller := &ContainerImageBuildReconciler{
 		Log:       ctrl.Log.WithName("controllers").WithName("ContainerImageBuild"),
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 		Recorder:  mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		JobConfig: cfg.JobConfig,
-	}).SetupWithManager(mgr); err != nil {
+	}
+
+	if err = controller.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	if cfg.GCInterval != 0 {
+		go func() {
+			for {
+				controller.RunGC(cfg.GCMaxRetentionCount)
+				time.Sleep(cfg.GCInterval)
+			}
+		}()
+	} else {
+		setupLog.Info("Auto-GC disabled, you must delete ContainerImageBuild resources on your own")
+	}
 
 	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

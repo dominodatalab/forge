@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -56,6 +57,9 @@ forge --enable-layer-caching`
 var (
 	debug bool
 
+	gcInterval     time.Duration
+	gcMaxKeepCount int
+
 	buildJobImage                      string
 	buildJobCAImage                    string
 	buildJobLabels                     map[string]string
@@ -90,6 +94,8 @@ var (
 				Namespace:            namespace,
 				MetricsAddr:          metricsAddr,
 				EnableLeaderElection: enableLeaderElection,
+				GCInterval:           gcInterval,
+				GCMaxRetentionCount:  gcMaxKeepCount,
 
 				JobConfig: &controllers.BuildJobConfig{
 					Image:                      buildJobImage,
@@ -171,6 +177,8 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")
 	rootCmd.Flags().BoolVar(&buildJobGrantFullPrivilege, "build-job-full-privilege", false, "Run builds jobs using a privileged root user")
 	rootCmd.Flags().StringVar(&buildAdvancedConfigFilename, "build-job-advanced-config", "", "Add volumes, volume mounts and environment variables to your build jobs using a JSON file")
+	rootCmd.Flags().DurationVar(&gcInterval, "gc-interval", 30*time.Minute, "Run ContainerImageBuild cleanup operation according to this interval. Set to 0 to disable")
+	rootCmd.Flags().IntVar(&gcMaxKeepCount, "gc-max-keep", 5, "Delete all ContainerImageBuild resources in a 'finished' state that exceed this count")
 
 	// leveraged by both main and build commands
 	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))

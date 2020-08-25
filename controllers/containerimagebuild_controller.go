@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +41,8 @@ type ControllerConfig struct {
 	Namespace            string
 	MetricsAddr          string
 	EnableLeaderElection bool
+	GCMaxRetentionCount  int
+	GCInterval           time.Duration
 
 	JobConfig *BuildJobConfig
 }
@@ -98,4 +102,52 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
+	ctx := context.Background()
+	log := r.Log.WithName("GC")
+	log.Info("Launching cleanup operation")
+
+	list := &forgev1alpha1.ContainerImageBuildList{}
+	if err := r.List(ctx, list); err != nil {
+		log.Error(err, "Failed to list build resources, something may be wrong")
+		return
+	}
+
+	listLen := len(list.Items)
+	if listLen == 0 {
+		log.V(1).Info("No build resources found, aborting")
+		return
+	}
+	log.Info("Fetched all build resources", "count", listLen)
+
+	log.V(1).Info("Filtering builds by state", "states", []forgev1alpha1.BuildState{
+		forgev1alpha1.BuildStateCompleted, forgev1alpha1.BuildStateFailed,
+	})
+	var builds []forgev1alpha1.ContainerImageBuild
+	for _, cib := range list.Items {
+		state := cib.Status.State
+		if state == forgev1alpha1.BuildStateCompleted || state == forgev1alpha1.BuildStateFailed {
+			builds = append(builds, cib)
+		}
+	}
+
+	if len(builds) <= retentionCount {
+		log.Info("Total resources are less than or equal to retention limit, aborting", "resourceCount", len(builds), "retentionCount", retentionCount)
+		return
+	}
+	log.Info("Total resources eligible for deletion", "count", len(builds))
+
+	sort.Slice(builds, func(i, j int) bool {
+		return builds[i].CreationTimestamp.Before(&builds[j].CreationTimestamp)
+	})
+
+	for _, build := range builds[:len(builds)-retentionCount] {
+		if err := r.Delete(ctx, &build); err != nil {
+			log.Error(err, "Failed to delete build", "name", build.Name, "namespace", build.Namespace)
+		}
+		log.Info("Deleted build", "name", build.Name, "namespace", build.Namespace)
+	}
+	log.Info("Cleanup complete")
 }
