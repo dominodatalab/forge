@@ -61,11 +61,17 @@ func StartManager(cfg ControllerConfig) {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if cfg.GCInterval != 0 {
+	if cfg.GCInterval > 0 {
+		ticker := time.NewTicker(cfg.GCInterval)
+		defer func() {
+			setupLog.Info("Shutting down GC routine")
+			ticker.Stop()
+		}()
+
 		go func() {
-			for {
+			select {
+			case <-ticker.C:
 				controller.RunGC(cfg.GCMaxRetentionCount)
-				time.Sleep(cfg.GCInterval)
 			}
 		}()
 	} else {
