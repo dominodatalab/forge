@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -18,6 +19,9 @@ import (
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/message"
 )
+
+// blocks until all resources belonging to a ContainerImageBuild have been deleted
+const gcDeleteOpt = client.PropagationPolicy(metav1.DeletePropagationForeground)
 
 type BuildJobConfig struct {
 	Image                      string
@@ -146,7 +150,7 @@ func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 	})
 
 	for _, build := range builds[:len(builds)-retentionCount] {
-		if err := r.Delete(ctx, &build); err != nil {
+		if err := r.Delete(ctx, &build, gcDeleteOpt); err != nil {
 			log.Error(err, "Failed to delete build", "name", build.Name, "namespace", build.Namespace)
 		}
 		log.Info("Deleted build", "name", build.Name, "namespace", build.Namespace)
