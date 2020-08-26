@@ -104,6 +104,8 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	return ctrl.Result{}, nil
 }
 
+// RunGC will delete ContainerImageBuild resources that are in a "completed" or "failed" state. The oldest resources
+// will be deleted first and the retentionCount will preserve N of resources for inspection.
 func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 	ctx := context.Background()
 	log := r.Log.WithName("GC")
