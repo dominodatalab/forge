@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -32,33 +29,14 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := buildjob.Config{
+			buildjob.Run(buildjob.Config{
 				ResourceName:        resourceName,
 				ResourceNamespace:   resourceNamespace,
 				BrokerOpts:          brokerOpts,
 				PreparerPluginsPath: preparerPluginsPath,
 				EnableLayerCaching:  enableLayerCaching,
 				Debug:               debug,
-			}
-
-			stopper := make(chan os.Signal)
-			signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
-
-			job, err := buildjob.New(cfg)
-			if err != nil {
-				panic(err)
-			}
-			defer job.Cleanup(false)
-
-			go func() {
-				<-stopper
-				job.Cleanup(true)
-				os.Exit(0)
-			}()
-
-			if err := job.Run(); err != nil {
-				panic(err)
-			}
+			})
 		},
 	}
 )

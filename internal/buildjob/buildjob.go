@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -23,8 +26,6 @@ import (
 )
 
 type Job struct {
-	log logr.Logger
-
 	clientk8s   kubernetes.Interface
 	clientforge clientv1alpha1.Interface
 
@@ -40,9 +41,36 @@ type Job struct {
 	cleanupSteps []func()
 }
 
-func New(cfg Config) (*Job, error) {
-	log := NewLogger()
+var log = newLogger()
 
+// Run creates, executes, and cleans up an OCI image build and push.
+func Run(cfg Config) {
+	stopper := make(chan os.Signal)
+	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
+
+	log := newLogger()
+	job, err := New(cfg, log)
+	if err != nil {
+		log.Error(err, "Error initializing build job")
+		panic(err)
+	}
+	defer job.Cleanup()
+
+	go func() {
+		<-stopper
+		log.Info("Caught kill signal, cleaning up")
+		job.Cleanup()
+		os.Exit(0)
+	}()
+
+	if err := job.Run(); err != nil {
+		logError(log, err)
+		panic(err)
+	}
+}
+
+// New creates a new OCI build and push job with the given config.
+func New(cfg Config, log logr.Logger) (*Job, error) {
 	// initialize kubernetes clients
 	log.Info("Initializing Kubernetes clients")
 
@@ -98,7 +126,6 @@ func New(cfg Config) (*Job, error) {
 	}
 
 	return &Job{
-		log:          log,
 		name:         cfg.ResourceName,
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
@@ -110,10 +137,11 @@ func New(cfg Config) (*Job, error) {
 	}, nil
 }
 
+// Run executes an OCI image build and push.
 func (j *Job) Run() error {
 	ctx := context.TODO()
 
-	j.log.Info("Fetching ContainerImageBuild resource", "Name", j.name, "Namespace", j.namespace)
+	log.Info("Fetching ContainerImageBuild resource", "Name", j.name, "Namespace", j.namespace)
 	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(j.name)
 	if err != nil {
 		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
@@ -123,9 +151,7 @@ func (j *Job) Run() error {
 		return err
 	}
 
-	j.log = j.log.WithValues("annotations", cib.Annotations)
-
-	j.log.Info("Creating build options using custom resource fields")
+	log.Info("Creating build options using custom resource fields")
 	opts, err := j.generateBuildOptions(ctx, cib)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate build options")
@@ -136,11 +162,9 @@ func (j *Job) Run() error {
 		return err
 	}
 
-	j.builder.SetLogger(j.log)
+	j.builder.SetLogger(log)
 	images, err := j.builder.BuildAndPush(ctx, opts)
 	if err != nil {
-		logError(j.log, err)
-
 		if iErr := j.transitionToFailure(cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
@@ -150,11 +174,8 @@ func (j *Job) Run() error {
 	return j.transitionToComplete(cib, images)
 }
 
-func (j *Job) Cleanup(forced bool) {
-	if forced {
-		j.log.Info("Caught kill signal, cleaning up")
-	}
-
+// Cleanup cleans up resources associated with a build job.
+func (j *Job) Cleanup() {
 	for _, fn := range j.cleanupSteps {
 		fn()
 	}

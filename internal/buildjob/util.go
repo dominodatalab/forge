@@ -12,7 +12,7 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-func NewLogger() logr.Logger {
+func newLogger() logr.Logger {
 	atom := zap.NewAtomicLevel()
 	return ctrlzap.New(func(options *ctrlzap.Options) {
 		options.Level = &atom
