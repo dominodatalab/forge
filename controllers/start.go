@@ -69,8 +69,7 @@ func StartManager(cfg ControllerConfig) {
 		}()
 
 		go func() {
-			select {
-			case <-ticker.C:
+			for range ticker.C {
 				controller.RunGC(cfg.GCMaxRetentionCount)
 			}
 		}()
