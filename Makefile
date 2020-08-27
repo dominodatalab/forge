@@ -54,7 +54,7 @@ vet:
 	go vet ./...
 
 golangci-lint:
-	golangci-lint run
+	golangci-lint run --skip-dirs docs
 
 # Generate code
 generate: controller-gen
