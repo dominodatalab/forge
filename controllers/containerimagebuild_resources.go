@@ -168,9 +168,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			},
 		},
 	}
-	for _, volume := range r.JobConfig.Volumes {
-		volumes = append(volumes, volume)
-	}
+	volumes = append(volumes, r.JobConfig.Volumes...)
 
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -178,9 +176,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			MountPath: config.GetStateDir(),
 		},
 	}
-	for _, mount := range r.JobConfig.VolumeMounts {
-		volumeMounts = append(volumeMounts, mount)
-	}
+	volumeMounts = append(volumeMounts, r.JobConfig.VolumeMounts...)
 
 	// optionally configure the custom CA init container w/ additional volumes/mounts
 	var initContainers []corev1.Container
