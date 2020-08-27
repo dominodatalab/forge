@@ -118,6 +118,7 @@ func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 	list := &forgev1alpha1.ContainerImageBuildList{}
 	if err := r.List(ctx, list); err != nil {
 		log.Error(err, "Failed to list build resources, something may be wrong")
+		r.Recorder.Event(list, corev1.EventTypeWarning, "GarbageCollection", "Unable to list ContainerImageBuild resources")
 		return
 	}
 
@@ -152,6 +153,7 @@ func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 	for _, build := range builds[:len(builds)-retentionCount] {
 		if err := r.Delete(ctx, &build, gcDeleteOpt); err != nil {
 			log.Error(err, "Failed to delete build", "name", build.Name, "namespace", build.Namespace)
+			r.Recorder.Event(&build, corev1.EventTypeWarning, "GarbageCollection", "Delete operation failed")
 		}
 		log.Info("Deleted build", "name", build.Name, "namespace", build.Namespace)
 	}
