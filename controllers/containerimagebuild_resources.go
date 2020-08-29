@@ -18,6 +18,11 @@ import (
 	"github.com/dominodatalab/forge/internal/config"
 )
 
+const (
+	rootlesskitCommand = "rootlesskit"
+	forgeCommand       = "/usr/bin/forge"
+)
+
 // creates all supporting resources required by build job
 func (r *ContainerImageBuildReconciler) checkPrerequisites(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
 	if err := r.checkServiceAccount(ctx, cib); err != nil {
@@ -247,7 +252,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
-							Command:         []string{"rootlesskit"},
+							Command:         []string{rootlesskitCommand},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
@@ -266,7 +271,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 // builds cli args required to launch forge in "build mode" inside a job
 func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.ContainerImageBuild) []string {
 	args := []string{
-		"/usr/bin/forge",
+		forgeCommand,
 		"build",
 		fmt.Sprintf("--resource=%s", cib.Name),
 		fmt.Sprintf("--enable-layer-caching=%t", r.JobConfig.EnableLayerCaching),

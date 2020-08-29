@@ -41,10 +41,6 @@ RUN git clone -c advice.detachedHead=false https://github.com/opencontainers/run
 RUN make static BUILDTAGS="seccomp apparmor" && \
     cp runc /usr/bin/
 
-FROM gobase AS rootlesskit
-ENV GO111MODULE=on
-RUN go get github.com/rootless-containers/rootlesskit/cmd/rootlesskit@v0.10.0
-
 FROM gobase AS forge
 WORKDIR /forge
 COPY go.mod go.sum ./
@@ -55,18 +51,24 @@ RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
 
 FROM base
+
 RUN apk add --no-cache fuse3 git pigz
+
+ARG ROOTLESSKIT_VERSION=v0.10.0
+RUN wget -qO - https://github.com/rootless-containers/rootlesskit/releases/download/$ROOTLESSKIT_VERSION/rootlesskit-x86_64.tar.gz | tar -xz -C /usr/bin
+
 COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
 COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
 COPY --from=runc /usr/bin/runc /usr/bin/runc
-COPY --from=rootlesskit /go/bin/rootlesskit /usr/bin/rootlesskit
 COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
 COPY --from=forge /usr/bin/forge /usr/bin/forge
+
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
 RUN adduser -D -u 1000 user && \
     mkdir -p /run/user/1000 && \
     chown -R user /run/user/1000 /home/user && \
     echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
+
 USER 1000
 ENV USER user
 ENV HOME /home/user
