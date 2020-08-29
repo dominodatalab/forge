@@ -240,8 +240,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			Labels:    cib.Labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit:            pointer.Int32Ptr(0),
-			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+			BackoffLimit: pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: podMeta,
 				Spec: corev1.PodSpec{

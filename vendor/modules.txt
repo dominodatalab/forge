@@ -30,7 +30,7 @@ github.com/beorn7/perks/quantile
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v0.0.0-20191219165238-8375c3424e4d
 github.com/containerd/console
-# github.com/containerd/containerd v1.4.0-0 => github.com/containerd/containerd v1.3.1-0.20200227195959-4d242818bf55
+# github.com/containerd/containerd v1.4.0-0 => github.com/containerd/containerd v1.4.0-beta.2.0.20200728183644-eb6354a11860
 github.com/containerd/containerd/api/services/content/v1
 github.com/containerd/containerd/archive
 github.com/containerd/containerd/archive/compression
@@ -97,7 +97,7 @@ github.com/davecgh/go-spew/spew
 # github.com/docker/distribution v2.7.1+incompatible
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
-# github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd => github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82
+# github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd => github.com/docker/docker v17.12.0-ce-rc1.0.20200310163718-4634ce647cf2+incompatible
 github.com/docker/docker/api/types/blkiodev
 github.com/docker/docker/api/types/container
 github.com/docker/docker/api/types/mount
@@ -210,7 +210,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/mitchellh/go-testing-interface
 # github.com/mitchellh/hashstructure v1.0.0
 github.com/mitchellh/hashstructure
-# github.com/moby/buildkit v0.7.1
+# github.com/moby/buildkit v0.7.2
 github.com/moby/buildkit/api/services/control
 github.com/moby/buildkit/api/types
 github.com/moby/buildkit/cache
@@ -698,6 +698,7 @@ k8s.io/client-go/plugin/pkg/client/auth/gcp
 k8s.io/client-go/rest
 k8s.io/client-go/rest/watch
 k8s.io/client-go/restmapper
+k8s.io/client-go/testing
 k8s.io/client-go/third_party/forked/golang/template
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/cache
@@ -738,6 +739,7 @@ sigs.k8s.io/controller-runtime/pkg/cache/internal
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/client/apiutil
 sigs.k8s.io/controller-runtime/pkg/client/config
+sigs.k8s.io/controller-runtime/pkg/client/fake
 sigs.k8s.io/controller-runtime/pkg/controller
 sigs.k8s.io/controller-runtime/pkg/controller/controllerutil
 sigs.k8s.io/controller-runtime/pkg/conversion
@@ -749,6 +751,7 @@ sigs.k8s.io/controller-runtime/pkg/healthz
 sigs.k8s.io/controller-runtime/pkg/internal/controller
 sigs.k8s.io/controller-runtime/pkg/internal/controller/metrics
 sigs.k8s.io/controller-runtime/pkg/internal/log
+sigs.k8s.io/controller-runtime/pkg/internal/objectutil
 sigs.k8s.io/controller-runtime/pkg/internal/recorder
 sigs.k8s.io/controller-runtime/pkg/internal/testing/integration
 sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/addr
