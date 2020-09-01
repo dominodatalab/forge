@@ -45,8 +45,7 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 		{
 			cib: &forgev1alpha1.ContainerImageBuild{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-cib-resource-quota",
-					CreationTimestamp: metav1.Now(),
+					Name: "test-cib-resource-quota",
 				},
 				Spec: forgev1alpha1.ContainerImageBuildSpec{
 					CpuQuota: 666,
@@ -67,8 +66,7 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 		{
 			cib: &forgev1alpha1.ContainerImageBuild{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-cib-no-resource-quota",
-					CreationTimestamp: metav1.Now(),
+					Name: "test-cib-no-resource-quota",
 				},
 				Spec: forgev1alpha1.ContainerImageBuildSpec{
 					CpuQuota: 0,
