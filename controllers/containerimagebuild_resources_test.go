@@ -78,9 +78,7 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.cib.Name, func(t *testing.T) {
-			if err := controller.createJobForBuild(context.TODO(), tc.cib); err != nil {
-				t.Errorf("createJobForBuild() error = %v", err)
-			}
+			require.NoError(t, controller.createJobForBuild(context.TODO(), tc.cib))
 
 			job := &batchv1.Job{}
 			require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: tc.cib.Name}, job))
