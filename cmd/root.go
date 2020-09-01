@@ -64,6 +64,7 @@ var (
 	buildJobCAImage                    string
 	buildJobLabels                     map[string]string
 	buildJobAnnotations                map[string]string
+	buildJobNodeSelector               map[string]string
 	buildJobCustomCASecret             string
 	buildJobPodSecurityPolicy          string
 	buildJobSecurityContextConstraints string
@@ -104,6 +105,7 @@ var (
 					PreparerPluginPath:         preparerPluginsPath,
 					Labels:                     buildJobLabels,
 					Annotations:                buildJobAnnotations,
+					NodeSelector:               buildJobNodeSelector,
 					PodSecurityPolicy:          buildJobPodSecurityPolicy,
 					SecurityContextConstraints: buildJobSecurityContextConstraints,
 					GrantFullPrivilege:         buildJobGrantFullPrivilege,
@@ -172,6 +174,7 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobCAImage, "build-job-ca-image", defaultBuildJobCAImage, "Image used to initialize SSL certificates using a custom CA. You should not have to override this.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
+	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
 	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
 	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")
 	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")

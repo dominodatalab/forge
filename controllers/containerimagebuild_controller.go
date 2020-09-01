@@ -30,6 +30,7 @@ type BuildJobConfig struct {
 	PreparerPluginPath         string
 	Labels                     map[string]string
 	Annotations                map[string]string
+	NodeSelector               map[string]string
 	GrantFullPrivilege         bool
 	EnableLayerCaching         bool
 	PodSecurityPolicy          string

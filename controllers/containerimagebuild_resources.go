@@ -241,6 +241,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 				ObjectMeta: podMeta,
 				Spec: corev1.PodSpec{
 					ServiceAccountName: cib.Name,
+					NodeSelector:       r.JobConfig.NodeSelector,
 					RestartPolicy:      corev1.RestartPolicyNever,
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
