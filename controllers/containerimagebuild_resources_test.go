@@ -38,34 +38,55 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 		Scheme: scheme,
 	}
 
-	cib := &forgev1alpha1.ContainerImageBuild{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "test-cib-resource-quota",
-			CreationTimestamp: metav1.Now(),
+	testCases := []struct {
+		cib       *forgev1alpha1.ContainerImageBuild
+		resources corev1.ResourceRequirements
+	}{
+		{
+			cib: &forgev1alpha1.ContainerImageBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-cib-resource-quota",
+					CreationTimestamp: metav1.Now(),
+				},
+				Spec: forgev1alpha1.ContainerImageBuildSpec{
+					CpuQuota: 666,
+					Memory:   "1G",
+				},
+			},
+			resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"memory": resource.MustParse("1G"),
+					"cpu":    resource.MustParse("666m"),
+				},
+				Requests: corev1.ResourceList{
+					"memory": resource.MustParse("1G"),
+					"cpu":    resource.MustParse("666m"),
+				},
+			},
 		},
-		Spec: forgev1alpha1.ContainerImageBuildSpec{
-			CpuQuota: 666,
-			Memory:   "1G",
+		{
+			cib: &forgev1alpha1.ContainerImageBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-cib-no-resource-quota",
+					CreationTimestamp: metav1.Now(),
+				},
+				Spec: forgev1alpha1.ContainerImageBuildSpec{
+					CpuQuota: 0,
+					Memory:   "",
+				},
+			},
 		},
 	}
-	if err := controller.createJobForBuild(context.TODO(), cib); err != nil {
-		t.Errorf("createJobForBuild() error = %v", err)
+
+	for _, tc := range testCases {
+		t.Run(tc.cib.Name, func(t *testing.T) {
+			if err := controller.createJobForBuild(context.TODO(), tc.cib); err != nil {
+				t.Errorf("createJobForBuild() error = %v", err)
+			}
+
+			job := &batchv1.Job{}
+			require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: tc.cib.Name}, job))
+			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Resources, tc.resources)
+		})
 	}
-
-	job := &batchv1.Job{}
-	require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: "test-cib-resource-quota", Namespace: ""}, job))
-
-	resources := job.Spec.Template.Spec.Containers[0].Resources
-	expected := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			"memory": resource.MustParse("1G"),
-			"cpu":    resource.MustParse("666m"),
-		},
-		Requests: corev1.ResourceList{
-			"memory": resource.MustParse("1G"),
-			"cpu":    resource.MustParse("666m"),
-		},
-	}
-
-	assert.Equal(t, resources, expected)
 }
