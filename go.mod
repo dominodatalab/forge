@@ -12,6 +12,7 @@ replace (
 
 require (
 	github.com/AkihiroSuda/containerd-fuse-overlayfs v0.0.0-20200220082720-bb896865146c
+	github.com/aws/aws-sdk-go-v2 v0.24.0
 	github.com/containerd/containerd v1.4.0-0
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
