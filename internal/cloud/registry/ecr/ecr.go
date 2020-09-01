@@ -2,6 +2,7 @@ package ecr
 
 import (
 	"context"
+	"regexp"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws/external"
@@ -10,12 +11,15 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 
+	"github.com/dominodatalab/forge/internal/cloud/registry"
 	"github.com/dominodatalab/forge/internal/cloud/registry/types"
 )
 
 var (
 	client   ecriface.ClientAPI
 	initOnce sync.Once
+
+	urlRegex = regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com/.+$`)
 )
 
 // LoadAuths will read the local AWS config once and use it to request ECR authorization data.
@@ -50,4 +54,8 @@ func authenticate(ctx context.Context) (types.AuthConfigs, error) {
 		}
 	}
 	return auths, nil
+}
+
+func init() {
+	registry.DefaultURLMux().RegisterLoader(urlRegex, LoadAuths)
 }
