@@ -112,7 +112,12 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 	defer os.RemoveAll(extract.RootDir)
 
 	for _, preparerPlugin := range d.preparerPlugins {
-		defer preparerPlugin.Cleanup()
+		defer func() {
+			if err := preparerPlugin.Cleanup(); err != nil {
+				d.logger.Error(err, "Error cleaning up prepared resources")
+			}
+		}()
+
 		d.logger.Info("Preparing resources for image build context")
 		if err := preparerPlugin.Prepare(extract.ContentsDir, opts.PluginData); err != nil {
 			return err

@@ -160,10 +160,6 @@ func (j *Job) Cleanup(forced bool) {
 	}
 }
 
-func (j *Job) addCleanupStep(fn func()) {
-	j.cleanupSteps = append(j.cleanupSteps, fn)
-}
-
 func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
 	registries, err := j.buildRegistryConfig(ctx, cib.Spec.Registries)
 	if err != nil {
@@ -236,8 +232,8 @@ func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace
 	auth, ok := output.Auths[host]
 	if !ok {
 		var urls []string
-		for k, _ := range output.Auths {
-			urls = append(urls, k)
+		for url := range output.Auths {
+			urls = append(urls, url)
 		}
 		return "", "", fmt.Errorf("registry server %q is not in registry secret %q: server list %v", host, name, urls)
 	}

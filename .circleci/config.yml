@@ -21,9 +21,14 @@ jobs:
     executor: golang
     environment:
       KUBEBUILDER_VERSION: 2.2.0
+      GOLANGCI_LINT_VERSION: v1.30.0
     steps:
       - checkout
       - load_env
+      - run:
+          name: Install golangci-lint
+          command: |
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VERSION
       - run:
           name: Install Kubebuilder
           command: |
