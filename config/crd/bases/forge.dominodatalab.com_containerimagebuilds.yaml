@@ -48,12 +48,9 @@ spec:
               description: Build context for the image. This can be a local path or
                 url.
               type: string
-            cpuQuota:
-              description: Limits build cpu consumption (value should be some value
-                from 0 to 100_000).
-              maximum: 100000
-              minimum: 10000
-              type: integer
+            cpu:
+              description: Limits build cpu consumption.
+              type: string
             imageName:
               description: Name used to build an image.
               minLength: 1

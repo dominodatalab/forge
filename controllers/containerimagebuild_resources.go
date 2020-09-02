@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -233,16 +234,20 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
 	}
-	if cib.Spec.CpuQuota > 0 {
-		quota := *resource.NewMilliQuantity(int64(cib.Spec.CpuQuota), resource.DecimalSI)
-		resources.Limits["cpu"] = quota
-		resources.Requests["cpu"] = quota
+	if cib.Spec.CPU != "" {
+		cpu, err := resource.ParseQuantity(cib.Spec.CPU)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("could not parse `cpu` field: %s", cib.Spec.CPU))
+		}
+
+		resources.Limits["cpu"] = cpu
+		resources.Requests["cpu"] = cpu
 	}
 
 	if cib.Spec.Memory != "" {
 		memory, err := resource.ParseQuantity(cib.Spec.Memory)
 		if err != nil {
-			return err
+			return errors.Wrap(err, fmt.Sprintf("could not parse `memory` field: %s", cib.Spec.Memory))
 		}
 
 		resources.Limits["memory"] = memory

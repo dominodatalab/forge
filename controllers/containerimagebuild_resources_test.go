@@ -48,8 +48,8 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 					Name: "test-cib-resource-quota",
 				},
 				Spec: forgev1alpha1.ContainerImageBuildSpec{
-					CpuQuota: 666,
-					Memory:   "1G",
+					CPU:    "666m",
+					Memory: "1G",
 				},
 			},
 			resources: corev1.ResourceRequirements{
@@ -69,8 +69,8 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 					Name: "test-cib-no-resource-quota",
 				},
 				Spec: forgev1alpha1.ContainerImageBuildSpec{
-					CpuQuota: 0,
-					Memory:   "",
+					CPU:    "",
+					Memory: "",
 				},
 			},
 		},
