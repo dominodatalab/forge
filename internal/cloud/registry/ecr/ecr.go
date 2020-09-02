@@ -16,10 +16,10 @@ import (
 )
 
 var (
+	urlRegex = regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com/.+$`)
+
 	client   ecriface.ClientAPI
 	initOnce sync.Once
-
-	urlRegex = regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com/.+$`)
 )
 
 // LoadAuths will read the local AWS config once and use it to request ECR authorization data.

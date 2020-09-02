@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/dominodatalab/forge/internal/cloud/registry/types"
@@ -33,5 +32,5 @@ func (m *URLMux) FromString(url string) (types.AuthLoader, error) {
 			return loader, nil
 		}
 	}
-	return nil, fmt.Errorf("no loader found for %q", url)
+	return nil, NoLoaderFoundError{URL: url}
 }

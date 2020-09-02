@@ -4,5 +4,5 @@ import (
 	"testing"
 )
 
-func TestGetAuthConfigs(t *testing.T) {
+func TestRetrieveAuthorization(t *testing.T) {
 }
