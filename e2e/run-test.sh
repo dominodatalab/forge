@@ -61,12 +61,12 @@ info "Installing forge CRDs"
 kubectl apply -k config/crd
 
 info "Launching Forge controller: $image"
-pushd config/controller/base
+pushd config/controller/controller
 kustomize edit set image quay.io/domino/forge="$image"
 kustomize edit set namespace "$namespace"
 popd
 
-kubectl apply -k config/controller/base
+kubectl apply -k config/controller/controller
 kubectl wait deploy --for=condition=available \
   --namespace "$namespace" \
   --selector app.kubernetes.io/name=forge \
