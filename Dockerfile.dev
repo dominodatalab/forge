@@ -27,7 +27,7 @@ FROM gcr.io/buildpacks/gcp/run
 
 USER root
 
-RUN apt-get update && apt-get install -y git gcc fuse3 pigz && apt-get clean
+RUN apt-get update && apt-get install -y git gcc pigz && apt-get clean
 
 ARG ROOTLESSKIT_VERSION=v0.10.0
 RUN curl -sSfL https://github.com/rootless-containers/rootlesskit/releases/download/$ROOTLESSKIT_VERSION/rootlesskit-x86_64.tar.gz | tar -xz -C /usr/bin
