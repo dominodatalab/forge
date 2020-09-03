@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: forge-build-job
+  labels:
+    app.kubernetes.io/name: forge
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      annotations:
+        "container.apparmor.security.beta.kubernetes.io/job": "unconfined"
+        "container.seccomp.security.alpha.kubernetes.io/job": "unconfined"
+    spec:
+      serviceAccountName: forge
+      terminationGracePeriodSeconds: 10
+      restartPolicy: Never
+      initContainers:
+        - name: init-ca-certs
+          env:
+            - name: CERT_DIR
+              value: /tmp/forge/ca-tls
+          image: quay.io/domino/forge-init-ca:master.58ce8293656c2910be9888a2a47e032e622cb5bc
+          volumeMounts:
+            - mountPath: /tmp/forge/ca-tls
+              name: ca-tls
+            - mountPath: /etc/ssl/certs
+              name: ssl-certs
+      containers:
+        - name: job
+          image: quay.io/domino/forge:latest
+          imagePullPolicy: IfNotPresent
+          args:
+          - build
+          - --resource
+          - test-tls-with-basic-auth
+          resources:
+            requests:
+              cpu: 1
+              memory: 20Mi
+          volumeMounts:
+            - mountPath: /home/cnb/.local/share/forge
+              name: state-dir
+            - mountPath: /etc/ssl/certs
+              name: ssl-certs
+              readOnly: true
+          securityContext:
+            privileged: true
+            runAsUser: 0
+      volumes:
+        - name: ca-tls
+          secret:
+            defaultMode: 420
+            secretName: docker-registry-tls
+        - name: ssl-certs
+          emptyDir: {}
+        - name: state-dir
+          emptyDir: {}
