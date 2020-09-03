@@ -1,0 +1,49 @@
+FROM golang:1.14-buster as idmap
+RUN apt-get update && apt-get install -y autoconf automake autopoint build-essential byacc gettext libcap-dev libtool libxslt1.1
+
+RUN git clone https://github.com/shadow-maint/shadow.git /shadow
+WORKDIR /shadow
+RUN git checkout 59c2dabb264ef7b3137f5edb52c0b31d5af0cf76
+RUN ./autogen.sh --disable-nls --disable-man --without-audit --without-selinux --without-acl --without-attr --without-tcb --without-nscd && \
+    make && \
+    cp src/newuidmap src/newgidmap /usr/bin/
+
+FROM golang:1.14-buster as runc
+RUN apt-get update && apt-get install -y libseccomp-dev
+
+WORKDIR /go/src/github.com/opencontainers/runc
+
+RUN git clone -c advice.detachedHead=false https://github.com/opencontainers/runc.git . && \
+    git checkout 56aca5aa50d07548d5db8fd33e9dc562f70f3208
+RUN make static BUILDTAGS="seccomp apparmor" && \
+    cp runc /usr/bin/
+
+FROM golang:1.14-buster as fuse-overlayfs
+RUN curl -sSL -o fuse-overlayfs https://github.com/containers/fuse-overlayfs/releases/download/v1.1.2/fuse-overlayfs-x86_64 && \
+    chmod +x fuse-overlayfs && \
+    mv fuse-overlayfs /usr/bin/
+
+FROM gcr.io/buildpacks/gcp/run
+
+USER root
+
+RUN apt-get update && apt-get install -y git gcc fuse3 pigz && apt-get clean
+
+ARG ROOTLESSKIT_VERSION=v0.10.0
+RUN curl -sSfL https://github.com/rootless-containers/rootlesskit/releases/download/$ROOTLESSKIT_VERSION/rootlesskit-x86_64.tar.gz | tar -xz -C /usr/bin
+
+COPY --from=idmap /usr/bin/newuidmap /usr/bin/newuidmap
+COPY --from=idmap /usr/bin/newgidmap /usr/bin/newgidmap
+COPY --from=runc /usr/bin/runc /usr/bin/runc
+COPY --from=fuse-overlayfs /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
+
+RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
+
+RUN mkdir -p /run/cnb/1000 && \
+    chown -R cnb /run/cnb/1000 /home/cnb && \
+    echo cnb:100000:65536 | tee /etc/subuid | tee /etc/subgid
+
+USER cnb
+ENV USER cnb
+ENV HOME /home/cnb
+ENV XDG_RUNTIME_DIR=/run/cnb/1000

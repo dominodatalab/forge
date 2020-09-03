@@ -15,8 +15,23 @@ commands:
 
             echo "export IMG=${IMG}" >> $BASH_ENV
             echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
-            echo "export BUILD_FLAGS=\"-ldflags='-X github.com/dominodatalab/forge/cmd.version=${VERSION} -X github.com/dominodatalab/forge/cmd.buildJobImage=${IMG}'\"" >> $BASH_ENV
+            echo "export BUILD_FLAGS=\"-ldflags='-X github.com/dominodatalab/forge/cmd.version=${VERSION} -X github.com/dominodatalab/forge/cmd.BuildJobImage=${IMG}'\"" >> $BASH_ENV
 jobs:
+  build-dev:
+    executor: golang
+    environment:
+      KUBEBUILDER_VERSION: 2.2.0
+      GOLANGCI_LINT_VERSION: v1.30.0
+      IMG: quay.io/domino/forge:dev.latest
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build & Push Dev Docker Image
+          command: |
+            docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+            make docker-build docker-push
+
   build:
     executor: golang
     environment:
@@ -128,6 +143,12 @@ workflows:
   version: 2
   main:
     jobs:
+      - build-dev:
+          context: org-global
+          # filters:
+          #   branches:
+          #     only:
+          #       - master
       - build:
           context: org-global
           filters:

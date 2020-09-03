@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: quay.io/domino/forge
+  newName: forge-build-dev
+resources:
+  - job.yaml
+  - rbac.yaml
+  - serviceaccount.yaml
+  - tls_with_basic_auth.yaml
+namespace: forge-dev

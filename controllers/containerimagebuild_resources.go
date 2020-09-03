@@ -212,8 +212,9 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		}
 
 		initContainers = append(initContainers, corev1.Container{
-			Name:  "init-ca-certs",
-			Image: r.JobConfig.CAImage,
+			Name:            "init-ca-certs",
+			Image:           r.JobConfig.CAImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env: []corev1.EnvVar{
 				{
 					Name:  "CERT_DIR",
@@ -249,6 +250,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{rootlesskitCommand},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,

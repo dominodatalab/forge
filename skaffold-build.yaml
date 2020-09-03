@@ -1,0 +1,28 @@
+apiVersion: skaffold/v2beta4
+kind: Config
+metadata:
+  name: forge-build
+build:
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    - image: forge-build-dev
+      buildpack:
+        builder: "gcr.io/buildpacks/builder"
+        runImage: quay.io/domino/forge:dev.latest
+        dependencies:
+          paths:
+            - api
+            - cmd
+            - controllers
+            - hack
+            - internal
+            - main.go
+            - go.mod
+          ignore:
+            - config
+            - vendor
+deploy:
+  kustomize:
+    paths:
+      - config/controller/build-dev

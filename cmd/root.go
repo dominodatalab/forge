@@ -24,7 +24,7 @@ const (
 Forge is a Kubernetes controller that builds and pushes OCI-compliant images to one or more distribution registries.
 Communication with the controller is achieved via the ContainerImageBuild CRD defined by the project. Forge will watch
 for these resources, launch an image build using the directives provided therein, and update the resource status with
-relevant information such as build state, errors and the final location(s) of the 
+relevant information such as build state, errors and the final location(s) of the
 
 If you need to run preparation steps against a context directory prior to a build, then you can configure one or more
 plugins. This allows users to hook into the build process and add/modify/delete files according to their business
@@ -52,6 +52,8 @@ forge --preparer-plugins-path /plugins/installed/here
 forge --enable-layer-caching`
 
 	defaultBuildJobCAImage = "quay.io/domino/forge-init-ca:v1.0.0"
+
+	kubernetesNamespaceSecret = "/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 var (
@@ -60,7 +62,7 @@ var (
 	gcInterval     time.Duration
 	gcMaxKeepCount int
 
-	buildJobImage                      string
+	BuildJobImage                      string
 	buildJobCAImage                    string
 	buildJobLabels                     map[string]string
 	buildJobAnnotations                map[string]string
@@ -99,7 +101,7 @@ var (
 				GCMaxRetentionCount:  gcMaxKeepCount,
 
 				JobConfig: &controllers.BuildJobConfig{
-					Image:                      buildJobImage,
+					Image:                      BuildJobImage,
 					CAImage:                    buildJobCAImage,
 					CustomCASecret:             buildJobCustomCASecret,
 					PreparerPluginPath:         preparerPluginsPath,
@@ -122,6 +124,11 @@ var (
 )
 
 func Execute() {
+	// This is dumb, but go-buildpacks don't support arbitrary command line arguments.
+	if env := os.Getenv("DEBUG_COMMAND"); env != "" {
+		rootCmd.SetArgs(strings.Split(env, " "))
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -162,20 +169,38 @@ func processBrokerOpts(cmd *cobra.Command, args []string) error {
 	return message.ValidateOpts(brokerOpts)
 }
 
+func defaultNamespace() string {
+	if _, err := os.Stat(kubernetesNamespaceSecret); err == nil {
+		file, err := os.Open(kubernetesNamespaceSecret)
+		if err != nil {
+			panic(err)
+		}
+
+		namespaceFile, err := ioutil.ReadAll(file)
+		if err != nil {
+			panic(err)
+		}
+
+		return string(namespaceFile)
+	}
+
+	return "default"
+}
+
 func init() {
 	rootCmd.Flags().SortFlags = false
 
 	// main command flags
-	rootCmd.Flags().StringVar(&namespace, "namespace", "default", "Watch for objects in desired namespace")
+	rootCmd.Flags().StringVar(&namespace, "namespace", defaultNamespace(), "Watch for objects in desired namespace")
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
-	rootCmd.Flags().StringVar(&buildJobImage, "build-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
+	rootCmd.Flags().StringVar(&BuildJobImage, "build-job-image", BuildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().StringVar(&buildJobCAImage, "build-job-ca-image", defaultBuildJobCAImage, "Image used to initialize SSL certificates using a custom CA. You should not have to override this.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
-	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
+	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "docker-registry-tls", "Secret container custom CA certificates for distribution registries")
 	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")
 	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")
 	rootCmd.Flags().BoolVar(&buildJobGrantFullPrivilege, "build-job-full-privilege", false, "Run builds jobs using a privileged root user")

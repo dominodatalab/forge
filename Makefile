@@ -68,6 +68,9 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
+docker-build-dev:
+	docker build . -f Dockerfile.dev -t ${IMG} $(ARGS)
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:

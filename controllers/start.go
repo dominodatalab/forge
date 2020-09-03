@@ -30,7 +30,7 @@ func StartManager(cfg ControllerConfig) {
 
 	logger := ctrlzap.New(func(opts *ctrlzap.Options) {
 		opts.Level = &atom
-		opts.Development = true
+		opts.Development = cfg.Debug
 	})
 	ctrl.SetLogger(logger)
 

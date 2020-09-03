@@ -19,16 +19,6 @@ spec:
         - name: controller
           image: quay.io/domino/forge:latest
           imagePullPolicy: IfNotPresent
-          args:
-            - --namespace
-            - $(WATCH_NAMESPACE)
-            - --build-job-custom-ca
-            - docker-registry-tls
-          env:
-            - name: WATCH_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
           resources:
             requests:
               cpu: 1
