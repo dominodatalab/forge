@@ -19,6 +19,8 @@ Because `forge` cannot run natively on MacOS due to the use of Linux-specific fe
 
   The default MacOS `openssl` is incompatible with the version used by cert-manager in development.
   Ensure `openssl` takes precendence in your PATH: `export PATH="/usr/local/opt/openssl@1.1/bin:$PATH"`.
+  
+* kustomize - `brew install kustomize`
 
 #### Running the controller
 
