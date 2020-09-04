@@ -18,7 +18,7 @@ Because `forge` cannot run natively on MacOS due to the use of Linux-specific fe
 * openssl - `brew install openssl`
 
   The default MacOS `openssl` is incompatible with the version used by cert-manager in development.
-  Ensure `openssl` takes precendence in your PATH: `export PATH="/usr/local/opt/openssl@1.1/bin:$PATH`.
+  Ensure `openssl` takes precendence in your PATH: `export PATH="/usr/local/opt/openssl@1.1/bin:$PATH"`.
 
 #### Running the controller
 
