@@ -74,7 +74,8 @@ helm upgrade docker-registry stable/docker-registry \
   --wait
 
 info "Installing docker-registry-2 chart"
-helm install docker-registry-2 stable/docker-registry \
+helm upgrade docker-registry-2 stable/docker-registry \
+  --install \
   --version 1.9.2 \
   --namespace "$namespace" \
   --values e2e/helm_values/docker-registry-auth-only.yaml \
@@ -88,3 +89,5 @@ helm upgrade rabbitmq bitnami/rabbitmq \
   --set "persistence.enabled=false" \
   --set "rabbitmq.password=password" \
   --wait
+
+info "Dependency installation complete"
