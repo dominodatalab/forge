@@ -30,7 +30,7 @@ jobs:
           name: Build & Push Dev Docker Image
           command: |
             docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
-            make docker-build docker-push
+            make docker-build-dev docker-push
 
   build:
     executor: golang
