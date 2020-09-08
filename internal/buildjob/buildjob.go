@@ -28,7 +28,7 @@ type Job struct {
 	clientk8s   kubernetes.Interface
 	clientforge clientv1alpha1.Interface
 
-	producer message.Producer
+	publisher message.Publisher
 
 	plugins []*preparer.Plugin
 
@@ -61,17 +61,16 @@ func New(cfg Config) (*Job, error) {
 
 	var cleanupSteps []func()
 
+	var publisher message.Publisher
 	// setup message publisher
-	var producer message.Producer
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		if producer, err = message.NewProducer(cfg.BrokerOpts); err != nil {
-			return nil, err
-		}
+		publisher, _ := message.NewPublisher(cfg.BrokerOpts)
+
 		cleanupSteps = append(cleanupSteps, func() {
 			log.Info("Closing message producer")
-			producer.Close()
+			publisher.Close()
 		})
 	}
 
@@ -103,7 +102,7 @@ func New(cfg Config) (*Job, error) {
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
 		clientforge:  clientforge,
-		producer:     producer,
+		publisher:     publisher,
 		plugins:      preparerPlugins,
 		builder:      ociBuilder,
 		cleanupSteps: cleanupSteps,

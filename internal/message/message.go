@@ -16,16 +16,16 @@ const AmqpBroker Broker = "amqp"
 var SupportedBrokers = []Broker{AmqpBroker}
 
 // Producer defines the operations required by all message producers.
-type Producer interface {
-	Publish(message interface{}) error
+type Publisher interface {
+	UnsafePush(message interface{}) error
 	Close() error
 }
 
 // NewProducer configures a new message producer using the provided options.
-func NewProducer(opts *Options) (Producer, error) {
+func NewPublisher(opts *Options) (Publisher, error) {
 	switch opts.Broker {
 	case AmqpBroker:
-		return amqp.NewQueue(opts.AmqpURI, opts.AmqpQueue)
+		return amqp.NewPublisher(opts.AmqpURI, opts.AmqpQueue), nil
 	default:
 		return nil, fmt.Errorf("%v is not supported", opts.Broker)
 	}

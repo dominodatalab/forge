@@ -24,8 +24,8 @@ var (
 	errAlreadyClosed = errors.New("already closed: not connected to the queue")
 )
 
-// producer represents a connection to a particular queue
-type Queue struct {
+// Publisher represents a connection to a particular queue
+type Publisher struct {
 	name          string
 	logger        *log.Logger
 	connection    *amqp.Connection
@@ -37,34 +37,34 @@ type Queue struct {
 }
 
 // create a new producer object and automatically try to connect to the queue
-func NewQueue(uri, queueName string) *Queue {
-	q:= Queue{
+func NewPublisher(uri, queueName string) *Publisher {
+	p := Publisher{
 		name:          queueName,
 		logger:        log.New(os.Stdout, "", log.LstdFlags),
 		done:          make(chan bool),
 	}
-	go q.handleReconnect(uri)
-	return &q
+	go p.handleReconnect(uri)
+	return &p
 }
 
-func (q *Queue) handleReconnect(uri string) {
+func (p Publisher) handleReconnect(uri string) {
 	for {
-		q.isConnected = false
+		p.isConnected = false
 		log.Println("Attempting to connect")
-		for !q.connect(uri) {
+		for !p.connect(uri) {
 			log.Println("Failed to connect. Retrying...")
 			time.Sleep(reconnectDelay)
 		}
 		select {
-		case <-q.done:
+		case <-p.done:
 			return
-		case <-q.notifyClose:
+		case <-p.notifyClose:
 		}
 	}
 }
 
-// create wrapper around amqp Dial function
-func (q *Queue) connect(uri string) bool {
+// wrapper around amqp Dial function
+func (p *Publisher) connect(uri string) bool {
 
 	// try and connect to the queue
 	conn, err := amqp.Dial(uri)
@@ -80,7 +80,7 @@ func (q *Queue) connect(uri string) bool {
 	ch.Confirm(false)
 
 	_, err = ch.QueueDeclare(
-		q.name,
+		p.name,
 		true,
 		false,
 		false,
@@ -94,68 +94,66 @@ func (q *Queue) connect(uri string) bool {
 		return false
 	}
 
-	q.changeConnection(conn, ch)
-	q.isConnected = true
+	p.changeConnection(conn, ch)
+	p.isConnected = true
 	log.Println("Connected!")
 	return true
 }
 
 // changeConnection takes a new connection to the queue,
 // and updates the channel listeners to reflect this.
-func (q *Queue) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
-	q.connection = conn
-	q.channel = ch
-	q.notifyClose = make(chan *amqp.Error)
-	q.notifyConfirm = make(chan amqp.Confirmation)
-	q.channel.NotifyClose(q.notifyClose)
-	q.channel.NotifyPublish(q.notifyConfirm)
+func (p *Publisher) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
+	p.connection = conn
+	p.channel = ch
+	p.notifyClose = make(chan *amqp.Error)
+	p.notifyConfirm = make(chan amqp.Confirmation)
+	p.channel.NotifyClose(p.notifyClose)
+	p.channel.NotifyPublish(p.notifyConfirm)
 }
 
 // Push will push data onto the queue, and wait for a confirm.
-// If no confirms are recieved until within the resendTimeout,
+// If no confirms are received until within the resendTimeout,
 // it continuously resends messages until a confirm is recieved.
 // This will block until the server sends a confirm. Errors are
 // only returned if the push action itself fails, see UnsafePush.
-func (q *Queue) Push(event interface{}) error {
-	if !q.isConnected {
+func (p *Publisher) Push(event interface{}) error {
+	if !p.isConnected {
 		return errors.New("failed to push push: not connected")
 	}
 
 	for {
-		err := q.UnsafePush(event)
+		err := p.UnsafePush(event)
 		if err != nil {
-			q.logger.Println("Push failed. Retrying...")
+			p.logger.Println("Push failed. Retrying...")
 			continue
 		}
 		select {
-		case confirm := <-q.notifyConfirm:
+		case confirm := <-p.notifyConfirm:
 			if confirm.Ack {
-				q.logger.Println("Push confirmed!")
+				p.logger.Println("Push confirmed!")
 				return nil
 			}
 		case <-time.After(resendDelay):
 		}
-		q.logger.Println("Push didn't confirm. Retrying...")
+		p.logger.Println("Push didn't confirm. Retrying...")
 	}
 }
 
 // UnsafePush will push to the queue without checking for
 // confirmation. It returns an error if it fails to connect.
-// No guarantees are provided for whether the server will
-// recieve the message.
-func (q *Queue) UnsafePush(event interface{}) error {
+func (p *Publisher) UnsafePush(event interface{}) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
-	if !q.isConnected {
+	if !p.isConnected {
 		return errNotConnected
 	}
 
-	return q.channel.Publish(
+	return p.channel.Publish(
 		"",     // Exchange
-		q.name, // Routing key
+		p.name, // Routing key
 		false,  // Mandatory
 		false,  // Immediate
 		amqp.Publishing{
@@ -169,12 +167,12 @@ func (q *Queue) UnsafePush(event interface{}) error {
 // It is required to call delivery.Ack when it has been
 // successfully processed, or delivery.Nack when it fails.
 // Ignoring this will cause data to build up on the server.
-func (q *Queue) Stream() (<-chan amqp.Delivery, error) {
-	if !q.isConnected {
+func (p *Publisher) Stream() (<-chan amqp.Delivery, error) {
+	if !p.isConnected {
 		return nil, errNotConnected
 	}
-	return q.channel.Consume(
-		q.name,
+	return p.channel.Consume(
+		p.name,
 		"",    // Consumer
 		false, // Auto-Ack
 		false, // Exclusive
@@ -185,19 +183,19 @@ func (q *Queue) Stream() (<-chan amqp.Delivery, error) {
 }
 
 // Close will cleanly shutdown the channel and connection.
-func (q *Queue) Close() error {
-	if !q.isConnected {
+func (p *Publisher) Close() error {
+	if !p.isConnected {
 		return errAlreadyClosed
 	}
-	err := q.channel.Close()
+	err := p.channel.Close()
 	if err != nil {
 		return err
 	}
-	err = q.connection.Close()
+	err = p.connection.Close()
 	if err != nil {
 		return err
 	}
-	close(q.done)
-	q.isConnected = false
+	close(p.done)
+	p.isConnected = false
 	return nil
 }
