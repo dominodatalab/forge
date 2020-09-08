@@ -25,7 +25,7 @@ type Producer interface {
 func NewProducer(opts *Options) (Producer, error) {
 	switch opts.Broker {
 	case AmqpBroker:
-		return amqp.NewProducer(opts.AmqpURI, opts.AmqpQueue)
+		return amqp.NewQueue(opts.AmqpURI, opts.AmqpQueue)
 	default:
 		return nil, fmt.Errorf("%v is not supported", opts.Broker)
 	}
