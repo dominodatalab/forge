@@ -11,10 +11,7 @@ import (
 )
 
 const (
-	// When reconnecting to the server after connection failure
 	reconnectDelay = 5 * time.Second
-
-	// When resending messages the server didn't confirm
 	resendDelay = 5 * time.Second
 )
 
@@ -36,7 +33,7 @@ type Publisher struct {
 	notifyConfirm chan amqp.Confirmation
 }
 
-// create a new producer object and automatically try to connect to the queue
+// create a new publisher object and try to connect to the queue
 func NewPublisher(uri, queueName string) *Publisher {
 	p := Publisher{
 		name:          queueName,
@@ -111,11 +108,8 @@ func (p *Publisher) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
 	p.channel.NotifyPublish(p.notifyConfirm)
 }
 
-// Push will push data onto the queue, and wait for a confirm.
-// If no confirms are received until within the resendTimeout,
-// it continuously resends messages until a confirm is recieved.
-// This will block until the server sends a confirm. Errors are
-// only returned if the push action itself fails, see UnsafePush.
+// will push data onto the queue and wait for a confirm.
+// it continuously resends messages until a confirm is received.
 func (p *Publisher) Push(event interface{}) error {
 	if !p.isConnected {
 		return errors.New("failed to push push: not connected")
@@ -139,7 +133,7 @@ func (p *Publisher) Push(event interface{}) error {
 	}
 }
 
-// UnsafePush will push to the queue without checking for
+// will push to the queue without checking for
 // confirmation. It returns an error if it fails to connect.
 func (p *Publisher) UnsafePush(event interface{}) error {
 	data, err := json.Marshal(event)
@@ -152,35 +146,14 @@ func (p *Publisher) UnsafePush(event interface{}) error {
 	}
 
 	return p.channel.Publish(
-		"",     // Exchange
-		p.name, // Routing key
-		false,  // Mandatory
-		false,  // Immediate
+		"",
+		p.name,
+		false,
+		false,
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        data,
 		},
-	)
-}
-
-// Stream will continuously put queue items on the channel.
-// It is required to call delivery.Ack when it has been
-// successfully processed, or delivery.Nack when it fails.
-// Ignoring this will cause data to build up on the server.
-
-// not 100% sure if we need this function or not
-func (p *Publisher) Stream() (<-chan amqp.Delivery, error) {
-	if !p.isConnected {
-		return nil, errNotConnected
-	}
-	return p.channel.Consume(
-		p.name,
-		"",    // Consumer
-		false, // Auto-Ack
-		false, // Exclusive
-		false, // No-local
-		false, // No-Wait
-		nil,   // Args
 	)
 }
 
