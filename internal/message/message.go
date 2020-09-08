@@ -21,7 +21,7 @@ type Publisher interface {
 	Close() error
 }
 
-// NewProducer configures a new message producer using the provided options.
+// NewPublisher configures a new message producer using the provided options.
 func NewPublisher(opts *Options) (Publisher, error) {
 	switch opts.Broker {
 	case AmqpBroker:
