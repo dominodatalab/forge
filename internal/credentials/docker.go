@@ -1,13 +1,11 @@
 package credentials
 
-type DockerConfig map[string]DockerConfigEntry
+import "github.com/docker/docker/api/types"
 
-type DockerConfigEntry struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
+// AuthConfigs is a map of registry urls to authentication credentials.
+type AuthConfigs map[string]types.AuthConfig
 
-// DockerConfigJSON models the structure of .dockerconfigfile data
+// DockerConfigJSON models the structure of .dockerconfigfile data.
 type DockerConfigJSON struct {
-	Auths DockerConfig `json:"auths"`
+	Auths AuthConfigs `json:"auths"`
 }
