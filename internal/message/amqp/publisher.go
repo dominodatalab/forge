@@ -15,12 +15,6 @@ const (
 	resendDelay = 5 * time.Second
 )
 
-var (
-	errNotConnected  = errors.New("not connected to the queue")
-	errNotConfirmed  = errors.New("message not confirmed")
-	errAlreadyClosed = errors.New("already closed: not connected to the queue")
-)
-
 // Publisher represents a connection to a particular queue
 type Publisher struct {
 	name          string
@@ -74,7 +68,10 @@ func (p *Publisher) connect(uri string) bool {
 		return false
 	}
 
-	ch.Confirm(false)
+	err = ch.Confirm(false)
+	if err != nil {
+		return false
+	}
 
 	_, err = ch.QueueDeclare(
 		p.name,
@@ -142,7 +139,7 @@ func (p *Publisher) UnsafePush(event interface{}) error {
 	}
 
 	if !p.isConnected {
-		return errNotConnected
+		return errors.New("not connected to the queue")
 	}
 
 	return p.channel.Publish(
@@ -160,7 +157,7 @@ func (p *Publisher) UnsafePush(event interface{}) error {
 // Close will cleanly shutdown the channel and connection.
 func (p *Publisher) Close() error {
 	if !p.isConnected {
-		return errAlreadyClosed
+		return errors.New("already closed: not connected to the queue")
 	}
 	err := p.channel.Close()
 	if err != nil {
