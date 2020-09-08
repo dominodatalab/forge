@@ -15,9 +15,9 @@ const AmqpBroker Broker = "amqp"
 // SupportedBrokers defines the list of implemented message publishers.
 var SupportedBrokers = []Broker{AmqpBroker}
 
-// Producer defines the operations required by all message producers.
+// Publisher defines the operations required by all message producers.
 type Publisher interface {
-	UnsafePush(message interface{}) error
+	Push(event interface{}) error
 	Close() error
 }
 

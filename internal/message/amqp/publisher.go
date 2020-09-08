@@ -167,6 +167,8 @@ func (p *Publisher) UnsafePush(event interface{}) error {
 // It is required to call delivery.Ack when it has been
 // successfully processed, or delivery.Nack when it fails.
 // Ignoring this will cause data to build up on the server.
+
+// not 100% sure if we need this function or not
 func (p *Publisher) Stream() (<-chan amqp.Delivery, error) {
 	if !p.isConnected {
 		return nil, errNotConnected

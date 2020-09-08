@@ -69,7 +69,7 @@ func New(cfg Config) (*Job, error) {
 		publisher, _ := message.NewPublisher(cfg.BrokerOpts)
 
 		cleanupSteps = append(cleanupSteps, func() {
-			log.Info("Closing message producer")
+			log.Info("Closing message publisher")
 			publisher.Close()
 		})
 	}
@@ -271,7 +271,7 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 		return nil, errors.Wrap(err, "unable to update status")
 	}
 
-	if j.producer != nil {
+	if j.publisher != nil {
 		update := &StatusUpdate{
 			Name:          cib.Name,
 			Annotations:   cib.Annotations,
@@ -281,7 +281,7 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 			ImageURLs:     cib.Status.ImageURLs,
 			ErrorMessage:  cib.Status.ErrorMessage,
 		}
-		if err := j.producer.Publish(update); err != nil {
+		if err := j.publisher.Push(update); err != nil {
 			return nil, errors.Wrap(err, "unable to publish message")
 		}
 	}
