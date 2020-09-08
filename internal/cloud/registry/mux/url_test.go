@@ -5,19 +5,18 @@ import (
 	"regexp"
 	"testing"
 
-	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dominodatalab/forge/internal/cloud/registry/types"
 )
 
 func TestURLMux(t *testing.T) {
-	expected := types.AuthConfigs{
-		"test-server": dockertypes.AuthConfig{},
+	expected := &types.AuthConfig{
+		Username: "test-user",
+		Password: "test-pass",
 	}
 	mux := NewURLMux()
-	mux.RegisterLoader(regexp.MustCompile(`^my.cloud`), func(ctx context.Context, url string) (types.AuthConfigs, error) {
+	mux.RegisterLoader(regexp.MustCompile(`^my.cloud`), func(ctx context.Context, url string) (*types.AuthConfig, error) {
 		return expected, nil
 	})
 

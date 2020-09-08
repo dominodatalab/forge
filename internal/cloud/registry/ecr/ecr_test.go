@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/pointer"
-
-	"github.com/dominodatalab/forge/internal/cloud/registry/types"
 )
 
 func TestLoadAuths(t *testing.T) {
@@ -37,10 +35,8 @@ func TestLoadAuths(t *testing.T) {
 		initOnce.Do(func() {})
 
 		actual, err := LoadAuths(ctx, url)
-		expected := types.AuthConfigs{
-			"https://123456789012.dkr.ecr.us-west-2.amazonaws.com": dockertypes.AuthConfig{
-				Auth: "c3RldmUtbwo=",
-			},
+		expected := &dockertypes.AuthConfig{
+			Auth: "c3RldmUtbwo=",
 		}
 
 		require.NoError(t, err)

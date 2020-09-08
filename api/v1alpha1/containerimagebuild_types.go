@@ -65,6 +65,10 @@ type Registry struct {
 	// Configure basic authentication credentials for a registry.
 	// +kubebuilder:validation:Optional
 	BasicAuth BasicAuthConfig `json:"basicAuth"`
+
+	// When enabled, the controller will request credentials from the specific cloud registry (AWS, GCP, Azure Cloud).
+	// +kubebuilder:validation:Optional
+	DynamicCloudCredentials bool `json:"dynamicCloudCredentials"`
 }
 
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild

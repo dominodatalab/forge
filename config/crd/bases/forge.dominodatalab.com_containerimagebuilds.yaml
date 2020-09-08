@@ -110,6 +110,10 @@ spec:
                         description: Inline basic auth username.
                         type: string
                     type: object
+                  dynamicCloudCredentials:
+                    description: When enabled, the controller will request credentials
+                      from the specific cloud registry (AWS, GCP, Azure Cloud).
+                    type: boolean
                   nonSSL:
                     description: Push image to a plain HTTP registry.
                     type: boolean
