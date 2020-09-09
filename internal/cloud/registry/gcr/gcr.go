@@ -9,16 +9,15 @@ package gcr
 
 import (
 	"context"
-	"regexp"
 
 	"github.com/docker/docker/api/types"
 	//dockertypes "github.com/docker/docker/api/types"
 	//"golang.org/x/oauth2/google"
 )
 
-var urlRegex = regexp.MustCompile(`^gcr\.io$`)
+//var urlRegex = regexp.MustCompile(`^gcr\.io$`)
 
-const scope = "https://www.googleapis.com/auth/cloud-platform"
+//const scope = "https://www.googleapis.com/auth/cloud-platform"
 
 func LoadAuths(ctx context.Context, url string) (*types.AuthConfig, error) {
 	//ts, err := google.DefaultTokenSource(ctx, scope)
