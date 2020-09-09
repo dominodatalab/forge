@@ -160,10 +160,6 @@ func (j *Job) Cleanup(forced bool) {
 	}
 }
 
-func (j *Job) addCleanupStep(fn func()) {
-	j.cleanupSteps = append(j.cleanupSteps, fn)
-}
-
 func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
 	registries, err := j.buildRegistryConfigs(ctx, cib.Spec.Registries)
 	if err != nil {

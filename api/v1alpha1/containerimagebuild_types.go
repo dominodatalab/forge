@@ -101,11 +101,9 @@ type ContainerImageBuildSpec struct {
 	// +kubebuilder:validation:Optional
 	NoCache bool `json:"noCache"`
 
-	// Limits build cpu consumption (value should be some value from 0 to 100_000).
+	// Limits build cpu consumption.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Minimum=10000
-	// +kubebuilder:validation:Maximum=100000
-	CpuQuota uint16 `json:"cpuQuota"`
+	CPU string `json:"cpu"`
 
 	// Limits build memory consumption.
 	// +kubebuilder:validation:Optional

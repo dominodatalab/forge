@@ -69,8 +69,8 @@ func init() {
 	buildCmd.Flags().StringVar(&resourceName, "resource", "", "Name of the ContainerImageBuild resource to process")
 	buildCmd.Flags().StringVar(&resourceNamespace, "resource-namespace", "", "Name of the namespace containing the ContainerImageBuild resource")
 
-	buildCmd.MarkFlagRequired("resource")
-	buildCmd.MarkFlagRequired("resource-namespace")
+	_ = buildCmd.MarkFlagRequired("resource")
+	_ = buildCmd.MarkFlagRequired("resource-namespace")
 
 	rootCmd.AddCommand(buildCmd)
 }

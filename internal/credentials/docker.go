@@ -29,7 +29,7 @@ func ExtractDockerAuth(input []byte, host string) (string, string, error) {
 	auth, ok := output.Auths[host]
 	if !ok {
 		var servers []string
-		for url, _ := range output.Auths {
+		for url := range output.Auths {
 			servers = append(servers, url)
 		}
 
