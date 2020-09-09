@@ -114,18 +114,18 @@ func (p *Publisher) Push(event interface{}) error {
 	for {
 		err := p.UnsafePush(event)
 		if err != nil {
-			p.logger.Println("Push failed. Retrying...")
+			p.logger.Info("Push failed. Retrying...")
 			continue
 		}
 		select {
 		case confirm := <-p.notifyConfirm:
 			if confirm.Ack {
-				p.logger.Println("Push confirmed!")
+				p.logger.Info("Push confirmed!")
 				return nil
 			}
 		case <-time.After(resendDelay):
 		}
-		p.logger.Println("Push didn't confirm. Retrying...")
+		p.logger.Info("Push didn't confirm. Retrying...")
 	}
 }
 
