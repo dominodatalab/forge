@@ -226,7 +226,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []apiv1alpha1.Re
 
 func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
 	if _, err := os.Stat(config.DynamicCredentialsFilepath); os.IsNotExist(err) {
-		return "", "", errors.Wrapf(err, "filesystem docker credentials missing", host)
+		return "", "", errors.Wrap(err, "filesystem docker credentials missing")
 	}
 
 	input, err := ioutil.ReadFile(config.DynamicCredentialsFilepath)
@@ -236,7 +236,7 @@ func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
 
 	username, password, err := credentials.ExtractDockerAuth(input, host)
 	if err != nil {
-		return "", "", errors.Wrap(err, "cannot process docker auth from filesystem")
+		return "", "", errors.Wrapf(err, "cannot process filesystem docker auth for host %q", host)
 	}
 
 	return username, password, nil
