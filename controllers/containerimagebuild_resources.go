@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -15,12 +16,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/cloud"
 	"github.com/dominodatalab/forge/internal/config"
+	"github.com/dominodatalab/forge/internal/credentials"
 )
 
 const (
 	rootlesskitCommand = "rootlesskit"
 	forgeCommand       = "/usr/bin/forge"
+	cloudCredentialsID = "dynamic-cloud-credentials"
 )
 
 // creates all supporting resources required by build job
@@ -32,6 +36,9 @@ func (r *ContainerImageBuildReconciler) checkPrerequisites(ctx context.Context, 
 		return err
 	}
 	if err := r.checkRoleBinding(ctx, cib); err != nil {
+		return err
+	}
+	if err := r.checkCloudRegistrySecrets(ctx, cib); err != nil {
 		return err
 	}
 
@@ -118,6 +125,75 @@ func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, ci
 			},
 		},
 	})
+}
+
+func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
+	// attempt authenticate with any registries that have been marked "dynamic cloud"
+	auths := credentials.AuthConfigs{}
+	for _, reg := range cib.Spec.Registries {
+		if !reg.DynamicCloudCredentials {
+			continue
+		}
+
+		ac, err := cloud.RetrieveRegistryAuthorization(ctx, reg.Server)
+		if err != nil {
+			return err
+		}
+
+		auths[reg.Server] = *ac
+	}
+	if len(auths) == 0 {
+		return nil
+	}
+
+	// serialize auth configs into JSON
+	dockerConfigJSON := credentials.DockerConfigJSON{
+		Auths: auths,
+	}
+	data, err := json.Marshal(dockerConfigJSON)
+	if err != nil {
+		return err
+	}
+
+	// build and create new secret for consumption by build job
+	name := fmt.Sprintf("%s-%s", cib.Name, cloudCredentialsID)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: cib.Namespace,
+			Labels:    cib.Labels,
+		},
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: data,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+	if err := r.withOwnedResource(ctx, cib, secret); err != nil {
+		return err
+	}
+
+	// add volume/mount to jobconfig for consumption during build
+	r.JobConfig.Volumes = append(r.JobConfig.Volumes, corev1.Volume{
+		Name: cloudCredentialsID,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: name,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  corev1.DockerConfigJsonKey,
+						Path: config.DynamicCredentialsFilename,
+					},
+				},
+			},
+		},
+	})
+	r.JobConfig.VolumeMounts = append(r.JobConfig.VolumeMounts, corev1.VolumeMount{
+		Name:      cloudCredentialsID,
+		MountPath: config.DynamicCredentialsPath,
+		ReadOnly:  true,
+	})
+
+	return nil
 }
 
 // generates build job definition using container image build spec

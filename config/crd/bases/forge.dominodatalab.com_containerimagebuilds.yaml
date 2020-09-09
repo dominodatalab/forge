@@ -112,7 +112,8 @@ spec:
                     type: object
                   dynamicCloudCredentials:
                     description: When enabled, the controller will request credentials
-                      from the specific cloud registry (AWS, GCP, Azure Cloud).
+                      from the specific cloud registry (AWS, GCP, Azure Cloud) and
+                      provide them to the build job for authentication.
                     type: boolean
                   nonSSL:
                     description: Push image to a plain HTTP registry.

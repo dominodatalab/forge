@@ -66,7 +66,8 @@ type Registry struct {
 	// +kubebuilder:validation:Optional
 	BasicAuth BasicAuthConfig `json:"basicAuth"`
 
-	// When enabled, the controller will request credentials from the specific cloud registry (AWS, GCP, Azure Cloud).
+	// When enabled, the controller will request credentials from the specific cloud registry (AWS, GCP, Azure Cloud)
+	// and provide them to the build job for authentication.
 	// +kubebuilder:validation:Optional
 	DynamicCloudCredentials bool `json:"dynamicCloudCredentials"`
 }

@@ -1,6 +1,19 @@
 package config
 
-import "time"
+import (
+	"path/filepath"
+	"time"
+)
+
+const (
+	// DynamicCredentialsPath is the directory inside the build job where dynamic cloud registry credentials are stored.
+	DynamicCredentialsPath = "/tmp/docker"
+	// DynamicCredentialsFilename is the name of the file housing dynamic cloud registry credentials.
+	DynamicCredentialsFilename = "config.json"
+)
+
+// DynamicCredentialsFilepath is the full path to the dynamic cloud registry credentials.
+var DynamicCredentialsFilepath = filepath.Join(DynamicCredentialsPath, DynamicCredentialsFilename)
 
 type Registry struct {
 	Host     string
