@@ -3,8 +3,7 @@ package amqp
 import (
 	"encoding/json"
 	"errors"
-	"log"
-	"os"
+	"github.com/go-logr/logr"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -18,7 +17,7 @@ const (
 // Publisher represents a connection to a particular queue
 type Publisher struct {
 	name          string
-	logger        *log.Logger
+	logger        logr.Logger
 	connection    *amqp.Connection
 	channel       *amqp.Channel
 	done          chan bool
@@ -28,10 +27,10 @@ type Publisher struct {
 }
 
 // create a new publisher object and try to connect to the queue
-func NewPublisher(uri, queueName string) *Publisher {
+func NewPublisher(uri, queueName string, log logr.Logger) *Publisher {
 	p := Publisher{
 		name:          queueName,
-		logger:        log.New(os.Stdout, "", log.LstdFlags),
+		logger:        log,
 		done:          make(chan bool),
 	}
 	go p.handleReconnect(uri)
@@ -41,9 +40,9 @@ func NewPublisher(uri, queueName string) *Publisher {
 func (p Publisher) handleReconnect(uri string) {
 	for {
 		p.isConnected = false
-		log.Println("Attempting to connect")
+		p.logger.Info("Attempting to connect")
 		for !p.connect(uri) {
-			log.Println("Failed to connect. Retrying...")
+			p.logger.Info("Failed to connect. Retrying.")
 			time.Sleep(reconnectDelay)
 		}
 		select {
@@ -90,7 +89,7 @@ func (p *Publisher) connect(uri string) bool {
 
 	p.changeConnection(conn, ch)
 	p.isConnected = true
-	log.Println("Connected!")
+	p.logger.Info("Connected!")
 	return true
 }
 

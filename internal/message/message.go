@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+	"github.com/go-logr/logr"
 
 	"github.com/dominodatalab/forge/internal/message/amqp"
 )
@@ -22,10 +23,10 @@ type Publisher interface {
 }
 
 // NewPublisher configures a new message producer using the provided options.
-func NewPublisher(opts *Options) (Publisher, error) {
+func NewPublisher(opts *Options, log logr.Logger) (Publisher, error) {
 	switch opts.Broker {
 	case AmqpBroker:
-		return amqp.NewPublisher(opts.AmqpURI, opts.AmqpQueue), nil
+		return amqp.NewPublisher(opts.AmqpURI, opts.AmqpQueue, log), nil
 	default:
 		return nil, fmt.Errorf("%v is not supported", opts.Broker)
 	}

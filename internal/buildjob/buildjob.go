@@ -66,7 +66,7 @@ func New(cfg Config) (*Job, error) {
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		publisher, _ := message.NewPublisher(cfg.BrokerOpts)
+		publisher, _ := message.NewPublisher(cfg.BrokerOpts, log)
 
 		cleanupSteps = append(cleanupSteps, func() {
 			log.Info("Closing message publisher")
