@@ -63,10 +63,13 @@ func New(cfg Config) (*Job, error) {
 
 	var publisher message.Publisher
 	// setup message publisher
+	log.Info("Set up message publisher if options are configured")
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		publisher, _ := message.NewPublisher(cfg.BrokerOpts, log)
+		if publisher = message.NewPublisher(cfg.BrokerOpts, log); publisher == nil {
+			return nil, errors.New("Message publisher failed to initialize, publisher was instantiated as nil")
+		}
 
 		cleanupSteps = append(cleanupSteps, func() {
 			log.Info("Closing message publisher")
