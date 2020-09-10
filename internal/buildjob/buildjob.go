@@ -105,7 +105,7 @@ func New(cfg Config) (*Job, error) {
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
 		clientforge:  clientforge,
-		publisher:     publisher,
+		publisher:    publisher,
 		plugins:      preparerPlugins,
 		builder:      ociBuilder,
 		cleanupSteps: cleanupSteps,

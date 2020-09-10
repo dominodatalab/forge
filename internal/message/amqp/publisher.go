@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/go-logr/logr"
+	"strconv"
 	"time"
 
 	"github.com/streadway/amqp"
 )
 
 const (
-	reconnectDelay = 5 * time.Second
-	resendDelay = 5 * time.Second
+	reconnectDelay = 3 * time.Second
+	resendDelay = 3 * time.Second
 )
 
 // Publisher represents a connection to a particular queue
@@ -38,10 +39,11 @@ func NewPublisher(uri, queueName string, log logr.Logger) *Publisher {
 }
 
 func (p Publisher) handleReconnect(uri string) {
-	for {
+	for attempt := 1; attempt < 10; attempt++ {
 		p.isConnected = false
-		p.logger.Info("Attempting to connect")
-		for !p.connect(uri) {
+
+		p.logger.Info("Attempting to connect: attempt " + strconv.Itoa(attempt))
+		if !p.connect(uri) {
 			p.logger.Info("Failed to connect. Retrying.")
 			time.Sleep(reconnectDelay)
 		}
@@ -52,6 +54,7 @@ func (p Publisher) handleReconnect(uri string) {
 		}
 	}
 }
+
 
 // wrapper around amqp Dial function
 func (p *Publisher) connect(uri string) bool {
@@ -108,10 +111,11 @@ func (p *Publisher) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
 // it continuously resends messages until a confirm is received.
 func (p *Publisher) Push(event interface{}) error {
 	if !p.isConnected {
-		return errors.New("failed to push push: not connected")
+		return errors.New("failed to push: not connected")
 	}
 
-	for {
+	for attempt := 1; attempt < 10; attempt++ {
+		p.logger.Info("Attempting to push: attempt " + strconv.Itoa(attempt))
 		err := p.UnsafePush(event)
 		if err != nil {
 			p.logger.Info("Push failed. Retrying...")
@@ -127,6 +131,7 @@ func (p *Publisher) Push(event interface{}) error {
 		}
 		p.logger.Info("Push didn't confirm. Retrying...")
 	}
+	return errors.New("failed to push: max retry limit reached")
 }
 
 // will push to the queue without checking for
@@ -158,14 +163,17 @@ func (p *Publisher) Close() error {
 	if !p.isConnected {
 		return errors.New("already closed: not connected to the queue")
 	}
+
 	err := p.channel.Close()
 	if err != nil {
 		return err
 	}
+
 	err = p.connection.Close()
 	if err != nil {
 		return err
 	}
+
 	close(p.done)
 	p.isConnected = false
 	return nil
