@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	urlRegex = regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com$`)
+	urlRegex = regexp.MustCompile(`(^[a-zA-Z0-9][a-zA-Z0-9-_]*)\.dkr\.ecr(-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?`)
 
 	client   ecriface.ClientAPI
 	initOnce sync.Once

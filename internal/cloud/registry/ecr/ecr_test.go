@@ -15,7 +15,52 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/pointer"
+
+	"github.com/dominodatalab/forge/internal/cloud/registry"
 )
+
+func TestPatternMatching(t *testing.T) {
+	testcases := []struct{
+		name string
+		url string
+		expectErr bool
+	}{
+		{
+			name: "america",
+			url: "0123456789012.dkr.ecr.us-west-2.amazonaws.com",
+		},
+		{
+			name: "fips",
+			url: "0123456789012.dkr.ecr-fips.us-gov-east-1.amazonaws.com",
+		},
+		{
+			name: "china",
+			url: "0123456789012.dkr.ecr.cn-north-1.amazonaws.com.cn",
+		},
+		{
+			name: "no_region",
+			url: "0123456789012.dkr.ecr.amazonaws.com",
+			expectErr: true,
+		},
+		{
+			name: "no_account_id",
+			url: "dkr.ecr.us-east-1.amazonaws.com",
+			expectErr: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			loader, err := registry.DefaultURLMux().FromString(tc.url)
+
+			if tc.expectErr {
+				assert.Error(t, err, "expected %q to return err", tc.url)
+				return
+			}
+
+			assert.NotNil(t, loader, "expected %q to return ECR loader", tc.url)
+		})
+	}
+}
 
 func TestLoadAuths(t *testing.T) {
 	ctx := context.Background()
