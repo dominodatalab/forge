@@ -20,31 +20,31 @@ import (
 )
 
 func TestPatternMatching(t *testing.T) {
-	testcases := []struct{
-		name string
-		url string
+	testcases := []struct {
+		name      string
+		url       string
 		expectErr bool
 	}{
 		{
 			name: "america",
-			url: "0123456789012.dkr.ecr.us-west-2.amazonaws.com",
+			url:  "0123456789012.dkr.ecr.us-west-2.amazonaws.com",
 		},
 		{
 			name: "fips",
-			url: "0123456789012.dkr.ecr-fips.us-gov-east-1.amazonaws.com",
+			url:  "0123456789012.dkr.ecr-fips.us-gov-east-1.amazonaws.com",
 		},
 		{
 			name: "china",
-			url: "0123456789012.dkr.ecr.cn-north-1.amazonaws.com.cn",
+			url:  "0123456789012.dkr.ecr.cn-north-1.amazonaws.com.cn",
 		},
 		{
-			name: "no_region",
-			url: "0123456789012.dkr.ecr.amazonaws.com",
+			name:      "no_region",
+			url:       "0123456789012.dkr.ecr.amazonaws.com",
 			expectErr: true,
 		},
 		{
-			name: "no_account_id",
-			url: "dkr.ecr.us-east-1.amazonaws.com",
+			name:      "no_account_id",
+			url:       "dkr.ecr.us-east-1.amazonaws.com",
 			expectErr: true,
 		},
 	}
@@ -64,14 +64,16 @@ func TestPatternMatching(t *testing.T) {
 
 func TestLoadAuths(t *testing.T) {
 	ctx := context.Background()
-	url := "ignored"
+	url := "0123456789012.dkr.ecr.af-south-1.amazonaws.com"
 
 	t.Run("success", func(t *testing.T) {
 		client = &mockECRClient{
+			inValid: func(input *ecr.GetAuthorizationTokenInput) {
+				require.Equal(t, []string{"0123456789012"}, input.RegistryIds, "auth performed against incorrect aws account id")
+			},
 			out: &ecr.GetAuthorizationTokenOutput{
 				AuthorizationData: []ecr.AuthorizationData{
 					{
-						ProxyEndpoint:      pointer.StringPtr("https://123456789012.dkr.ecr.us-west-2.amazonaws.com"),
 						AuthorizationToken: pointer.StringPtr("c3RldmUtbwo="), // base64 -> "steve-o"
 					},
 				},
@@ -117,15 +119,29 @@ func TestLoadAuths(t *testing.T) {
 		require.Nil(t, out)
 		assert.EqualError(t, err, "cannot load aws config: resolve error")
 	})
+
+	t.Run("bad_url", func(t *testing.T) {
+		client = &mockECRClient{}
+		initOnce.Do(func() {})
+
+		_, err := LoadAuths(ctx, "garbage.url")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid ecr url")
+	})
 }
 
 type mockECRClient struct {
 	ecriface.ClientAPI
-	out *ecr.GetAuthorizationTokenOutput
-	err error
+	inValid func(input *ecr.GetAuthorizationTokenInput) // validate input
+	out     *ecr.GetAuthorizationTokenOutput // mock output
+	err     error // mock error
 }
 
 func (m *mockECRClient) GetAuthorizationTokenRequest(input *ecr.GetAuthorizationTokenInput) ecr.GetAuthorizationTokenRequest {
+	if m.inValid != nil {
+		m.inValid(input)
+	}
+
 	mockReq := &aws.Request{
 		HTTPRequest:  &http.Request{},
 		HTTPResponse: &http.Response{},

@@ -2,6 +2,7 @@ package ecr
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sync"
 
@@ -15,7 +16,7 @@ import (
 )
 
 var (
-	urlRegex = regexp.MustCompile(`(^[a-zA-Z0-9][a-zA-Z0-9-_]*)\.dkr\.ecr(-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?`)
+	urlRegex = regexp.MustCompile(`^(?P<aws_account_id>[a-zA-Z0-9][a-zA-Z0-9-_]*)\.dkr\.ecr(-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?`)
 
 	client   ecriface.ClientAPI
 	initOnce sync.Once
@@ -39,10 +40,15 @@ func LoadAuths(ctx context.Context, url string) (*types.AuthConfig, error) {
 }
 
 func authenticate(ctx context.Context, url string) (*types.AuthConfig, error) {
-	// TODO: extract AWS account ID from url and add to token input
-	input := &ecr.GetAuthorizationTokenInput{}
-	req := client.GetAuthorizationTokenRequest(input)
+	match := urlRegex.FindStringSubmatch(url)
+	if match == nil {
+		return nil, fmt.Errorf("invalid ecr url: %q should match %v", url, urlRegex)
+	}
+	input := &ecr.GetAuthorizationTokenInput{
+		RegistryIds: []string{match[1]},
+	}
 
+	req := client.GetAuthorizationTokenRequest(input)
 	resp, err := req.Send(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ecr auth token")
