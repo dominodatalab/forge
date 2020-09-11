@@ -50,6 +50,7 @@ func (p *Publisher) handleReconnect(uri string) {
 			p.logger.Info("Connection established.")
 			return
 		case <-p.notifyClose:
+			p.logger.Info("Closing.")
 		}
 	}
 }
@@ -108,16 +109,15 @@ func (p *Publisher) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
 // will push data onto the queue and wait for a confirm.
 // it continuously resends messages until a confirm is received.
 func (p *Publisher) Push(event interface{}) error {
-	if !p.isConnected {
-		return errors.New("failed to push: not connected")
-	}
 
 	for {
 		p.logger.Info("Attempting to push")
+		if !p.isConnected {
+			p.logger.Info("Not connected. Attempting to reconnect..")
+		}
 		err := p.UnsafePush(event)
 		if err != nil {
 			p.logger.Info("Push failed. Retrying...")
-			continue
 		}
 		select {
 		case confirm := <-p.notifyConfirm:
