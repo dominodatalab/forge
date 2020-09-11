@@ -3,10 +3,10 @@ package buildjob
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -229,17 +229,23 @@ func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
 		return "", "", errors.Wrap(err, "filesystem docker credentials missing")
 	}
 
-	input, err := ioutil.ReadFile(config.DynamicCredentialsFilepath)
+	input, err := os.Open(config.DynamicCredentialsFilepath)
 	if err != nil {
 		return "", "", errors.Wrap(err, "cannot read docker credentials")
 	}
+	defer input.Close()
 
-	username, password, err := credentials.ExtractDockerAuth(input, host)
+	cf := configfile.New("")
+	if err := cf.LoadFromReader(input); err != nil {
+		return "", "", err
+	}
+
+	ac, err := 	cf.GetAuthConfig(host)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot process filesystem docker auth for host %q", host)
 	}
 
-	return username, password, nil
+	return ac.Username, ac.Password, nil
 }
 
 func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
