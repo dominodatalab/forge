@@ -2,8 +2,10 @@ package ecr
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws/external"
@@ -54,13 +56,36 @@ func authenticate(ctx context.Context, url string) (*types.AuthConfig, error) {
 		return nil, errors.Wrap(err, "failed to get ecr auth token")
 	}
 	if len(resp.AuthorizationData) != 1 {
-		return nil, errors.Wrapf(err, "invalid ecr authorization data: %v", resp.AuthorizationData)
+		return nil, errors.Wrapf(err, "expected a single ecr authorization token: %v", resp.AuthorizationData)
 	}
-	data := resp.AuthorizationData[0]
+	authToken := *resp.AuthorizationData[0].AuthorizationToken
+
+	username, password, err := decodeAuth(authToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid ecr authorization token")
+	}
 
 	return &types.AuthConfig{
-		Auth: *data.AuthorizationToken,
+		Username: username,
+		Password: password,
 	}, nil
+}
+
+func decodeAuth(auth string) (string, string, error) {
+	if auth == "" {
+		return "", "", errors.New("docker auth token cannot be blank")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(auth)
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to decode docker auth token")
+	}
+
+	creds := strings.SplitN(string(decoded), ":", 2)
+	if len(creds) != 2 {
+		return "", "", fmt.Errorf("invalid docker auth token: %q", creds)
+	}
+	return creds[0], creds[1], nil
 }
 
 func init() {

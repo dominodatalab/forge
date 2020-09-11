@@ -74,7 +74,7 @@ func TestLoadAuths(t *testing.T) {
 			out: &ecr.GetAuthorizationTokenOutput{
 				AuthorizationData: []ecr.AuthorizationData{
 					{
-						AuthorizationToken: pointer.StringPtr("c3RldmUtbwo="), // base64 -> "steve-o"
+						AuthorizationToken: pointer.StringPtr("c3RldmUtbzphd2Vzb21l"), // base64 -> "steve-o:awesome"
 					},
 				},
 			},
@@ -83,7 +83,8 @@ func TestLoadAuths(t *testing.T) {
 
 		actual, err := LoadAuths(ctx, url)
 		expected := &dockertypes.AuthConfig{
-			Auth: "c3RldmUtbwo=",
+			Username: "steve-o",
+			Password: "awesome",
 		}
 
 		require.NoError(t, err)
