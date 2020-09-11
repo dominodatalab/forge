@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/go-logr/logr"
-	"strconv"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -38,23 +37,22 @@ func NewPublisher(uri, queueName string, log logr.Logger) *Publisher {
 	return &p
 }
 
-func (p Publisher) handleReconnect(uri string) {
-	for attempt := 1; attempt < 10; attempt++ {
+func (p *Publisher) handleReconnect(uri string) {
+	for {
 		p.isConnected = false
-
-		p.logger.Info("Attempting to connect: attempt " + strconv.Itoa(attempt))
-		if !p.connect(uri) {
+		for !p.connect(uri) {
 			p.logger.Info("Failed to connect. Retrying.")
 			time.Sleep(reconnectDelay)
 		}
+
 		select {
 		case <-p.done:
+			p.logger.Info("Connection established.")
 			return
 		case <-p.notifyClose:
 		}
 	}
 }
-
 
 // wrapper around amqp Dial function
 func (p *Publisher) connect(uri string) bool {
@@ -114,8 +112,8 @@ func (p *Publisher) Push(event interface{}) error {
 		return errors.New("failed to push: not connected")
 	}
 
-	for attempt := 1; attempt < 10; attempt++ {
-		p.logger.Info("Attempting to push: attempt " + strconv.Itoa(attempt))
+	for {
+		p.logger.Info("Attempting to push")
 		err := p.UnsafePush(event)
 		if err != nil {
 			p.logger.Info("Push failed. Retrying...")
@@ -131,7 +129,6 @@ func (p *Publisher) Push(event interface{}) error {
 		}
 		p.logger.Info("Push didn't confirm. Retrying...")
 	}
-	return errors.New("failed to push: max retry limit reached")
 }
 
 // will push to the queue without checking for

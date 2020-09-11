@@ -284,7 +284,9 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 			ImageURLs:     cib.Status.ImageURLs,
 			ErrorMessage:  cib.Status.ErrorMessage,
 		}
+
 		if err := j.publisher.Push(update); err != nil {
+			j.log.Info("Attempting to push to RMQ")
 			return nil, errors.Wrap(err, "unable to publish message")
 		}
 	}
