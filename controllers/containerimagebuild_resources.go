@@ -129,6 +129,7 @@ func (r *ContainerImageBuildReconciler) checkRoleBinding(ctx context.Context, ci
 	})
 }
 
+// inject cloud registry secret when flagged
 func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
 	// attempt authenticate with any registries that have been marked "dynamic cloud"
 	auths := credentials.AuthConfigs{}
@@ -175,7 +176,7 @@ func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Co
 	}
 
 	// add volume/mount to jobconfig for consumption during build
-	r.JobConfig.Volumes = append(r.JobConfig.Volumes, corev1.Volume{
+	r.JobConfig.DynamicVolumes = append(r.JobConfig.DynamicVolumes, corev1.Volume{
 		Name: cloudCredentialsID,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
@@ -189,7 +190,7 @@ func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Co
 			},
 		},
 	})
-	r.JobConfig.VolumeMounts = append(r.JobConfig.VolumeMounts, corev1.VolumeMount{
+	r.JobConfig.DynamicVolumeMounts = append(r.JobConfig.DynamicVolumeMounts, corev1.VolumeMount{
 		Name:      cloudCredentialsID,
 		MountPath: config.DynamicCredentialsPath,
 		ReadOnly:  true,
@@ -200,6 +201,12 @@ func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Co
 
 // generates build job definition using container image build spec
 func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild) error {
+	// reset dynamic volumes created by other funcs after use
+	defer func() {
+		r.JobConfig.DynamicVolumes = []corev1.Volume{}
+		r.JobConfig.DynamicVolumeMounts = []corev1.VolumeMount{}
+	}()
+
 	// setup pod metadata
 	podMeta := metav1.ObjectMeta{
 		Name:      cib.Name,
@@ -252,6 +259,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		},
 	}
 	volumes = append(volumes, r.JobConfig.Volumes...)
+	volumes = append(volumes, r.JobConfig.DynamicVolumes...)
 
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -260,6 +268,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		},
 	}
 	volumeMounts = append(volumeMounts, r.JobConfig.VolumeMounts...)
+	volumeMounts = append(volumeMounts, r.JobConfig.DynamicVolumeMounts...)
 
 	// optionally configure the custom CA init container w/ additional volumes/mounts
 	var initContainers []corev1.Container

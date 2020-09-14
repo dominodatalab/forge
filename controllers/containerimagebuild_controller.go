@@ -39,6 +39,9 @@ type BuildJobConfig struct {
 	Volumes                    []corev1.Volume
 	VolumeMounts               []corev1.VolumeMount
 	EnvVar                     []corev1.EnvVar
+
+	DynamicVolumes      []corev1.Volume
+	DynamicVolumeMounts []corev1.VolumeMount
 }
 
 type ControllerConfig struct {
