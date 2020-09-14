@@ -5,16 +5,18 @@ go 1.13
 // Overrides should match https://github.com/moby/buildkit/blob/<release>/go.mod
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.0-beta.2.0.20200728183644-eb6354a11860
-	github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200310163718-4634ce647cf2+incompatible
+	github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82
 	github.com/hashicorp/go-immutable-radix => github.com/tonistiigi/go-immutable-radix v0.0.0-20170803185627-826af9ccf0fe
 	github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
 )
 
 require (
 	github.com/AkihiroSuda/containerd-fuse-overlayfs v0.0.0-20200220082720-bb896865146c
+	github.com/aws/aws-sdk-go-v2 v0.24.0
 	github.com/containerd/containerd v1.4.0-0
+	github.com/docker/cli v0.0.0-20200227165822-2298e6a3fe24
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v1.4.2-0.20190916154449-92cc603036dd // indirect
+	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/h2non/filetype v1.0.12
