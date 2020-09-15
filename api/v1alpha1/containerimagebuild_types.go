@@ -125,6 +125,7 @@ type ContainerImageBuildSpec struct {
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
 type ContainerImageBuildStatus struct {
+	PreviousState    BuildState   `json:"-"` // NOTE: should we persist this value?
 	State            BuildState   `json:"state,omitempty"`
 	ImageURLs        []string     `json:"imageURLs,omitempty"`
 	ImageSize        uint64       `json:"imageSize,omitempty"`
@@ -141,6 +142,7 @@ func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 		s.State = BuildStateInitialized
 	}
 
+	s.PreviousState = s.State
 	s.State = state
 }
 
