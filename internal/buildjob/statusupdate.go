@@ -12,14 +12,13 @@ import (
 )
 
 type StatusUpdate struct {
-	Name          string            `json:"name"`
-	Annotations   map[string]string `json:"annotations"`
-	ObjectLink    string            `json:"objectLink"`
-	PreviousState string            `json:"previousState"`
-	CurrentState  string            `json:"currentState"`
-	ErrorMessage  string            `json:"errorMessage"`
-	ImageURLs     []string          `json:"imageURLs"`
-	ImageSize     uint64            `json:"imageSize"`
+	Name         string            `json:"name"`
+	Annotations  map[string]string `json:"annotations"`
+	ObjectLink   string            `json:"objectLink"`
+	CurrentState string            `json:"currentState"`
+	ErrorMessage string            `json:"errorMessage"`
+	ImageURLs    []string          `json:"imageURLs"`
+	ImageSize    uint64            `json:"imageSize"`
 }
 
 func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.ContainerImageBuild, error) {
@@ -54,12 +53,17 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 		return nil, errors.Wrap(err, "unable to update status")
 	}
 
+	previousState := apiv1alpha1.BuildStateInitialized
+	if stateLen := len(cib.Status.States); stateLen > 0 {
+		previousState = cib.Status.States[stateLen-1].State
+	}
+
 	if j.producer != nil {
 		update := &StatusUpdate{
 			Name:          cib.Name,
 			Annotations:   cib.Annotations,
 			ObjectLink:    strings.TrimSuffix(cib.GetSelfLink(), "/status"),
-			PreviousState: string(cib.Status.PreviousState),
+			PreviousState: string(previousState),
 			CurrentState:  string(cib.Status.State),
 			ImageURLs:     cib.Status.ImageURLs,
 			ErrorMessage:  cib.Status.ErrorMessage,

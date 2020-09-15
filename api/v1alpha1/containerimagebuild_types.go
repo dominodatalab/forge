@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"errors"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -123,26 +124,32 @@ type ContainerImageBuildSpec struct {
 	PluginData map[string]string `json:"pluginData"`
 }
 
+// ContainerImageBuildState defines a previously observed state of ContainerImageBuild
+type ContainerImageBuildState struct {
+	State           BuildState `json:"state,omitempty"`
+	DurationSeconds string     `json:"durationSeconds,omitempty"`
+}
+
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
 type ContainerImageBuildStatus struct {
-	PreviousState    BuildState   `json:"-"` // NOTE: should we persist this value?
-	State            BuildState   `json:"state,omitempty"`
-	ImageURLs        []string     `json:"imageURLs,omitempty"`
-	ImageSize        uint64       `json:"imageSize,omitempty"`
-	ErrorMessage     string       `json:"errorMessage,omitempty"`
-	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
-	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`
+	State            BuildState                 `json:"state,omitempty"`
+	States           []ContainerImageBuildState `json:"states,omitempty"`
+	ImageURLs        []string                   `json:"imageURLs,omitempty"`
+	ImageSize        uint64                     `json:"imageSize,omitempty"`
+	ErrorMessage     string                     `json:"errorMessage,omitempty"`
+	BuildStartedAt   *metav1.Time               `json:"buildStartedAt,omitempty"`
+	BuildCompletedAt *metav1.Time               `json:"buildCompletedAt,omitempty"`
 }
 
 // SetStatus will set a new build state and preserve the previous state in a transient field.
 // An initialized state will be set when no state is provided.
-func (s *ContainerImageBuildStatus) SetState(state BuildState) {
+func (s *ContainerImageBuildStatus) SetState(state BuildState, durationSeconds float64) {
 	// NOTE: try to leverage kubebuilder default values on State later; currently doesn't work
 	if s.State == "" {
 		s.State = BuildStateInitialized
 	}
 
-	s.PreviousState = s.State
+	s.States = append(s.States, ContainerImageBuildState{s.State, fmt.Sprintf("%.2f", durationSeconds)})
 	s.State = state
 }
 

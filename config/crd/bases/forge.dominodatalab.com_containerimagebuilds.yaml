@@ -167,6 +167,18 @@ spec:
             state:
               description: BuildState represents a phase in the build process.
               type: string
+            states:
+              items:
+                description: ContainerImageBuildState defines a previously observed
+                  state of ContainerImageBuild
+                properties:
+                  durationSeconds:
+                    type: string
+                  state:
+                    description: BuildState represents a phase in the build process.
+                    type: string
+                type: object
+              type: array
           type: object
       type: object
   version: v1alpha1
