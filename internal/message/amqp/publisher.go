@@ -1,13 +1,13 @@
 package amqp
 
 import (
-"encoding/json"
-"fmt"
-"time"
+	"encoding/json"
+	"fmt"
+	"time"
 
-"github.com/go-logr/logr"
-"github.com/pkg/errors"
-"github.com/streadway/amqp"
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	"github.com/streadway/amqp"
 )
 
 const (

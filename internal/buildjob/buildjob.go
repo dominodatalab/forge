@@ -67,7 +67,7 @@ func New(cfg Config) (*Job, error) {
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		if publisher, err := message.NewPublisher(cfg.BrokerOpts, log); err != nil {
+		if publisher, err = message.NewPublisher(cfg.BrokerOpts, log); err != nil {
 			return nil, err
 		}
 
@@ -160,6 +160,7 @@ func (j *Job) Cleanup(forced bool) {
 	for _, fn := range j.cleanupSteps {
 		fn()
 	}
+	j.log.Info("Done!")
 }
 
 func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
