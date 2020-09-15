@@ -128,6 +128,7 @@ type ContainerImageBuildStatus struct {
 	PreviousState    BuildState   `json:"-"` // NOTE: should we persist this value?
 	State            BuildState   `json:"state,omitempty"`
 	ImageURLs        []string     `json:"imageURLs,omitempty"`
+	ImageSize        uint64       `json:"imageSize,omitempty"`
 	ErrorMessage     string       `json:"errorMessage,omitempty"`
 	BuildStartedAt   *metav1.Time `json:"buildStartedAt,omitempty"`
 	BuildCompletedAt *metav1.Time `json:"buildCompletedAt,omitempty"`
@@ -148,6 +149,10 @@ func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Namespaced,shortName=cib
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Image Name",type="string",JSONPath=".spec.imageName"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state"
+// +kubebuilder:printcolumn:name="Image URLs",type="string",priority=1,JSONPath=".status.imageURLs"
 
 // ContainerImageBuild is the Schema for the containerimagebuilds API
 type ContainerImageBuild struct {

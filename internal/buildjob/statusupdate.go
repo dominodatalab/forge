@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/builder/types"
 )
 
 type StatusUpdate struct {
@@ -18,6 +19,7 @@ type StatusUpdate struct {
 	CurrentState  string            `json:"currentState"`
 	ErrorMessage  string            `json:"errorMessage"`
 	ImageURLs     []string          `json:"imageURLs"`
+	ImageSize     uint64            `json:"imageSize"`
 }
 
 func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.ContainerImageBuild, error) {
@@ -27,9 +29,10 @@ func (j *Job) transitionToBuilding(cib *apiv1alpha1.ContainerImageBuild) (*apiv1
 	return j.updateStatus(cib)
 }
 
-func (j *Job) transitionToComplete(cib *apiv1alpha1.ContainerImageBuild, images []string) error {
+func (j *Job) transitionToComplete(cib *apiv1alpha1.ContainerImageBuild, image *types.Image) error {
 	cib.Status.SetState(apiv1alpha1.BuildStateCompleted)
-	cib.Status.ImageURLs = images
+	cib.Status.ImageURLs = image.URLs
+	cib.Status.ImageSize = image.Size
 	cib.Status.BuildCompletedAt = &metav1.Time{Time: time.Now()}
 
 	_, err := j.updateStatus(cib)

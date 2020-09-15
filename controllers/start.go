@@ -4,6 +4,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-logr/zapr"
+	"github.com/newrelic/go-agent/v3/integrations/nrzap"
+	"github.com/newrelic/go-agent/v3/newrelic"
+
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -20,6 +24,7 @@ var (
 	setupLog  = ctrl.Log.WithName("setup")
 )
 
+const newrelicShutdownTimeout = 5 * time.Second
 const leaderElectionID = "forge-leader-election"
 
 func StartManager(cfg ControllerConfig) {
@@ -28,11 +33,23 @@ func StartManager(cfg ControllerConfig) {
 		atom.SetLevel(zap.DebugLevel)
 	}
 
-	logger := ctrlzap.New(func(opts *ctrlzap.Options) {
+	zapLogger := ctrlzap.NewRaw(func(opts *ctrlzap.Options) {
 		opts.Level = &atom
 		opts.Development = true
 	})
+	logger := zapr.NewLogger(zapLogger)
 	ctrl.SetLogger(logger)
+
+	newrelicApp, err := newrelic.NewApplication(
+		newrelic.ConfigEnabled(false),
+		nrzap.ConfigLogger(zapLogger),
+		newrelic.ConfigFromEnvironment(),
+	)
+	if err != nil {
+		setupLog.Error(err, "unable to create New Relic Application")
+		os.Exit(1)
+	}
+	defer newrelicApp.Shutdown(newrelicShutdownTimeout)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             newScheme,
@@ -53,6 +70,7 @@ func StartManager(cfg ControllerConfig) {
 		Scheme:    mgr.GetScheme(),
 		Recorder:  mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		JobConfig: cfg.JobConfig,
+		NewRelic:  newrelicApp,
 	}
 
 	if err = controller.SetupWithManager(mgr); err != nil {
