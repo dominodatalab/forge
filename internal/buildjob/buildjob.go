@@ -28,7 +28,7 @@ type Job struct {
 	clientk8s   kubernetes.Interface
 	clientforge clientv1alpha1.Interface
 
-	publisher message.Publisher
+	publisher message.Producer
 
 	plugins []*preparer.Plugin
 
@@ -61,14 +61,14 @@ func New(cfg Config) (*Job, error) {
 
 	var cleanupSteps []func()
 
-	var publisher message.Publisher
+	var publisher message.Producer
 	// setup message publisher
 	log.Info("Set up message publisher if options are configured")
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		if publisher = message.NewPublisher(cfg.BrokerOpts, log); publisher == nil {
-			return nil, errors.New("Message publisher failed to initialize, publisher was instantiated as nil")
+		if publisher, err := message.NewPublisher(cfg.BrokerOpts, log); err != nil {
+			return nil, err
 		}
 
 		cleanupSteps = append(cleanupSteps, func() {
@@ -274,21 +274,19 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 		return nil, errors.Wrap(err, "unable to update status")
 	}
 
-	if j.publisher != nil {
-		update := &StatusUpdate{
-			Name:          cib.Name,
-			Annotations:   cib.Annotations,
-			ObjectLink:    strings.TrimSuffix(cib.GetSelfLink(), "/status"),
-			PreviousState: string(cib.Status.PreviousState),
-			CurrentState:  string(cib.Status.State),
-			ImageURLs:     cib.Status.ImageURLs,
-			ErrorMessage:  cib.Status.ErrorMessage,
-		}
+	update := &StatusUpdate{
+		Name:          cib.Name,
+		Annotations:   cib.Annotations,
+		ObjectLink:    strings.TrimSuffix(cib.GetSelfLink(), "/status"),
+		PreviousState: string(cib.Status.PreviousState),
+		CurrentState:  string(cib.Status.State),
+		ImageURLs:     cib.Status.ImageURLs,
+		ErrorMessage:  cib.Status.ErrorMessage,
+	}
 
-		if err := j.publisher.Push(update); err != nil {
-			j.log.Info("Attempting to push to RMQ")
-			return nil, errors.Wrap(err, "unable to publish message")
-		}
+	if err := j.publisher.Push(update); err != nil {
+		j.log.Info("Attempting to push to RMQ")
+		return nil, errors.Wrap(err, "unable to publish message")
 	}
 
 	return cib, nil

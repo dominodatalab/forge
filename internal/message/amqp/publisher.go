@@ -1,177 +1,129 @@
 package amqp
 
 import (
-	"encoding/json"
-	"errors"
-	"github.com/go-logr/logr"
-	"time"
+"encoding/json"
+"fmt"
+"time"
 
-	"github.com/streadway/amqp"
+"github.com/go-logr/logr"
+"github.com/pkg/errors"
+"github.com/streadway/amqp"
 )
 
 const (
-	reconnectDelay = 3 * time.Second
-	resendDelay = 3 * time.Second
+	connectionRetryLimit = 5
+	connectionRetryDelay = 5 * time.Second
+
+	queueDurable    = true
+	queueAutoDelete = false
+	queueExclusive  = false
+	queueNoWait     = false
+
+	amqpExchange     = ""
+	publishMandatory = true
+	publishImmediate = false
 )
 
-// Publisher represents a connection to a particular queue
-type Publisher struct {
-	name          string
-	logger        logr.Logger
-	connection    *amqp.Connection
-	channel       *amqp.Channel
-	done          chan bool
-	isConnected   bool
-	notifyClose   chan *amqp.Error
-	notifyConfirm chan amqp.Confirmation
+var queueArgs = amqp.Table{
+	"x-single-active-consumer": true,
 }
 
-// create a new publisher object and try to connect to the queue
-func NewPublisher(uri, queueName string, log logr.Logger) *Publisher {
-	p := Publisher{
-		name:          queueName,
-		logger:        log,
-		done:          make(chan bool),
+type publisher struct {
+	log       logr.Logger
+	url       string
+	queueName string
+
+	conn    AMQPConnection
+	channel AMQPChannel
+	err     chan error
+}
+
+func NewPublisher(url, name string, logger logr.Logger) (*publisher, error) {
+	p := &publisher{
+		log:       logger.WithName("MessagePublisher"),
+		url:       url,
+		queueName: name,
+		err:       make(chan error),
 	}
-	go p.handleReconnect(uri)
-	return &p
+
+	if err := p.connect(); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
-func (p *Publisher) handleReconnect(uri string) {
-	for {
-		p.isConnected = false
-		for !p.connect(uri) {
-			p.logger.Info("Failed to connect. Retrying.")
-			time.Sleep(reconnectDelay)
+func (p *publisher) Push(event interface{}) error {
+	select {
+	case <-p.err:
+		p.log.Info("attempting to reconnect to rabbitmq", "url", p.url)
+
+		if err := p.connect(); err != nil {
+			return err
 		}
-
-		select {
-		case <-p.done:
-			p.logger.Info("Connection established.")
-			return
-		case <-p.notifyClose:
-			p.logger.Info("Closing.")
-		}
-	}
-}
-
-// wrapper around amqp Dial function
-func (p *Publisher) connect(uri string) bool {
-
-	// try and connect to the queue
-	conn, err := amqp.Dial(uri)
-	if err != nil {
-		return false
+	default:
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return false
-	}
-
-	err = ch.Confirm(false)
-	if err != nil {
-		return false
-	}
-
-	_, err = ch.QueueDeclare(
-		p.name,
-		true,
-		false,
-		false,
-		false,
-		amqp.Table {
-			"x-single-active-consumer": true,
-		},
-	)
-
-	if err != nil {
-		return false
-	}
-
-	p.changeConnection(conn, ch)
-	p.isConnected = true
-	p.logger.Info("Connected!")
-	return true
-}
-
-// changeConnection takes a new connection to the queue,
-// and updates the channel listeners to reflect this.
-func (p *Publisher) changeConnection(conn *amqp.Connection, ch *amqp.Channel) {
-	p.connection = conn
-	p.channel = ch
-	p.notifyClose = make(chan *amqp.Error)
-	p.notifyConfirm = make(chan amqp.Confirmation)
-	p.channel.NotifyClose(p.notifyClose)
-	p.channel.NotifyPublish(p.notifyConfirm)
-}
-
-// will push data onto the queue and wait for a confirm.
-// it continuously resends messages until a confirm is received.
-func (p *Publisher) Push(event interface{}) error {
-
-	for {
-		p.logger.Info("Attempting to push")
-		if !p.isConnected {
-			p.logger.Info("Not connected. Attempting to reconnect..")
-		}
-		err := p.UnsafePush(event)
-		if err != nil {
-			p.logger.Info("Push failed. Retrying...")
-		}
-		select {
-		case confirm := <-p.notifyConfirm:
-			if confirm.Ack {
-				p.logger.Info("Push confirmed!")
-				return nil
-			}
-		case <-time.After(resendDelay):
-		}
-		p.logger.Info("Push didn't confirm. Retrying...")
-	}
-}
-
-// will push to the queue without checking for
-// confirmation. It returns an error if it fails to connect.
-func (p *Publisher) UnsafePush(event interface{}) error {
 	data, err := json.Marshal(event)
 	if err != nil {
+		return errors.Wrap(err, "cannot marshal rabbitmq event")
+	}
+
+	q, err := p.channel.QueueDeclare(
+		p.queueName,
+		queueDurable,
+		queueAutoDelete,
+		queueExclusive,
+		queueNoWait,
+		queueArgs,
+	)
+	if err != nil {
 		return err
 	}
 
-	if !p.isConnected {
-		return errors.New("not connected to the queue")
+	message := amqp.Publishing{
+		ContentType: "application/json",
+		Body:        data,
 	}
-
-	return p.channel.Publish(
-		"",
-		p.name,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        data,
-		},
-	)
+	err = p.channel.Publish(amqpExchange, q.Name, publishMandatory, publishImmediate, message)
+	return errors.Wrap(err, "failed to publish rabbitmq message")
 }
 
-// Close will cleanly shutdown the channel and connection.
-func (p *Publisher) Close() error {
-	if !p.isConnected {
-		return errors.New("already closed: not connected to the queue")
+func (p *publisher) connect() error {
+	ticker := time.NewTicker(connectionRetryDelay)
+	defer ticker.Stop()
+
+	for counter := 0; counter < connectionRetryLimit; <-ticker.C {
+		var err error
+
+		p.conn, err = defaultDialer(p.url)
+		if err != nil {
+			p.log.Error(err, "cannot dial rabbitmq", "url", p.url, "attempt", counter+1)
+
+			counter++
+			continue
+		}
+
+		go func() {
+			closed := make(chan *amqp.Error, 1)
+			p.conn.NotifyClose(closed)
+
+			reason, ok := <-closed
+			if ok {
+				p.log.Error(reason, "rabbitmq connection closed, registering err signal")
+				p.err <- reason
+			}
+		}()
+
+		p.channel, err = p.conn.Channel()
+		return errors.Wrapf(err, "failed to create rabbitmq channel to %q", p.url)
 	}
 
-	err := p.channel.Close()
-	if err != nil {
-		return err
-	}
+	return fmt.Errorf("rabbitmq connection retry limit reached: %d", connectionRetryLimit)
+}
 
-	err = p.connection.Close()
-	if err != nil {
-		return err
+func (p *publisher) Close() error {
+	if p.conn != nil {
+		return p.conn.Close()
 	}
-
-	close(p.done)
-	p.isConnected = false
 	return nil
 }
