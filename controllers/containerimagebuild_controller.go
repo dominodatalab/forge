@@ -3,9 +3,12 @@ package controllers
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/newrelic/go-agent/v3/newrelic"
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,8 +16,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
 	"github.com/dominodatalab/forge/internal/message"
@@ -63,23 +65,60 @@ type ContainerImageBuildReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
+	NewRelic *newrelic.Application
+
 	JobConfig *BuildJobConfig
+}
+
+var (
+	containerImageBuildsCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "forge",
+			Subsystem: "controller",
+			Name:      "container_image_builds",
+			Help:      "Counter of container image builds partitioned by status",
+		},
+		[]string{"status"},
+	)
+
+	gcTiming = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: "forge",
+			Subsystem: "controller",
+			Name:      "container_image_builds_gc",
+			Help:      "Histogram for garbage collection invocations",
+		},
+	)
+
+	gcCompletedGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "forge",
+			Subsystem: "controller",
+			Name:      "container_image_builds_gc_completed",
+			Help:      "Gauge tracking last garbage collection time",
+		},
+	)
+
+	gcCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "forge",
+			Subsystem: "controller",
+			Name:      "container_image_builds_objects_gc",
+			Help:      "Counter of container image build objects garbage collected",
+		},
+		[]string{"status"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(containerImageBuildsCount)
+	metrics.Registry.MustRegister(gcTiming)
+	metrics.Registry.MustRegister(gcCount)
 }
 
 func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&forgev1alpha1.ContainerImageBuild{}).
-		WithEventFilter(predicate.Funcs{ // NOTE this ignores update/delete events
-			CreateFunc: func(event event.CreateEvent) bool {
-				return true
-			},
-			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				return false
-			},
-			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-				return false
-			},
-		}).
 		Complete(r)
 }
 
@@ -87,6 +126,10 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds/status,verbs=get;update;patch
 
 func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	txn := r.NewRelic.StartTransaction("Reconcile")
+	txn.AddAttribute("containerimagebuild", req.NamespacedName.String())
+	defer txn.End()
+
 	ctx := context.Background()
 	log := r.Log.WithValues("containerimagebuild", req.NamespacedName)
 
@@ -97,7 +140,17 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if build.DeletionTimestamp != nil {
+		containerImageBuildsCount.WithLabelValues("deleted").Inc()
+	}
+
+	if build.Status.State != "" {
+		containerImageBuildsCount.WithLabelValues(strings.ToLower(string(build.Status.State))).Inc()
+		return ctrl.Result{}, nil
+	}
+
 	log.Info("Reconciling build job", "Name", build.Name, "Namespace", build.Namespace)
+	containerImageBuildsCount.WithLabelValues("initializing").Inc()
 
 	if err := r.checkPrerequisites(ctx, build); err != nil {
 		log.Error(err, "Failed to create job prerequisites", "Name", build.Name, "Namespace", build.Namespace)
@@ -115,6 +168,13 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 // RunGC will delete ContainerImageBuild resources that are in a "completed" or "failed" state. The oldest resources
 // will be deleted first and the retentionCount will preserve N of resources for inspection.
 func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
+	txn := r.NewRelic.StartTransaction("GarbageCollection")
+	defer txn.End()
+
+	timer := prometheus.NewTimer(gcTiming)
+	defer timer.ObserveDuration()
+	defer gcCompletedGauge.SetToCurrentTime()
+
 	ctx := context.Background()
 	log := r.Log.WithName("GC")
 	log.Info("Launching cleanup operation")
@@ -157,8 +217,10 @@ func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 	for _, build := range builds[:len(builds)-retentionCount] {
 		if err := r.Delete(ctx, &build, gcDeleteOpt); err != nil {
 			log.Error(err, "Failed to delete build", "name", build.Name, "namespace", build.Namespace)
+			gcCount.WithLabelValues("failed").Inc()
 			r.Recorder.Event(&build, corev1.EventTypeWarning, "GarbageCollection", "Delete operation failed")
 		}
+		gcCount.WithLabelValues("successful").Inc()
 		log.Info("Deleted build", "name", build.Name, "namespace", build.Namespace)
 	}
 	log.Info("Cleanup complete")

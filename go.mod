@@ -19,11 +19,14 @@ require (
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/go-logr/logr v0.1.0
+	github.com/go-logr/zapr v0.1.0
 	github.com/h2non/filetype v1.0.12
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v1.3.0
 	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/moby/buildkit v0.7.2
+	github.com/newrelic/go-agent/v3 v3.9.0
+	github.com/newrelic/go-agent/v3/integrations/nrzap v1.0.0
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/opencontainers/image-spec v1.0.1
@@ -31,12 +34,14 @@ require (
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20180702182724-07a764486eb1 // indirect
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/cobra v1.0.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/bbolt v1.3.3
-	go.uber.org/zap v1.10.0
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	go.uber.org/zap v1.12.0
+	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+	golang.org/x/tools v0.0.0-20200901173145-80e1b0398e67 // indirect
 	google.golang.org/grpc v1.27.1
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2

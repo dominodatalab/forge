@@ -18,6 +18,7 @@ import (
 	"github.com/dominodatalab/forge/internal/archive"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage"
 	"github.com/dominodatalab/forge/internal/builder/embedded/bkimage/types"
+	builder "github.com/dominodatalab/forge/internal/builder/types"
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/plugins/preparer"
 )
@@ -50,7 +51,7 @@ func (d *driver) SetLogger(logger logr.Logger) {
 	d.bk.SetLogger(logger)
 }
 
-func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([]string, error) {
+func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) (*builder.Image, error) {
 	if len(opts.PushRegistries) == 0 {
 		return nil, errors.New("image builds require at least one push registry")
 	}
@@ -61,6 +62,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 
 	var headImg string
 	var images []string
+	var imageSize uint64
 	for idx, registry := range opts.PushRegistries {
 		// Build fully-qualified image name
 		image := fmt.Sprintf("%s/%s", registry, opts.ImageName)
@@ -81,10 +83,8 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 			if err := d.build(ctx, headImg, opts); err != nil {
 				return nil, err
 			}
-			if opts.ImageSizeLimit != 0 {
-				if err := d.validateImageSize(ctx, headImg, opts.ImageSizeLimit); err != nil {
-					return nil, err
-				}
+			if imageSize, err = d.validateImageSize(ctx, headImg, opts.ImageSizeLimit); err != nil {
+				return nil, err
 			}
 		} else { // Tag tail images
 			if err := d.tag(ctx, headImg, image); err != nil {
@@ -100,7 +100,10 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) ([
 	}
 
 	// Return a list of every registry image
-	return images, nil
+	return &builder.Image{
+		URLs: images,
+		Size: imageSize,
+	}, nil
 }
 
 func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
@@ -197,20 +200,20 @@ func (d *driver) push(ctx context.Context, image string) error {
 	return nil
 }
 
-func (d *driver) validateImageSize(ctx context.Context, name string, limit uint64) error {
+func (d *driver) validateImageSize(ctx context.Context, name string, limit uint64) (uint64, error) {
 	id := identity.NewID()
 	ctx = session.NewContext(ctx, id)
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 
 	image, err := d.bk.GetImage(ctx, name)
 	if err != nil {
-		return fmt.Errorf("cannot validate image size: %v", err)
+		return 0, fmt.Errorf("cannot validate image size: %v", err)
 	}
 
 	imageSize := uint64(image.ContentSize)
-	if imageSize > limit {
-		return fmt.Errorf("image %q is too large to push to registry (size: %d, limit: %d)", name, imageSize, limit)
+	if limit > 0 && imageSize > limit {
+		return 0, fmt.Errorf("image %q is too large to push to registry (size: %d, limit: %d)", name, imageSize, limit)
 	}
 
-	return nil
+	return imageSize, nil
 }

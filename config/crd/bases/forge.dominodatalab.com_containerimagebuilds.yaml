@@ -8,6 +8,20 @@ metadata:
   creationTimestamp: null
   name: containerimagebuilds.forge.dominodatalab.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.imageName
+    name: Image Name
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  - JSONPath: .status.state
+    name: State
+    type: string
+  - JSONPath: .status.imageURLs
+    name: Image URLs
+    priority: 1
+    type: string
   group: forge.dominodatalab.com
   names:
     kind: ContainerImageBuild
@@ -143,6 +157,9 @@ spec:
               type: string
             errorMessage:
               type: string
+            imageSize:
+              format: int64
+              type: integer
             imageURLs:
               items:
                 type: string
