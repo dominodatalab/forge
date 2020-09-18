@@ -12,7 +12,6 @@ import (
 
 const (
 	connectionRetryLimit = 5
-	connectionRetryDelay = 5 * time.Second
 
 	queueDurable    = true
 	queueAutoDelete = false
@@ -24,13 +23,16 @@ const (
 	publishImmediate = false
 )
 
-var queueArgs = amqp.Table{
-	"x-single-active-consumer": true,
-}
+var (
+	connectionRetryDelay = 5 * time.Second
+	queueArgs            = amqp.Table{
+		"x-single-active-consumer": true,
+	}
+)
 
 type publisher struct {
 	log       logr.Logger
-	url       string
+	uri       string
 	queueName string
 
 	conn    AMQPConnection
@@ -38,10 +40,10 @@ type publisher struct {
 	err     chan error
 }
 
-func NewPublisher(url, name string, logger logr.Logger) (*publisher, error) {
+func NewPublisher(uri, name string, logger logr.Logger) (*publisher, error) {
 	p := &publisher{
 		log:       logger.WithName("MessagePublisher"),
-		url:       url,
+		uri:       uri,
 		queueName: name,
 		err:       make(chan error),
 	}
@@ -55,7 +57,7 @@ func NewPublisher(url, name string, logger logr.Logger) (*publisher, error) {
 func (p *publisher) Push(event interface{}) error {
 	select {
 	case <-p.err:
-		p.log.Info("attempting to reconnect to rabbitmq", "url", p.url)
+		p.log.Info("attempting to reconnect to rabbitmq", "uri", p.uri)
 
 		if err := p.connect(); err != nil {
 			return err
@@ -95,9 +97,9 @@ func (p *publisher) connect() error {
 	for counter := 0; counter < connectionRetryLimit; <-ticker.C {
 		var err error
 
-		p.conn, err = defaultDialer(p.url)
+		p.conn, err = defaultDialerAdapter(p.uri)
 		if err != nil {
-			p.log.Error(err, "cannot dial rabbitmq", "url", p.url, "attempt", counter+1)
+			p.log.Error(err, "cannot dial rabbitmq", "uri", p.uri, "attempt", counter+1)
 
 			counter++
 			continue
@@ -115,7 +117,7 @@ func (p *publisher) connect() error {
 		}()
 
 		p.channel, err = p.conn.Channel()
-		return errors.Wrapf(err, "failed to create rabbitmq channel to %q", p.url)
+		return errors.Wrapf(err, "failed to create rabbitmq channel to %q", p.uri)
 	}
 
 	return fmt.Errorf("rabbitmq connection retry limit reached: %d", connectionRetryLimit)

@@ -6,6 +6,19 @@ import (
 	"github.com/streadway/amqp"
 )
 
+var (
+	defaultDialer AMQPDialer = amqp.Dial
+
+	defaultDialerAdapter AMQPDialerAdapter = func(url string) (AMQPConnection, error) {
+		conn, err := defaultDialer(url)
+		if err != nil {
+			return nil, err
+		}
+
+		return ConnectionAdapter{conn}, nil
+	}
+)
+
 type AMQPChannel interface {
 	io.Closer
 
@@ -28,13 +41,6 @@ func (c ConnectionAdapter) Channel() (AMQPChannel, error) {
 	return c.Connection.Channel()
 }
 
-type AMQPDialer func(url string) (AMQPConnection, error)
+type AMQPDialer func(url string) (*amqp.Connection, error)
 
-var defaultDialer AMQPDialer = func(url string) (AMQPConnection, error) {
-	conn, err := amqp.Dial(url)
-	if err != nil {
-		return nil, err
-	}
-
-	return ConnectionAdapter{conn}, nil
-}
+type AMQPDialerAdapter func(url string) (AMQPConnection, error)
