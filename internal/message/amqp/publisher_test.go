@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streadway/amqp"
-
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
+	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 var (
@@ -20,259 +18,190 @@ var (
 	queueName = "test-queue"
 )
 
-type testConnectConfig struct {
-	withMocks func(conn *fakeConnection, channel *fakeChannel)
-	operation func(expectErr bool)
-}
-
-func testConnect(t *testing.T, config testConnectConfig) {
-	t.Helper()
-
-	originalDelay := connectionRetryDelay
-	originalDialer := defaultDialerAdapter
-	defer func() {
-		connectionRetryDelay = originalDelay
-		defaultDialerAdapter = originalDialer
-	}()
-
-	connectionRetryDelay = 1 * time.Nanosecond
-
-	t.Run("connect success", func(t *testing.T) {
-		mockChannel := &fakeChannel{}
-		mockConn := &fakeConnection{}
-		mockConn.On("Channel").Return(mockChannel, nil)
-
-		mockDialerAdapter := fakeDialerAdapter{}
-		mockDialerAdapter.On("Dial", uri).Return(mockConn, nil)
-		defaultDialerAdapter = mockDialerAdapter.Dial
-
-		config.withMocks(mockConn, mockChannel)
-		config.operation(false)
-
-		mockDialerAdapter.AssertExpectations(t)
-		mockConn.AssertExpectations(t)
-	})
-
-	t.Run("channel failure", func(t *testing.T) {
-
-		mockConn := &fakeConnection{}
-		mockConn.On("Channel").Return(nil, errors.New("test channel failure"))
-
-		mockDialerAdapter := fakeDialerAdapter{}
-		mockDialerAdapter.On("Dial", uri).Return(mockConn, nil)
-		defaultDialerAdapter = mockDialerAdapter.Dial
-
-		config.withMocks(mockConn, nil)
-		config.operation(true)
-
-		mockDialerAdapter.AssertExpectations(t)
-		mockConn.AssertExpectations(t)
-	})
-
-	t.Run("retry limit failure", func(t *testing.T) {
-		mock := fakeDialerAdapter{}
-		mock.On("Dial", uri).Return(nil, errors.New("test dial error"))
-		defaultDialerAdapter = mock.Dial
-
-		config.withMocks(nil, nil)
-		config.operation(true)
-
-		mock.AssertExpectations(t)
-		mock.AssertNumberOfCalls(t, "Dial", connectionRetryLimit)
-	})
-
-	t.Run("reconnect success", func(t *testing.T) {
-		mockChannel := &fakeChannel{}
-		mockConn := &fakeConnection{}
-		mockConn.On("Channel").Return(mockChannel, nil)
-
-		mockDialerAdapter := fakeDialerAdapter{}
-		mockDialerAdapter.On("Dial", uri).Return(nil, errors.New("test dial error")).Once()
-		mockDialerAdapter.On("Dial", uri).Return(mockConn, nil).Once()
-
-		defaultDialerAdapter = mockDialerAdapter.Dial
-
-		config.withMocks(mockConn, mockChannel)
-		config.operation(false)
-
-		mockDialerAdapter.AssertExpectations(t)
-		mockDialerAdapter.AssertNumberOfCalls(t, "Dial", 2)
-	})
-}
-
 func TestNewPublisher(t *testing.T) {
-	/*
-		1. Create a new publisher successfully
-		2. Create a new publisher and fail
+	setup := func(fn func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel)) (*mockDialerAdapter, *mockConnection, func()) {
+		mockChan := &mockChannel{}
+		mockConn := &mockConnection{}
+		mockAdapter := &mockDialerAdapter{}
 
-		connect:
-		success states:
-		successful dial
-		retry success
+		fn(mockAdapter, mockConn, mockChan)
 
-		failure states:
-		retry limit failure / unsuccessful dial
-		connection success channel failure
+		origAdapter := defaultDialerAdapter
+		origRetryDelay := connectionRetryDelay
 
-	*/
+		defaultDialerAdapter = mockAdapter.Dial
+		connectionRetryDelay = 1 * time.Nanosecond
 
-	config := testConnectConfig{
-		operation: func(expectErr bool) {
-			actual, err := NewPublisher(uri, queueName, logger)
-			if expectErr {
-				assert.Error(t, err)
-				return
-			}
+		reset := func() {
+			defaultDialerAdapter = origAdapter
+			connectionRetryDelay = origRetryDelay
+		}
 
-			require.NoError(t, err)
-			assert.NotNil(t, actual.conn)
-			assert.NotNil(t, actual.channel)
-			assert.Equal(t, queueName, actual.queueName)
-			assert.Equal(t, uri, actual.uri)
-		},
+		return mockAdapter, mockConn, reset
 	}
-	testConnect(t, config)
-}
 
-func TestPublisher_Close(t *testing.T) {
-	/*
-		1. close successfully
-		2. close unsuccessfully
-	*/
+	t.Run("connect", func(t *testing.T) {
+		adapter, conn, reset := setup(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
+			conn.On("Channel").Return(channel, nil)
+			adapter.On("Dial", uri).Return(conn, nil)
+		})
+		defer reset()
 
-	t.Run("success", func(t *testing.T) {
-		fakeConn := &fakeConnection{}
-		fakeConn.On("Close").Return(nil)
-		p := &publisher{
-			conn: fakeConn,
-		}
+		actual, err := NewPublisher(uri, queueName, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, actual.conn)
+		assert.NotNil(t, actual.channel)
+		assert.Equal(t, queueName, actual.queueName)
+		assert.Equal(t, uri, actual.uri)
 
-		assert.NoError(t, p.Close())
-		fakeConn.AssertExpectations(t)
+		adapter.AssertExpectations(t)
+		conn.AssertExpectations(t)
 	})
 
-	t.Run("no_connection", func(t *testing.T) {
-		p := &publisher{}
+	t.Run("reconnect", func(t *testing.T) {
+		adapter, _, reset := setup(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
+			conn.On("Channel").Return(channel, nil)
+			adapter.On("Dial", uri).Return(nil, errors.New("test dial error")).Once()
+			adapter.On("Dial", uri).Return(conn, nil).Once()
+		})
+		defer reset()
 
-		assert.NoError(t, p.Close())
+		actual, err := NewPublisher(uri, queueName, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, actual.conn)
+		assert.NotNil(t, actual.channel)
+		assert.Equal(t, queueName, actual.queueName)
+		assert.Equal(t, uri, actual.uri)
+
+		adapter.AssertExpectations(t)
+		adapter.AssertNumberOfCalls(t, "Dial", 2)
 	})
 
-	t.Run("failure", func(t *testing.T) {
-		fakeConn := &fakeConnection{}
-		fakeConn.On("Close").Return(errors.New("test failed to close connection"))
-		p := &publisher{
-			conn: fakeConn,
-		}
+	t.Run("channel_failure", func(t *testing.T) {
+		adapter, conn, reset := setup(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
+			conn.On("Channel").Return(nil, errors.New("test channel failure"))
+			adapter.On("Dial", uri).Return(conn, nil)
+		})
+		defer reset()
 
-		assert.EqualError(t, p.Close(), "test failed to close connection")
-		fakeConn.AssertExpectations(t)
+		_, err := NewPublisher(uri, queueName, logger)
+		assert.Error(t, err)
+
+		adapter.AssertExpectations(t)
+		conn.AssertExpectations(t)
+	})
+
+	t.Run("retry_limit_failure", func(t *testing.T) {
+		adapter, _, reset := setup(func(adapter *mockDialerAdapter, conn *mockConnection, channel *mockChannel) {
+			adapter.On("Dial", uri).Return(nil, errors.New("test dial error"))
+		})
+		defer reset()
+
+		_, err := NewPublisher(uri, queueName, logger)
+		assert.Error(t, err)
+
+		adapter.AssertExpectations(t)
+		adapter.AssertNumberOfCalls(t, "Dial", connectionRetryLimit)
 	})
 }
 
 func TestPublisher_Push(t *testing.T) {
-
-	var (
-		event           = ""
-		queueDurable    = true
-		queueAutoDelete = false
-		queueExclusive  = false
-		queueNoWait     = false
-	)
-
-	t.Run("reconnect connection failure", func(t *testing.T) {
-		//mockConn := &fakeConnection{}
-		//mockChan := &fakeChannel{}
-		//mockChan.On("QueueDeclare", queueName, queueDurable, queueAutoDelete, queueExclusive, queueNoWait, queueArgs).Return(
-		//	amqp.Queue{}, nil)
-		//mockConn.On("Channel").Return(mockChan, nil)
-
-		p := &publisher{
-			log:       logger,
-			uri:       uri,
-			queueName: queueName,
-			err:       make(chan error, 1),
-		}
-		go func() {
-			p.err <- errors.New("test failed")
-		}()
-
-		config := testConnectConfig{
-			withMocks: func(conn *fakeConnection, channel *fakeChannel) {
-				if channel != nil {
-					channel.On(
-						"QueueDeclare",
-						queueName,
-						queueDurable,
-						queueAutoDelete,
-						queueExclusive,
-						queueNoWait,
-						queueArgs,
-					).Return(amqp.Queue{}, nil)
-					channel.On("Publish", "", "", true, false, amqp.Publishing{ContentType: "application/json", Body: []byte(`""`)}).Return(nil)
-				}
-			},
-			operation: func(expectErr bool) {
-				err := p.Push(event)
-				if expectErr {
-					assert.Error(t, err)
-					return
-				}
-
-				require.NoError(t, err)
-			},
-		}
-		testConnect(t, config)
-	})
-
-	t.Run("failed to marshal rmq event", func(t *testing.T) {
-		fakeConn := &fakeConnection{}
-		p := &publisher{
-			conn: fakeConn,
-		}
-
-		event := make(chan bool)
-
-		err := p.Push(event)
-		assert.Error(t, err)
-	})
-
-	t.Run("failed to declare queue", func(t *testing.T) {
-		mockConn := &fakeConnection{}
-		mockChan := &fakeChannel{}
-		mockChan.On("QueueDeclare", queueName, queueDurable, queueAutoDelete, queueExclusive, queueNoWait, queueArgs).Return(
-			nil, errors.New("failed to create queue"))
-		mockConn.On("Channel").Return(
-			&fakeChannel{}, nil)
-		p := &publisher{
-			conn: mockConn,
-		}
-
-		err := p.Push(event)
-		assert.NoError(t, err)
-	})
-
-	t.Run("failed to publish", func(t *testing.T) {
-		mockConn := &fakeConnection{}
-		mockChan := &fakeChannel{}
-		mockChan.On("QueueDeclare", queueName, queueDurable, queueAutoDelete, queueExclusive, queueNoWait, queueArgs).Return(
-			nil, errors.New("failed to create queue"))
-		mockConn.On("Channel").Return(mockChan, nil)
-
-		p := &publisher{
-			conn: mockConn,
-		}
-
-		err := p.Push(event)
-		assert.NoError(t, err)
-	})
+	testEvent := "hello"
 
 	t.Run("success", func(t *testing.T) {
-		mockConn := &fakeConnection{}
-		mockConn.On("Channel").Return(&fakeChannel{}, nil)
-		p := &publisher{
+		mockChan := &mockChannel{}
+
+		mockChan.On("QueueDeclare", queueName, true, false, false, false, amqp.Table{
+			"x-single-active-consumer": true,
+		}).Return(amqp.Queue{Name: queueName}, nil)
+
+		mockChan.On("Publish", "", queueName, true, false, amqp.Publishing{
+			ContentType: "application/json",
+			Body:        []byte(`"hello"`),
+		}).Return(nil)
+
+		pub := &publisher{
+			channel:   mockChan,
+			queueName: queueName,
+		}
+
+		assert.NoError(t, pub.Push(testEvent))
+
+		mockChan.AssertExpectations(t)
+	})
+
+	t.Run("publish_failure", func(t *testing.T) {
+		mockChan := &mockChannel{}
+
+		mockChan.On("QueueDeclare", queueName, true, false, false, false, amqp.Table{
+			"x-single-active-consumer": true,
+		}).Return(amqp.Queue{Name: queueName}, nil)
+
+		mockChan.On("Publish", "", queueName, true, false, amqp.Publishing{
+			ContentType: "application/json",
+			Body:        []byte(`"hello"`),
+		}).Return(errors.New("test error"))
+
+		pub := &publisher{
+			channel:   mockChan,
+			queueName: queueName,
+		}
+
+		assert.EqualError(t, pub.Push(testEvent), "failed to publish rabbitmq message: test error")
+
+		mockChan.AssertExpectations(t)
+	})
+
+	t.Run("bad_event", func(t *testing.T) {
+		badType := make(chan int)
+		defer close(badType)
+		pub := &publisher{}
+
+		assert.EqualError(t, pub.Push(badType), "cannot marshal rabbitmq event: json: unsupported type: chan int")
+	})
+
+	t.Run("queue_declare_failure", func(t *testing.T) {
+		mockChan := &mockChannel{}
+
+		mockChan.On("QueueDeclare", queueName, true, false, false, false, amqp.Table{
+			"x-single-active-consumer": true,
+		}).Return(amqp.Queue{}, errors.New("test error"))
+
+		pub := &publisher{
+			channel:   mockChan,
+			queueName: queueName,
+		}
+
+		assert.EqualError(t, pub.Push(testEvent), "failed to declare rabbitmq queue: test error")
+
+		mockChan.AssertExpectations(t)
+	})
+}
+
+func TestPublisher_Close(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockConn := &mockConnection{}
+		mockConn.On("Close").Return(nil)
+		pub := &publisher{
 			conn: mockConn,
 		}
 
-		assert.NoError(t, p.Push(event))
+		assert.NoError(t, pub.Close())
+		mockConn.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockConn := &mockConnection{}
+		mockConn.On("Close").Return(errors.New("test failed to close connection"))
+		pub := &publisher{
+			conn: mockConn,
+		}
+
+		assert.EqualError(t, pub.Close(), "test failed to close connection")
+		mockConn.AssertExpectations(t)
+	})
+
+	t.Run("no_connection", func(t *testing.T) {
+		assert.NoError(t, (&publisher{}).Close())
 	})
 }

@@ -35,8 +35,8 @@ type publisher struct {
 	uri       string
 	queueName string
 
-	conn    AMQPConnection
-	channel AMQPChannel
+	conn    Connection
+	channel Channel
 	err     chan error
 }
 
@@ -79,7 +79,7 @@ func (p *publisher) Push(event interface{}) error {
 		queueArgs,
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to declare rabbitmq queue")
 	}
 
 	message := amqp.Publishing{
@@ -88,6 +88,13 @@ func (p *publisher) Push(event interface{}) error {
 	}
 	err = p.channel.Publish(amqpExchange, q.Name, publishMandatory, publishImmediate, message)
 	return errors.Wrap(err, "failed to publish rabbitmq message")
+}
+
+func (p *publisher) Close() error {
+	if p.conn != nil {
+		return p.conn.Close()
+	}
+	return nil
 }
 
 func (p *publisher) connect() error {
@@ -121,11 +128,4 @@ func (p *publisher) connect() error {
 	}
 
 	return fmt.Errorf("rabbitmq connection retry limit reached: %d", connectionRetryLimit)
-}
-
-func (p *publisher) Close() error {
-	if p.conn != nil {
-		return p.conn.Close()
-	}
-	return nil
 }
