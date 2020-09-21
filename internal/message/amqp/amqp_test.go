@@ -29,8 +29,6 @@ func (m *mockConnection) Channel() (Channel, error) {
 
 func (m *mockConnection) NotifyClose(receiver chan *amqp.Error) chan *amqp.Error {
 	return receiver
-	//args := m.Called(receiver)
-	//return args.Get(0).(chan *amqp.Error)
 }
 
 func (m *mockConnection) Close() error {

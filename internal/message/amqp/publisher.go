@@ -60,7 +60,7 @@ func (p *publisher) Push(event interface{}) error {
 		p.log.Info("attempting to reconnect to rabbitmq", "uri", p.uri)
 
 		if err := p.connect(); err != nil {
-			return err
+			return errors.Wrap(err, "could not reconnect to rabbitmq")
 		}
 	default:
 	}
