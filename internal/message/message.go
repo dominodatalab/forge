@@ -3,6 +3,8 @@ package message
 import (
 	"fmt"
 
+	"github.com/go-logr/logr"
+
 	"github.com/dominodatalab/forge/internal/message/amqp"
 )
 
@@ -17,15 +19,15 @@ var SupportedBrokers = []Broker{AmqpBroker}
 
 // Producer defines the operations required by all message producers.
 type Producer interface {
-	Publish(message interface{}) error
+	Push(message interface{}) error
 	Close() error
 }
 
 // NewProducer configures a new message producer using the provided options.
-func NewProducer(opts *Options) (Producer, error) {
+func NewProducer(opts *Options, log logr.Logger) (Producer, error) {
 	switch opts.Broker {
 	case AmqpBroker:
-		return amqp.NewProducer(opts.AmqpURI, opts.AmqpQueue)
+		return amqp.NewPublisher(opts.AmqpURI, opts.AmqpQueue, log)
 	default:
 		return nil, fmt.Errorf("%v is not supported", opts.Broker)
 	}
