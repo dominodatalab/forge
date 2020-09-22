@@ -1,7 +1,13 @@
 # Forge
 
-![CircleCI](https://img.shields.io/circleci/build/github/dominodatalab/forge?style=for-the-badge)
+[![CircleCI](https://circleci.com/gh/dominodatalab/forge.svg?style=shield)](https://app.circleci.com/pipelines/github/dominodatalab/forge)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dominodatalab/forge)](https://goreportcard.com/report/github.com/dominodatalab/forge)
+[![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/dominodatalab/forge)](https://pkg.go.dev/mod/github.com/dominodatalab/forge)
 
+Forge is a Kubernetes controller designed to securely build OCI-compliant images
+inside a cluster and push them to one or more target registries. This project
+was derived from the work done in the [img][img] project and extended to support
+build dispatch via a [custom resource definition][crd].
 
 ### Preparer Plugins
 
@@ -25,3 +31,6 @@ Cleanup runs after the build has finished (successfully or otherwise).
 #### Using
 
 To add a new runtime plugin for Forge, place a file in `/usr/local/share/forge/plugins/` (by default) or specify it with `--preparer-plugins-path`.
+
+[img]: https://github.com/genuinetools/img
+[crd]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/
