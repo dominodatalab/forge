@@ -37,7 +37,7 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/cobra v1.0.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.0
 	go.etcd.io/bbolt v1.3.3
 	go.uber.org/zap v1.12.0
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
