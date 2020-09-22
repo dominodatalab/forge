@@ -40,12 +40,13 @@ type publisher struct {
 	err     chan error
 }
 
-func NewPublisher(uri, name string, logger logr.Logger) (*publisher, error) {
+// NewPublisher creates a new AMQP publisher that targets a specific broker uri and queue.
+func NewPublisher(uri, queueName string, logger logr.Logger) (*publisher, error) {
 	p := &publisher{
-		log:       logger.WithName("MessagePublisher"),
 		uri:       uri,
-		queueName: name,
+		queueName: queueName,
 		err:       make(chan error),
+		log:       logger.WithName("MessagePublisher"),
 	}
 
 	if err := p.connect(); err != nil {
@@ -54,7 +55,12 @@ func NewPublisher(uri, name string, logger logr.Logger) (*publisher, error) {
 	return p, nil
 }
 
-func (p *publisher) Push(event interface{}) error {
+// Push will marshal the provided object into a JSON message, ensure the target queue has been created, and push the
+// message onto it.
+//
+// In the event that the underlying connection was closed after publisher creation, this function will attempt to
+// reconnection to the AMQP broker before performing these operations.
+func (p *publisher) Push(obj interface{}) error {
 	select {
 	case <-p.err:
 		p.log.Info("attempting to reconnect to rabbitmq", "uri", p.uri)
@@ -65,7 +71,7 @@ func (p *publisher) Push(event interface{}) error {
 	default:
 	}
 
-	data, err := json.Marshal(event)
+	data, err := json.Marshal(obj)
 	if err != nil {
 		return errors.Wrap(err, "cannot marshal rabbitmq event")
 	}
@@ -90,6 +96,8 @@ func (p *publisher) Push(event interface{}) error {
 	return errors.Wrap(err, "failed to publish rabbitmq message")
 }
 
+// Close will close the underlying AMQP connection if one has been set, and this operation will cascade down to any
+// channels created under this connection.
 func (p *publisher) Close() error {
 	if p.conn != nil {
 		return p.conn.Close()
@@ -97,6 +105,7 @@ func (p *publisher) Close() error {
 	return nil
 }
 
+// implements retry logic with delays for establishing AMQP connections.
 func (p *publisher) connect() error {
 	ticker := time.NewTicker(connectionRetryDelay)
 	defer ticker.Stop()
