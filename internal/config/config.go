@@ -23,14 +23,16 @@ type Registry struct {
 }
 
 type BuildOptions struct {
-	ContextURL     string
-	ImageName      string
-	ImageSizeLimit uint64
-	Labels         map[string]string
-	BuildArgs      []string
-	NoCache        bool
-	Timeout        time.Duration
-	Registries     []Registry
-	PushRegistries []string
-	PluginData     map[string]string
+	ContextURL              string
+	ImageName               string
+	ImageSizeLimit          uint64
+	Labels                  map[string]string
+	BuildArgs               []string
+	DisableBuildCache       bool
+	DisableLayerCacheExport bool
+	Timeout                 time.Duration
+	Registries              []Registry
+	PushRegistries          []string
+	PluginData              map[string]string
+	CacheFrom               []string
 }

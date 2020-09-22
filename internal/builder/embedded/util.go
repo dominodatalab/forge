@@ -37,46 +37,48 @@ func solveRequestWithContext(sessionID string, image string, cacheImageLayers bo
 		ExporterAttrs: map[string]string{
 			"name": image,
 		},
+		Cache: controlapi.CacheOptions{},
 	}
+
+	imageName, err := reference.ParseNormalizedNamed(image)
+	if err != nil {
+		return nil, err
+	}
+	cacheTaggedName, err := reference.WithTag(imageName, cacheTag)
+	if err != nil {
+		return nil, err
+	}
+	cacheTagRef := cacheTaggedName.String()
 
 	if cacheImageLayers {
-		imageName, err := reference.ParseNormalizedNamed(image)
-		if err != nil {
-			return nil, err
-		}
-		cacheTaggedName, err := reference.WithTag(imageName, cacheTag)
-		if err != nil {
-			return nil, err
-		}
-		cacheTagRef := cacheTaggedName.String()
+		if !opts.DisableLayerCacheExport {
+			cacheMode, err := getExportMode()
+			if err != nil {
+				return nil, err
+			}
 
-		cacheMode, err := getExportMode()
-		if err != nil {
-			return nil, err
-		}
+			req.Cache.Exports = []*controlapi.CacheOptionsEntry{{
+				Type: "registry",
+				Attrs: map[string]string{
+					"mode": cacheMode,
+					"ref":  cacheTagRef,
+				},
+			}}
 
-		registryExport := &controlapi.CacheOptionsEntry{
-			Type: "registry",
-			Attrs: map[string]string{
-				"mode": cacheMode,
-				"ref":  cacheTagRef,
-			},
-		}
-		registryImport := &controlapi.CacheOptionsEntry{
-			Type: "registry",
-			Attrs: map[string]string{
-				"ref": cacheTagRef,
-			},
+			req.FrontendAttrs["cache-from"] = cacheTagRef
 		}
 
-		req.Cache = controlapi.CacheOptions{
-			Exports: []*controlapi.CacheOptionsEntry{registryExport},
-			Imports: []*controlapi.CacheOptionsEntry{registryImport},
+		if !opts.DisableBuildCache {
+			req.Cache.Imports = []*controlapi.CacheOptionsEntry{{
+				Type: "registry",
+				Attrs: map[string]string{
+					"ref": cacheTagRef,
+				},
+			}}
 		}
-		req.FrontendAttrs["cache-from"] = cacheTagRef
 	}
 
-	if opts.NoCache {
+	if opts.DisableBuildCache {
 		req.FrontendAttrs["no-cache"] = ""
 	}
 

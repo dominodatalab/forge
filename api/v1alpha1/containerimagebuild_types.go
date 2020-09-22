@@ -97,10 +97,6 @@ type ContainerImageBuildSpec struct {
 	// +kubebuilder:validation:Optional
 	Labels map[string]string `json:"labels"`
 
-	// Disable the use of cache layers for a build.
-	// +kubebuilder:validation:Optional
-	NoCache bool `json:"noCache"`
-
 	// Limits build cpu consumption.
 	// +kubebuilder:validation:Optional
 	CPU string `json:"cpu"`
@@ -121,6 +117,14 @@ type ContainerImageBuildSpec struct {
 	// Provide arbitrary data for use in plugins that extend default capabilities.
 	// +kubebuilder:validation:Optional
 	PluginData map[string]string `json:"pluginData"`
+
+	// Disable the use of layer caches during build.
+	// +kubebuilder:validation:Optional
+	DisableBuildCache bool `json:"disableBuildCache"`
+
+	// Disable export of layer cache when it is enabled.
+	// +kubebuilder:validation:Optional
+	DisableLayerCacheExport bool `json:"disableLayerCacheExport"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
