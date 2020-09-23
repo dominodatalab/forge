@@ -64,7 +64,7 @@ func (j *Job) updateStatus(cib *apiv1alpha1.ContainerImageBuild) (*apiv1alpha1.C
 			ImageURLs:     cib.Status.ImageURLs,
 			ErrorMessage:  cib.Status.ErrorMessage,
 		}
-		if err := j.producer.Publish(update); err != nil {
+		if err := j.producer.Push(update); err != nil {
 			return nil, errors.Wrap(err, "unable to publish message")
 		}
 	}

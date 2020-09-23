@@ -66,7 +66,7 @@ func New(cfg Config) (*Job, error) {
 	if cfg.BrokerOpts != nil {
 		log.Info("Initializing status update message publisher")
 
-		if producer, err = message.NewProducer(cfg.BrokerOpts); err != nil {
+		if producer, err = message.NewProducer(cfg.BrokerOpts, log); err != nil {
 			return nil, err
 		}
 		cleanupSteps = append(cleanupSteps, func() {
