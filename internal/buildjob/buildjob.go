@@ -167,16 +167,17 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.Contain
 	}
 
 	opts := &config.BuildOptions{
-		ContextURL:     cib.Spec.Context,
-		ImageName:      cib.Spec.ImageName,
-		ImageSizeLimit: cib.Spec.ImageSizeLimit,
-		Labels:         cib.Spec.Labels,
-		BuildArgs:      cib.Spec.BuildArgs,
-		NoCache:        cib.Spec.NoCache,
-		PushRegistries: cib.Spec.PushRegistries,
-		PluginData:     cib.Spec.PluginData,
-		Timeout:        time.Duration(cib.Spec.TimeoutSeconds) * time.Second,
-		Registries:     registries,
+		ContextURL:              cib.Spec.Context,
+		ImageName:               cib.Spec.ImageName,
+		ImageSizeLimit:          cib.Spec.ImageSizeLimit,
+		Labels:                  cib.Spec.Labels,
+		BuildArgs:               cib.Spec.BuildArgs,
+		DisableBuildCache:       cib.Spec.DisableBuildCache,
+		DisableLayerCacheExport: cib.Spec.DisableLayerCacheExport,
+		PushRegistries:          cib.Spec.PushRegistries,
+		PluginData:              cib.Spec.PluginData,
+		Timeout:                 time.Duration(cib.Spec.TimeoutSeconds) * time.Second,
+		Registries:              registries,
 	}
 	return opts, nil
 }

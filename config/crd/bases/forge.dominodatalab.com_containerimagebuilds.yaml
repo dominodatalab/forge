@@ -65,6 +65,12 @@ spec:
             cpu:
               description: Limits build cpu consumption.
               type: string
+            disableBuildCache:
+              description: Disable the use of layer caches during build.
+              type: boolean
+            disableLayerCacheExport:
+              description: Disable export of layer cache when it is enabled.
+              type: boolean
             imageName:
               description: Name used to build an image.
               minLength: 1
@@ -82,9 +88,6 @@ spec:
             memory:
               description: Limits build memory consumption.
               type: string
-            noCache:
-              description: Disable the use of cache layers for a build.
-              type: boolean
             pluginData:
               additionalProperties:
                 type: string
