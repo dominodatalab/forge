@@ -73,11 +73,7 @@ func deleteCRD(logger logr.Logger, crdClient apixv1beta1client.CustomResourceDef
 	}
 
 	logger.Info("Deleting CRD", "name", crd.Name)
-	if err := crdClient.Delete(crd.Name, &metav1.DeleteOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	return crdClient.Delete(crd.Name, &metav1.DeleteOptions{})
 }
 
 func getCRDClient() (apixv1beta1client.CustomResourceDefinitionInterface, error) {
