@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"github.com/go-logr/logr"
 	"github.com/markbates/pkger"
 	apixv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apixv1beta1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
@@ -15,9 +16,7 @@ import (
 	"github.com/dominodatalab/forge/internal/kubernetes"
 )
 
-const (
-	crdFilename = "github.com/dominodatalab/forge:/config/crd/bases/forge.dominodatalab.com_containerimagebuilds.yaml"
-)
+const crdFilename = "github.com/dominodatalab/forge:/config/crd/bases/forge.dominodatalab.com_containerimagebuilds.yaml"
 
 func Apply() error {
 	logger := zap.New()
@@ -28,9 +27,11 @@ func Apply() error {
 		return err
 	}
 
-	logger.Info("Loading existing CRD (if it exists)")
+	return createOrUpdateCRD(logger, crdClient)
+}
 
-	crd, err := loadCRD()
+func createOrUpdateCRD(logger logr.Logger, crdClient apixv1beta1client.CustomResourceDefinitionInterface) error {
+	crd, err := loadCRD(logger)
 	if err != nil {
 		return err
 	}
@@ -62,15 +63,16 @@ func Delete() error {
 		return err
 	}
 
-	logger.Info("Loading existing CRD")
+	return deleteCRD(logger, crdClient)
+}
 
-	crd, err := loadCRD()
+func deleteCRD(logger logr.Logger, crdClient apixv1beta1client.CustomResourceDefinitionInterface) error {
+	crd, err := loadCRD(logger)
 	if err != nil {
 		return err
 	}
 
 	logger.Info("Deleting CRD", "name", crd.Name)
-
 	if err := crdClient.Delete(crd.Name, &metav1.DeleteOptions{}); err != nil {
 		return err
 	}
@@ -92,20 +94,22 @@ func getCRDClient() (apixv1beta1client.CustomResourceDefinitionInterface, error)
 	return crdClient, nil
 }
 
-func loadCRD() (*apixv1beta1.CustomResourceDefinition, error) {
+func loadCRD(logger logr.Logger) (*apixv1beta1.CustomResourceDefinition, error) {
+	logger.Info("Loading existing CRD", "filename", crdFilename)
+
 	crdFile, err := pkger.Open(crdFilename)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	yBytes, err := ioutil.ReadAll(crdFile)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	crdTmpl, err := yaml.YAMLToJSON(yBytes)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	crd := &apixv1beta1.CustomResourceDefinition{}
