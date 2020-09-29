@@ -23,6 +23,7 @@ require (
 	github.com/h2non/filetype v1.0.12
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v1.3.0
+	github.com/markbates/pkger v0.17.1
 	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/moby/buildkit v0.7.2
 	github.com/newrelic/go-agent/v3 v3.9.0
@@ -44,8 +45,10 @@ require (
 	golang.org/x/tools v0.0.0-20200901173145-80e1b0398e67 // indirect
 	google.golang.org/grpc v1.27.1
 	k8s.io/api v0.17.2
+	k8s.io/apiextensions-apiserver v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
 	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/controller-runtime v0.5.0
+	sigs.k8s.io/yaml v1.1.0
 )

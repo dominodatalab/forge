@@ -182,6 +182,8 @@ github.com/evanphx/json-patch
 github.com/go-logr/logr
 # github.com/go-logr/zapr v0.1.0
 github.com/go-logr/zapr
+# github.com/gobuffalo/here v0.6.0
+github.com/gobuffalo/here
 # github.com/gofrs/flock v0.7.0
 github.com/gofrs/flock
 # github.com/gogo/googleapis v1.3.2
@@ -257,6 +259,14 @@ github.com/jmespath/go-jmespath
 github.com/json-iterator/go
 # github.com/konsorten/go-windows-terminal-sequences v1.0.2
 github.com/konsorten/go-windows-terminal-sequences
+# github.com/markbates/pkger v0.17.1
+github.com/markbates/pkger
+github.com/markbates/pkger/here
+github.com/markbates/pkger/internal/maps
+github.com/markbates/pkger/pkging
+github.com/markbates/pkger/pkging/embed
+github.com/markbates/pkger/pkging/mem
+github.com/markbates/pkger/pkging/stdos
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mitchellh/go-testing-interface v0.0.0-20171004221916-a61a99592b77
@@ -642,7 +652,7 @@ gopkg.in/fsnotify.v1
 gopkg.in/inf.v0
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
-# gopkg.in/yaml.v2 v2.2.4
+# gopkg.in/yaml.v2 v2.2.7
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 gopkg.in/yaml.v3

@@ -7,8 +7,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
@@ -38,18 +36,4 @@ func logError(log logr.Logger, err error) {
 
 	log.Info(strings.Repeat("=", 70))
 	log.Info(fmt.Sprintf("Error during image build and push: %s", cause.Error()))
-}
-
-// set up standard and custom k8s clients
-func loadKubernetesConfig() (*rest.Config, error) {
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		clientcmd.NewDefaultClientConfigLoadingRules(),
-		&clientcmd.ConfigOverrides{},
-	)
-
-	if cfg, err := kubeconfig.ClientConfig(); err == nil {
-		return cfg, nil
-	}
-
-	return rest.InClusterConfig()
 }

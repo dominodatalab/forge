@@ -20,3 +20,6 @@ bin/
 
 # Ignore custom root CA files generated during testing
 e2e/rootCA.*
+
+# pkger
+pkged.go

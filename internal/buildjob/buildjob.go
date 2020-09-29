@@ -18,6 +18,7 @@ import (
 	clientv1alpha1 "github.com/dominodatalab/forge/internal/clientset/v1alpha1"
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
+	forgek8s "github.com/dominodatalab/forge/internal/kubernetes"
 	"github.com/dominodatalab/forge/internal/message"
 	"github.com/dominodatalab/forge/plugins/preparer"
 )
@@ -46,7 +47,7 @@ func New(cfg Config) (*Job, error) {
 	// initialize kubernetes clients
 	log.Info("Initializing Kubernetes clients")
 
-	restCfg, err := loadKubernetesConfig()
+	restCfg, err := forgek8s.LoadKubernetesConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot load k8s config")
 	}

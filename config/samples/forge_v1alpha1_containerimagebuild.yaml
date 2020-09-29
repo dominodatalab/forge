@@ -10,8 +10,11 @@ spec:
   # remote context can either be a .tar or .tgz file
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/multi-stage-app.tgz
 
-  # disable the cache if necessary
-  noCache: false
+  # disable the build cache if necessary
+  disableBuildCache: false
+
+  # disable the export cache if necessary
+  disableLayerCacheExport: false
 
   # metadata attached to image during build
   labels:

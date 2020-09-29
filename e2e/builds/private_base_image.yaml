@@ -5,7 +5,7 @@ metadata:
 spec:
   imageName: variable-base-app
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/variable-base-app.tgz
-  noCache: true
+  disableBuildCache: true
   buildArgs:
     - base=docker-registry:5000/simple-app:latest
   pushTo:
