@@ -15,8 +15,6 @@ import (
 	"github.com/dominodatalab/forge/internal/kubernetes"
 )
 
-var crdTmpl []byte
-
 const (
 	crdFilename = "github.com/dominodatalab/forge:/config/crd/bases/forge.dominodatalab.com_containerimagebuilds.yaml"
 )
@@ -105,7 +103,7 @@ func loadCRD() (*apixv1beta1.CustomResourceDefinition, error) {
 		panic(err)
 	}
 
-	crdTmpl, err = yaml.YAMLToJSON(yBytes)
+	crdTmpl, err := yaml.YAMLToJSON(yBytes)
 	if err != nil {
 		panic(err)
 	}

@@ -10,10 +10,8 @@ var (
 	applyCrdCmd = &cobra.Command{
 		Use:   "crd-apply",
 		Short: "Apply the ContainerImageBuild CRD to a cluster",
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := crd.Apply(); err != nil {
-				panic(err)
-			}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return crd.Apply()
 		},
 	}
 
