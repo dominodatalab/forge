@@ -5,7 +5,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// set up standard and custom k8s clients
+// LoadKubernetesConfig returns the canonical kubernetes config for use with a client
 func LoadKubernetesConfig() (*rest.Config, error) {
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
