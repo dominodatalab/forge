@@ -132,7 +132,7 @@ helm install rabbitmq bitnami/rabbitmq \
   --wait
 
 info "Installing forge CRDs"
-kubectl apply -k config/crd
+docker run --rm -it -v "$KUBECONFIG:/kubeconfig" -e KUBECONFIG=/kubeconfig "$image" crd-apply
 
 info "Launching Forge controller: $image"
 pushd config/controller
