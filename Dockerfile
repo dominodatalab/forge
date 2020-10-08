@@ -53,6 +53,7 @@ RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
 
 FROM base
+ARG ISTIO_GID=1337
 
 RUN apk add --no-cache fuse3 git pigz
 
@@ -67,12 +68,12 @@ COPY --from=forge /usr/bin/forge /usr/bin/forge
 
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
 RUN adduser -D -u 1000 user && \
-    addgroup -S -g 1337 istio && \
+    addgroup -S -g $ISTIO_GID istio && \
     addgroup user istio && \
     mkdir -p /run/user/1000 && \
     chown -R user /run/user/1000 /home/user && \
     echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid && \
-    echo user:1337:1 >> /etc/subgid
+    echo user:$ISTIO_GID:1 >> /etc/subgid
 
 USER 1000
 ENV USER user
