@@ -15,6 +15,13 @@ spec:
         app.kubernetes.io/name: forge
     spec:
       serviceAccountName: forge
+      initContainers:
+        - name: apply-crd
+          image: quay.io/domino/forge:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - crd-apply
+      terminationGracePeriodSeconds: 10
       containers:
         - name: controller
           image: quay.io/domino/forge:latest

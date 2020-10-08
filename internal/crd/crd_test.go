@@ -14,7 +14,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-var logger = zapr.NewLogger(zap.NewNop())
+func init() {
+	logger = zapr.NewLogger(zap.NewNop())
+}
 
 func TestCreateCRD(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
@@ -71,7 +73,7 @@ func TestUpdateCRD(t *testing.T) {
 func TestApplyCRDError(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 
-	expected := apierrors.NewInternalError(errors.New("thsi is an error"))
+	expected := apierrors.NewInternalError(errors.New("this is an error"))
 	fakeClient.PrependReactor("get", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		return true, nil, expected
 	})
@@ -100,5 +102,17 @@ func TestDeleteCRD(t *testing.T) {
 
 	if !deleted {
 		t.Errorf("Existing CRD was not deleted")
+	}
+}
+
+func TestDeleteCRDError(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	expected := apierrors.NewInternalError(errors.New("this is an error"))
+	fakeClient.PrependReactor("delete", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, expected
+	})
+
+	if err := deleteCRD(logger, fakeClient.ApiextensionsV1beta1().CustomResourceDefinitions()); err == nil || err != expected {
+		t.Errorf("Received error %v did not match %v", err, expected)
 	}
 }

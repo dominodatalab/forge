@@ -18,8 +18,9 @@ import (
 
 const crdFilename = "github.com/dominodatalab/forge:/config/crd/bases/forge.dominodatalab.com_containerimagebuilds.yaml"
 
+var logger = zap.New()
+
 func Apply() error {
-	logger := zap.New()
 	logger.Info("Initializing Kubernetes CRD client")
 
 	crdClient, err := getCRDClient()
@@ -55,7 +56,6 @@ func createOrUpdateCRD(logger logr.Logger, crdClient apixv1beta1client.CustomRes
 }
 
 func Delete() error {
-	logger := zap.New()
 	logger.Info("Initializing Kubernetes CRD client")
 
 	crdClient, err := getCRDClient()
