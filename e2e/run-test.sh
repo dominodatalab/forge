@@ -131,9 +131,6 @@ helm install rabbitmq bitnami/rabbitmq \
   --namespace "$namespace" \
   --wait
 
-info "Installing forge CRDs"
-kubectl apply -k config/crd
-
 info "Launching Forge controller: $image"
 pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"

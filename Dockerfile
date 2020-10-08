@@ -42,10 +42,12 @@ RUN make static BUILDTAGS="seccomp apparmor" && \
     cp runc /usr/bin/
 
 FROM gobase AS forge
+RUN go get github.com/markbates/pkger/cmd/pkger
 WORKDIR /forge
 COPY go.mod go.sum ./
 COPY vendor vendor
 COPY . .
+RUN pkger
 ARG BUILD_FLAGS
 RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
