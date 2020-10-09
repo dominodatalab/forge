@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -360,7 +362,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
-							Command:         []string{rootlesskitCommand},
+							Command:         []string{"/bin/sh"},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
@@ -397,7 +399,15 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		args = append(args, bs...)
 	}
 
-	return args
+	if !r.JobConfig.GrantFullPrivilege {
+		args = append([]string{rootlesskitCommand}, args...)
+	}
+
+	if _, found := os.LookupEnv("ISTIO_ENABLED"); found {
+		args = append(args, "\n wget -qO- --post-data \"\" http://localhost:15020/quitquitquit")
+	}
+
+	return append([]string{"-c"}, strings.Join(args, " "))
 }
 
 // checks if runtime object exists. if it does not exist, ownership is assigned to a container image build resource and

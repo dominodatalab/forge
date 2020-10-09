@@ -55,7 +55,7 @@ RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
 FROM base
 ARG ISTIO_GID=1337
 
-RUN apk add --no-cache fuse3 git pigz
+RUN apk add --no-cache fuse3 git pigz wget
 
 ARG ROOTLESSKIT_VERSION=v0.10.0
 RUN wget -qO - https://github.com/rootless-containers/rootlesskit/releases/download/$ROOTLESSKIT_VERSION/rootlesskit-x86_64.tar.gz | tar -xz -C /usr/bin
