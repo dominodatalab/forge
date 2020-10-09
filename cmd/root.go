@@ -70,6 +70,7 @@ var (
 	buildJobSecurityContextConstraints string
 	buildJobGrantFullPrivilege         bool
 	buildAdvancedConfigFilename        string
+	buildJobIstioSupport               bool
 
 	namespace            string
 	metricsAddr          string
@@ -114,6 +115,7 @@ var (
 					EnvVar:                     advCfg.Env,
 					Volumes:                    advCfg.Volumes,
 					VolumeMounts:               advCfg.VolumeMounts,
+					EnableIstioSupport:         buildJobIstioSupport,
 				},
 			}
 			controllers.StartManager(cfg)
@@ -180,6 +182,7 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")
 	rootCmd.Flags().BoolVar(&buildJobGrantFullPrivilege, "build-job-full-privilege", false, "Run builds jobs using a privileged root user")
 	rootCmd.Flags().StringVar(&buildAdvancedConfigFilename, "build-job-advanced-config", "", "Add volumes, volume mounts and environment variables to your build jobs using a JSON file")
+	rootCmd.Flags().BoolVar(&buildJobIstioSupport, "build-job-enable-istio-support", false, "Modifies build job resources to support Istio sidecars")
 	rootCmd.Flags().DurationVar(&gcInterval, "gc-interval", 30*time.Minute, "Run ContainerImageBuild cleanup operation according to this interval. Set to 0 to disable")
 	rootCmd.Flags().IntVar(&gcMaxKeepCount, "gc-max-keep", 5, "Delete all ContainerImageBuild resources in a 'finished' state that exceed this count")
 

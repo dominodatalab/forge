@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -403,7 +402,7 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		args = append([]string{rootlesskitCommand}, args...)
 	}
 
-	if _, found := os.LookupEnv("ISTIO_ENABLED"); found {
+	if r.JobConfig.EnableIstioSupport {
 		args = append(args, "\n wget -qO- --post-data \"\" http://localhost:15020/quitquitquit")
 	}
 
