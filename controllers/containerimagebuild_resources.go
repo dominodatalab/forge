@@ -403,7 +403,7 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 	}
 
 	if r.JobConfig.EnableIstioSupport {
-		args = append(args, "\n wget -qO- --post-data \"\" http://localhost:15020/quitquitquit")
+		args = append(args, "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE")
 	}
 
 	return append([]string{"-c"}, strings.Join(args, " "))
