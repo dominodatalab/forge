@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/internal/message"
 )
 
 func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
@@ -83,6 +85,56 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 			job := &batchv1.Job{}
 			require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: tc.cib.Name}, job))
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Resources, tc.resources)
+		})
+	}
+}
+
+func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
+	tests := []struct {
+		name      string
+		jobConfig *BuildJobConfig
+		want      string
+	}{
+		{
+			name:      "rootless",
+			jobConfig: &BuildJobConfig{},
+			want:      "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false",
+		},
+		{
+			name:      "privileged",
+			jobConfig: &BuildJobConfig{GrantFullPrivilege: true},
+			want:      "/usr/bin/forge build --resource=test-cib --enable-layer-caching=false",
+		},
+		{
+			name:      "istio",
+			jobConfig: &BuildJobConfig{EnableIstioSupport: true},
+			want:      "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false \nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE",
+		},
+		{
+			name: "broker opts",
+			jobConfig: &BuildJobConfig{BrokerOpts: &message.Options{
+				Broker:    "my-broker",
+				AmqpURI:   "amqp://uri:5672",
+				AmqpQueue: "my-queue",
+			}},
+			want: "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false --message-broker=my-broker --amqp-queue=my-queue --amqp-uri=amqp://uri:5672",
+		},
+		{
+			name:      "preparer plugins path",
+			jobConfig: &BuildJobConfig{PreparerPluginPath: "/path/to/plugins"},
+			want:      "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false --preparer-plugins-path=/path/to/plugins",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ContainerImageBuildReconciler{
+				JobConfig: tt.jobConfig,
+			}
+			if got := r.prepareJobArgs(&forgev1alpha1.ContainerImageBuild{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cib"},
+			}); !reflect.DeepEqual(got, []string{"-c", tt.want}) {
+				t.Errorf("prepareJobArgs() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

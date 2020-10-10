@@ -385,7 +385,10 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		"build",
 		fmt.Sprintf("--resource=%s", cib.Name),
 		fmt.Sprintf("--enable-layer-caching=%t", r.JobConfig.EnableLayerCaching),
-		fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath),
+	}
+
+	if r.JobConfig.PreparerPluginPath != "" {
+		args = append(args, fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath))
 	}
 
 	if r.JobConfig.BrokerOpts != nil {
