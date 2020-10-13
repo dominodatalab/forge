@@ -53,8 +53,9 @@ RUN make static BUILD_FLAGS="$BUILD_FLAGS" && \
     mv bin/forge /usr/bin/
 
 FROM base
+ARG ISTIO_GID=1337
 
-RUN apk add --no-cache fuse3 git pigz
+RUN apk add --no-cache fuse3 git pigz wget
 
 ARG ROOTLESSKIT_VERSION=v0.10.0
 RUN wget -qO - https://github.com/rootless-containers/rootlesskit/releases/download/$ROOTLESSKIT_VERSION/rootlesskit-x86_64.tar.gz | tar -xz -C /usr/bin
@@ -67,9 +68,12 @@ COPY --from=forge /usr/bin/forge /usr/bin/forge
 
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
 RUN adduser -D -u 1000 user && \
+    addgroup -S -g $ISTIO_GID istio && \
+    addgroup user istio && \
     mkdir -p /run/user/1000 && \
     chown -R user /run/user/1000 /home/user && \
-    echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
+    echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid && \
+    echo user:$ISTIO_GID:1 >> /etc/subgid
 
 USER 1000
 ENV USER user

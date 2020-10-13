@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -360,7 +361,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
-							Command:         []string{rootlesskitCommand},
+							Command:         []string{"/bin/sh"},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,
 							SecurityContext: secCtx,
@@ -384,7 +385,10 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		"build",
 		fmt.Sprintf("--resource=%s", cib.Name),
 		fmt.Sprintf("--enable-layer-caching=%t", r.JobConfig.EnableLayerCaching),
-		fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath),
+	}
+
+	if r.JobConfig.PreparerPluginPath != "" {
+		args = append(args, fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath))
 	}
 
 	if r.JobConfig.BrokerOpts != nil {
@@ -397,7 +401,15 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		args = append(args, bs...)
 	}
 
-	return args
+	if !r.JobConfig.GrantFullPrivilege {
+		args = append([]string{rootlesskitCommand}, args...)
+	}
+
+	if r.JobConfig.EnableIstioSupport {
+		args = append(args, "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE")
+	}
+
+	return append([]string{"-c"}, strings.Join(args, " "))
 }
 
 // checks if runtime object exists. if it does not exist, ownership is assigned to a container image build resource and
