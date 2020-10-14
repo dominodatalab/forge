@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/dominodatalab/forge/controllers"
 	"github.com/dominodatalab/forge/internal/config"
-	"github.com/dominodatalab/forge/internal/message"
 )
 
 const (
@@ -75,21 +73,16 @@ var (
 	namespace            string
 	metricsAddr          string
 	enableLeaderElection bool
-	messageBroker        string
-	amqpURI              string
-	amqpQueue            string
 	preparerPluginsPath  string
 	enableLayerCaching   bool
-	brokerOpts           *message.Options
 
 	advCfg = &advancedConfig{}
 
 	rootCmd = &cobra.Command{
-		Use:               "forge",
-		Long:              description,
-		Example:           examples,
-		PreRunE:           processAdvancedConfig,
-		PersistentPreRunE: processBrokerOpts,
+		Use:     "forge",
+		Long:    description,
+		Example: examples,
+		PreRunE: processAdvancedConfig,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := controllers.ControllerConfig{
 				Debug:                debug,
@@ -111,7 +104,6 @@ var (
 					SecurityContextConstraints: buildJobSecurityContextConstraints,
 					GrantFullPrivilege:         buildJobGrantFullPrivilege,
 					EnableLayerCaching:         enableLayerCaching,
-					BrokerOpts:                 brokerOpts,
 					EnvVar:                     advCfg.Env,
 					Volumes:                    advCfg.Volumes,
 					VolumeMounts:               advCfg.VolumeMounts,
@@ -151,19 +143,6 @@ func processAdvancedConfig(cmd *cobra.Command, args []string) error {
 	return dec.Decode(advCfg)
 }
 
-func processBrokerOpts(cmd *cobra.Command, args []string) error {
-	if messageBroker == "" {
-		return nil
-	}
-
-	brokerOpts = &message.Options{
-		Broker:    message.Broker(strings.ToLower(messageBroker)),
-		AmqpURI:   amqpURI,
-		AmqpQueue: amqpQueue,
-	}
-	return message.ValidateOpts(brokerOpts)
-}
-
 func init() {
 	rootCmd.Flags().SortFlags = false
 
@@ -187,9 +166,6 @@ func init() {
 	rootCmd.Flags().IntVar(&gcMaxKeepCount, "gc-max-keep", 5, "Delete all ContainerImageBuild resources in a 'finished' state that exceed this count")
 
 	// leveraged by both main and build commands
-	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
-	rootCmd.PersistentFlags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
-	rootCmd.PersistentFlags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
 	rootCmd.PersistentFlags().StringVar(&preparerPluginsPath, "preparer-plugins-path", path.Join(config.GetStateDir(), "plugins"), "Path to specific preparer plugins or directory to load them from")
 	rootCmd.PersistentFlags().BoolVar(&enableLayerCaching, "enable-layer-caching", false, "Enable image layer caching")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enabled verbose logging")

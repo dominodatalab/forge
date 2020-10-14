@@ -35,7 +35,6 @@ var (
 			cfg := buildjob.Config{
 				ResourceName:        resourceName,
 				ResourceNamespace:   resourceNamespace,
-				BrokerOpts:          brokerOpts,
 				PreparerPluginsPath: preparerPluginsPath,
 				EnableLayerCaching:  enableLayerCaching,
 				Debug:               debug,

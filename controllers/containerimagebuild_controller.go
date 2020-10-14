@@ -37,7 +37,6 @@ type BuildJobConfig struct {
 	EnableLayerCaching         bool
 	PodSecurityPolicy          string
 	SecurityContextConstraints string
-	BrokerOpts                 *message.Options
 	Volumes                    []corev1.Volume
 	VolumeMounts               []corev1.VolumeMount
 	EnvVar                     []corev1.EnvVar
@@ -62,12 +61,11 @@ type ControllerConfig struct {
 type ContainerImageBuildReconciler struct {
 	client.Client
 	*kubernetes.Clientset
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
 
-	NewRelic *newrelic.Application
-
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
+	NewRelic  *newrelic.Application
 	JobConfig *BuildJobConfig
 }
 
@@ -139,6 +137,11 @@ func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	if err := r.Get(ctx, req.NamespacedName, build); err != nil {
 		log.Error(err, "Unable to find resource")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// NOTE: we should really be performing validation in a webhook
+	if err := r.validate(build); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if build.DeletionTimestamp != nil {
@@ -225,4 +228,16 @@ func (r *ContainerImageBuildReconciler) RunGC(retentionCount int) {
 		log.Info("Deleted build", "name", build.Name, "namespace", build.Namespace)
 	}
 	log.Info("Cleanup complete")
+}
+
+func (r *ContainerImageBuildReconciler) validate(cib *forgev1alpha1.ContainerImageBuild) error {
+	if cib.Spec.Messaging == nil {
+		return nil
+	}
+
+	return message.ValidateOpts(&message.Options{
+		Broker:    cib.Spec.Messaging.MessageBroker,
+		AmqpURI:   cib.Spec.Messaging.AMQPURI,
+		AmqpQueue: cib.Spec.Messaging.AMQPQueueName,
+	})
 }

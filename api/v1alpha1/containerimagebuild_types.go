@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/dominodatalab/forge/internal/message"
 )
 
 // BasicAuthConfig contains credentials either inline or a reference to a dockerconfigjson secret.
@@ -72,7 +74,19 @@ type Registry struct {
 	DynamicCloudCredentials bool `json:"dynamicCloudCredentials"`
 }
 
-// ContainerImageBuildSpec defines the desired state of ContainerImageBuild
+// ContainerImageBuildMessaging controls the parameters used to send build status updates over a message bus.
+type ContainerImageBuildMessaging struct {
+	// MessageBroker indicates the message bus implementation.
+	MessageBroker message.Broker `json:"broker"`
+
+	// AMQPURI designates the AMQP broker connection URI.
+	AMQPURI string `json:"amqpURI"`
+
+	// AMQPQueueName designates the AMQP broker queue name.
+	AMQPQueueName string `json:"amqpQueueName"`
+}
+
+// ContainerImageBuildSpec defines the desired state of ContainerImageBuild.
 type ContainerImageBuildSpec struct {
 	// Name used to build an image.
 	// +kubebuilder:validation:MinLength=1
@@ -125,9 +139,13 @@ type ContainerImageBuildSpec struct {
 	// Disable export of layer cache when it is enabled.
 	// +kubebuilder:validation:Optional
 	DisableLayerCacheExport bool `json:"disableLayerCacheExport"`
+
+	// Publish resource state changes to a message broker.
+	// +kubebuilder:validation:Optional
+	Messaging *ContainerImageBuildMessaging `json:"messaging"`
 }
 
-// ContainerImageBuildStatus defines the observed state of ContainerImageBuild
+// ContainerImageBuildStatus defines the observed state of ContainerImageBuild.
 type ContainerImageBuildStatus struct {
 	PreviousState    BuildState   `json:"-"` // NOTE: should we persist this value?
 	State            BuildState   `json:"state,omitempty"`
@@ -158,7 +176,7 @@ func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state"
 // +kubebuilder:printcolumn:name="Image URLs",type="string",priority=1,JSONPath=".status.imageURLs"
 
-// ContainerImageBuild is the Schema for the containerimagebuilds API
+// ContainerImageBuild is the Schema for the containerimagebuilds API.
 type ContainerImageBuild struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -169,7 +187,7 @@ type ContainerImageBuild struct {
 
 // +kubebuilder:object:root=true
 
-// ContainerImageBuildList contains a list of ContainerImageBuild
+// ContainerImageBuildList contains a list of ContainerImageBuild.
 type ContainerImageBuildList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

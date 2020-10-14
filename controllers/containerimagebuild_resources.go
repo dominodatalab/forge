@@ -391,16 +391,6 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		args = append(args, fmt.Sprintf("--preparer-plugins-path=%s", r.JobConfig.PreparerPluginPath))
 	}
 
-	if r.JobConfig.BrokerOpts != nil {
-		opts := r.JobConfig.BrokerOpts
-		bs := []string{
-			fmt.Sprintf("--message-broker=%s", opts.Broker),
-			fmt.Sprintf("--amqp-queue=%s", opts.AmqpQueue),
-			fmt.Sprintf("--amqp-uri=%s", opts.AmqpURI),
-		}
-		args = append(args, bs...)
-	}
-
 	if !r.JobConfig.GrantFullPrivilege {
 		args = append([]string{rootlesskitCommand}, args...)
 	}

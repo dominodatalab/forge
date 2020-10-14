@@ -62,20 +62,6 @@ func New(cfg Config) (*Job, error) {
 
 	var cleanupSteps []func()
 
-	// setup message publisher
-	var producer message.Producer
-	if cfg.BrokerOpts != nil {
-		log.Info("Initializing status update message publisher")
-
-		if producer, err = message.NewProducer(cfg.BrokerOpts, log); err != nil {
-			return nil, err
-		}
-		cleanupSteps = append(cleanupSteps, func() {
-			log.Info("Closing message producer")
-			producer.Close()
-		})
-	}
-
 	// setup preparer plugins
 	log.Info("Loading configured preparer plugins")
 
@@ -104,7 +90,6 @@ func New(cfg Config) (*Job, error) {
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
 		clientforge:  clientforge,
-		producer:     producer,
 		plugins:      preparerPlugins,
 		builder:      ociBuilder,
 		cleanupSteps: cleanupSteps,
@@ -118,6 +103,9 @@ func (j *Job) Run() error {
 	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(j.name)
 	if err != nil {
 		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
+	}
+	if err := j.initializeProducer(cib); err != nil {
+		return err
 	}
 
 	if cib, err = j.transitionToBuilding(cib); err != nil {
@@ -260,4 +248,30 @@ func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace
 	}
 
 	return username, password, nil
+}
+
+func (j *Job) initializeProducer(cib *apiv1alpha1.ContainerImageBuild) error {
+	msgConf := cib.Spec.Messaging
+	if msgConf != nil {
+		j.log.Info("Initializing status update message publisher")
+
+		brokerOpts := &message.Options{
+			Broker:    msgConf.MessageBroker,
+			AmqpURI:   msgConf.AMQPURI,
+			AmqpQueue: msgConf.AMQPQueueName,
+		}
+
+		producer, err := message.NewProducer(brokerOpts, j.log)
+		if err != nil {
+			return err
+		}
+
+		j.producer = producer
+		j.cleanupSteps = append(j.cleanupSteps, func() {
+			j.log.Info("Closing message producer")
+			_ = producer.Close()
+		})
+	}
+
+	return nil
 }

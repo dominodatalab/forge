@@ -47,3 +47,12 @@ spec:
     # registry w/o tls encryption and basic auth
     - server: my-docker-registry:5000
       nonSSL: true
+
+  # optionally publish status updates to a message broker
+  messaging:
+    # target amqp broker
+    broker: amqp
+    # amqp broker location
+    amqpURI: amqp://user:password@rabbitmq:5672
+    # amqp queue where messages will be published
+    amqpQueueName: different-queue

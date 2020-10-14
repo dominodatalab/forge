@@ -36,7 +36,7 @@ spec:
   validation:
     openAPIV3Schema:
       description: ContainerImageBuild is the Schema for the containerimagebuilds
-        API
+        API.
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -51,7 +51,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: ContainerImageBuildSpec defines the desired state of ContainerImageBuild
+          description: ContainerImageBuildSpec defines the desired state of ContainerImageBuild.
           properties:
             buildArgs:
               description: Image build arguments.
@@ -88,6 +88,23 @@ spec:
             memory:
               description: Limits build memory consumption.
               type: string
+            messaging:
+              description: Publish resource state changes to a message broker.
+              properties:
+                amqpQueueName:
+                  description: AMQPQueueName designates the AMQP broker queue name.
+                  type: string
+                amqpURI:
+                  description: AMQPURI designates the AMQP broker connection URI.
+                  type: string
+                broker:
+                  description: MessageBroker indicates the message bus implementation.
+                  type: string
+              required:
+              - amqpQueueName
+              - amqpURI
+              - broker
+              type: object
             pluginData:
               additionalProperties:
                 type: string
@@ -150,7 +167,7 @@ spec:
           - pushTo
           type: object
         status:
-          description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild
+          description: ContainerImageBuildStatus defines the observed state of ContainerImageBuild.
           properties:
             buildCompletedAt:
               format: date-time
