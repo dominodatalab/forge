@@ -1,6 +1,6 @@
 module github.com/dominodatalab/forge
 
-go 1.13
+go 1.15
 
 // Overrides should match https://github.com/moby/buildkit/blob/<release>/go.mod
 replace (

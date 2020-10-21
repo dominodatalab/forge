@@ -73,7 +73,7 @@ docker-push:
 # Regenerate controller manifests and code using Docker (useful if on MacOS)
 controller-regen-docker:
 	docker run --rm -it -v ${PWD}:/forge \
-		--workdir /forge golang:1.13-alpine3.12 \
+		--workdir /forge golang:1.15-alpine3.12 \
 		sh -c "apk add --no-cache build-base && make manifests generate"
 
 # find or download controller-gen
