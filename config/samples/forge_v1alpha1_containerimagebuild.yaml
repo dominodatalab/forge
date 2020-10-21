@@ -47,3 +47,6 @@ spec:
     # registry w/o tls encryption and basic auth
     - server: my-docker-registry:5000
       nonSSL: true
+
+  # override default status update queue name
+  messageQueueName: some-different-queue

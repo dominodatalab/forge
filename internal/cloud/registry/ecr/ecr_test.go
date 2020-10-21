@@ -134,8 +134,8 @@ func TestLoadAuths(t *testing.T) {
 type mockECRClient struct {
 	ecriface.ClientAPI
 	inValid func(input *ecr.GetAuthorizationTokenInput) // validate input
-	out     *ecr.GetAuthorizationTokenOutput // mock output
-	err     error // mock error
+	out     *ecr.GetAuthorizationTokenOutput            // mock output
+	err     error                                       // mock error
 }
 
 func (m *mockECRClient) GetAuthorizationTokenRequest(input *ecr.GetAuthorizationTokenInput) ecr.GetAuthorizationTokenRequest {
