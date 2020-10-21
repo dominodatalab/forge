@@ -89,9 +89,9 @@ spec:
               description: Limits build memory consumption.
               type: string
             messageQueueName:
-              description: Publish status update to queue when status update messaging
-                is configured. If the configuration or this value is missing, then
-                no messages will be published.
+              description: Override queue where messages are published when status
+                update messaging is configured. If this value is provided and the
+                message configuration is missing, then no messages will be published.
               type: string
             pluginData:
               additionalProperties:

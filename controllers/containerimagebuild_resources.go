@@ -28,7 +28,7 @@ const (
 	rootlesskitCommand = "rootlesskit"
 	forgeCommand       = "/usr/bin/forge"
 	cloudCredentialsID = "dynamic-cloud-credentials"
-	istioCmdArg        = `\nEXIT_CODE=$?; wget -qO- --post-data "" http://localhost:15020/quitquitquit; exit $EXIT_CODE`
+	istioCmdArg        = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
 )
 
 // creates all supporting resources required by build job
