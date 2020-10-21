@@ -28,6 +28,7 @@ const (
 	rootlesskitCommand = "rootlesskit"
 	forgeCommand       = "/usr/bin/forge"
 	cloudCredentialsID = "dynamic-cloud-credentials"
+	istioCmdArg        = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
 )
 
 // creates all supporting resources required by build job
@@ -393,10 +394,16 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 
 	if r.JobConfig.BrokerOpts != nil {
 		opts := r.JobConfig.BrokerOpts
+
+		queueName := opts.AmqpQueue
+		if cib.Spec.MessageQueueName != "" {
+			queueName = cib.Spec.MessageQueueName
+		}
+
 		bs := []string{
 			fmt.Sprintf("--message-broker=%s", opts.Broker),
-			fmt.Sprintf("--amqp-queue=%s", opts.AmqpQueue),
 			fmt.Sprintf("--amqp-uri=%s", opts.AmqpURI),
+			fmt.Sprintf("--amqp-queue=%s", queueName),
 		}
 		args = append(args, bs...)
 	}
@@ -406,7 +413,7 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 	}
 
 	if r.JobConfig.EnableIstioSupport {
-		args = append(args, "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE")
+		args = append(args, istioCmdArg)
 	}
 
 	return append([]string{"-c"}, strings.Join(args, " "))

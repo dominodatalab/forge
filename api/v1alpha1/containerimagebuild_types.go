@@ -125,6 +125,11 @@ type ContainerImageBuildSpec struct {
 	// Disable export of layer cache when it is enabled.
 	// +kubebuilder:validation:Optional
 	DisableLayerCacheExport bool `json:"disableLayerCacheExport"`
+
+	// Override queue where messages are published when status update messaging is configured. If this value is provided
+	// and the message configuration is missing, then no messages will be published.
+	// +kubebuilder:validation:Optional
+	MessageQueueName string `json:"messageQueueName"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild

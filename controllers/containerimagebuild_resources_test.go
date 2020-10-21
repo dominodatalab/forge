@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,7 +116,7 @@ func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 				AmqpURI:   "amqp://uri:5672",
 				AmqpQueue: "my-queue",
 			}},
-			want: "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false --message-broker=my-broker --amqp-queue=my-queue --amqp-uri=amqp://uri:5672",
+			want: "rootlesskit /usr/bin/forge build --resource=test-cib --enable-layer-caching=false --message-broker=my-broker --amqp-uri=amqp://uri:5672 --amqp-queue=my-queue",
 		},
 		{
 			name:      "preparer plugins path",
@@ -130,11 +129,11 @@ func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 			r := &ContainerImageBuildReconciler{
 				JobConfig: tt.jobConfig,
 			}
-			if got := r.prepareJobArgs(&forgev1alpha1.ContainerImageBuild{
+			got := r.prepareJobArgs(&forgev1alpha1.ContainerImageBuild{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cib"},
-			}); !reflect.DeepEqual(got, []string{"-c", tt.want}) {
-				t.Errorf("prepareJobArgs() = %v, want %v", got, tt.want)
-			}
+			})
+
+			assert.Equal(t, []string{"-c", tt.want}, got)
 		})
 	}
 }

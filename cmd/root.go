@@ -52,6 +52,7 @@ forge --preparer-plugins-path /plugins/installed/here
 forge --enable-layer-caching`
 
 	defaultBuildJobCAImage = "quay.io/domino/forge-init-ca:v1.0.0"
+	defaultMessageQueue    = "forge-status-update"
 )
 
 var (
@@ -189,7 +190,7 @@ func init() {
 	// leveraged by both main and build commands
 	rootCmd.PersistentFlags().StringVar(&messageBroker, "message-broker", "", fmt.Sprintf("Publish resource state changes to a message broker (supported values: %v)", message.SupportedBrokers))
 	rootCmd.PersistentFlags().StringVar(&amqpURI, "amqp-uri", "", "AMQP broker connection URI")
-	rootCmd.PersistentFlags().StringVar(&amqpQueue, "amqp-queue", "", "AMQP broker queue name")
+	rootCmd.PersistentFlags().StringVar(&amqpQueue, "amqp-queue", defaultMessageQueue, "AMQP broker queue name")
 	rootCmd.PersistentFlags().StringVar(&preparerPluginsPath, "preparer-plugins-path", path.Join(config.GetStateDir(), "plugins"), "Path to specific preparer plugins or directory to load them from")
 	rootCmd.PersistentFlags().BoolVar(&enableLayerCaching, "enable-layer-caching", false, "Enable image layer caching")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enabled verbose logging")
