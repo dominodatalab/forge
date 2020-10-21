@@ -401,9 +401,9 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 		}
 
 		bs := []string{
+			fmt.Sprintf("--message-broker=%s", opts.Broker),
 			fmt.Sprintf("--amqp-uri=%s", opts.AmqpURI),
 			fmt.Sprintf("--amqp-queue=%s", queueName),
-			fmt.Sprintf("--message-broker=%s", opts.Broker),
 		}
 		args = append(args, bs...)
 	}
