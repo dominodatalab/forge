@@ -1,15 +1,37 @@
 package archive
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type errClient struct {
+	err error
+}
+
+func (e *errClient) Get(_ string) (*http.Response, error) {
+	return nil, &url.Error{Err: e.err}
+}
+
+type tempError struct {
+}
+
+func (tempError) Temporary() bool {
+	return true
+}
+
+func (tempError) Error() string {
+	return "temp"
+}
 
 func TestFetchAndExtract(t *testing.T) {
 	srv := httptest.NewServer(nil)
@@ -36,7 +58,7 @@ func TestFetchAndExtract(t *testing.T) {
 				}
 			})
 
-			ext, err := FetchAndExtract(srv.URL)
+			ext, err := FetchAndExtract(context.TODO(), srv.URL)
 			if err != nil {
 				t.Error(err)
 			}
@@ -74,11 +96,52 @@ func TestFetchAndExtract(t *testing.T) {
 		})
 	}
 
-	t.Run("fetch-failure", func(t *testing.T) {
-		t.SkipNow()
-	})
-
 	t.Run("unsupported-format", func(t *testing.T) {
 		t.SkipNow()
 	})
+}
+
+func Test_downloadFile(t *testing.T) {
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	t.Run("timeout", func(t *testing.T) {
+		done, err := downloadFile(&errClient{os.ErrDeadlineExceeded}, "http://my-fake-url", "")
+		if done || err != nil {
+			t.Errorf("Expected download timeout to retry: %v", err)
+		}
+	})
+
+	t.Run("temporary failure", func(t *testing.T) {
+		done, err := downloadFile(&errClient{tempError{}}, "http://my-fake-url", "")
+		if done || err != nil {
+			t.Errorf("Expected temporary failure to retry: %v", err)
+		}
+	})
+
+	cases := []struct {
+		statusCode int
+		retry      bool
+		error      bool
+	}{
+		{http.StatusGatewayTimeout, true, false},
+		{http.StatusBadGateway, true, false},
+		{http.StatusBadRequest, true, true},
+		{http.StatusInternalServerError, true, true},
+		{http.StatusOK, false, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("status code: %d", tc.statusCode), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.statusCode)
+			}))
+			defer srv.Close()
+
+			done, err := downloadFile(srv.Client(), srv.URL, filepath.Join(os.TempDir(), fmt.Sprintf("test-%d.tar", tc.statusCode)))
+			if done != tc.retry && (err != nil) != tc.error {
+				t.Errorf("Expected status code %d (retry=%v, error=%v): got (done=%v, error=%v)", tc.statusCode, tc.retry, tc.error, done, err)
+			}
+		})
+	}
 }

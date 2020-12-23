@@ -24,6 +24,7 @@ type Registry struct {
 
 type BuildOptions struct {
 	ContextURL              string
+	ContextTimeout          time.Duration
 	ImageName               string
 	ImageSizeLimit          uint64
 	Labels                  map[string]string

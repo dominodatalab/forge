@@ -4,14 +4,18 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/h2non/filetype"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type mimeType string
@@ -21,7 +25,19 @@ const (
 	mimeTypeGzip = mimeType("application/gzip")
 )
 
-type Extractor func(url string) (*Extraction, error)
+var defaultBackoff = wait.Backoff{
+	Duration: time.Second,
+	Factor:   2,
+	Steps:    10,
+	Jitter:   0.1,
+	Cap:      30 * time.Second,
+}
+
+type fileDownloader interface {
+	Get(string) (*http.Response, error)
+}
+
+type Extractor func(ctx context.Context, url string) (*Extraction, error)
 
 type Extraction struct {
 	RootDir     string
@@ -29,14 +45,25 @@ type Extraction struct {
 	ContentsDir string
 }
 
-func FetchAndExtract(url string) (*Extraction, error) {
+func FetchAndExtract(ctx context.Context, url string) (*Extraction, error) {
 	wd, err := ioutil.TempDir("", "forge-")
 	if err != nil {
 		return nil, err
 	}
 
 	archive := filepath.Join(wd, "archive")
-	if err := downloadFile(url, archive); err != nil {
+
+	err = wait.ExponentialBackoff(defaultBackoff, func() (bool, error) {
+		// TODO in client-go v0.21.0 ExponentialBackoffWithContext can handle this for us
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+
+		return downloadFile(http.DefaultClient, url, archive)
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -63,25 +90,35 @@ func FetchAndExtract(url string) (*Extraction, error) {
 	}, nil
 }
 
-func downloadFile(url, fp string) error {
-	resp, err := http.Get(url)
+// downloadFile takes a file URL and local location to download it to.
+// It returns "done" (retryable or not) and an error.
+func downloadFile(c fileDownloader, fileUrl, fp string) (bool, error) {
+	resp, err := c.Get(fileUrl)
 	if err != nil {
-		return err
+		if urlError, ok := err.(*url.Error); ok && (urlError.Timeout() || urlError.Temporary()) {
+			return false, nil
+		}
+
+		return false, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("file download failed with status %d", resp.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusBadGateway, http.StatusGatewayTimeout:
+		return false, nil
+	case http.StatusOK:
+	default:
+		return false, fmt.Errorf("file download failed with status %d", resp.StatusCode)
 	}
 
 	out, err := os.Create(fp)
 	if err != nil {
-		return err
+		return true, err
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
-	return err
+	return true, err
 }
 
 func getFileContentType(fp string) (ct mimeType, err error) {

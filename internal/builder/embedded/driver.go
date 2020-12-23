@@ -108,7 +108,14 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) (*
 
 func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
 	// download and extract remote OCI context
-	extract, err := archive.FetchAndExtract(opts.ContextURL)
+	fetchCtx := ctx
+	if opts.ContextTimeout > 0 {
+		var cancel context.CancelFunc
+		fetchCtx, cancel = context.WithTimeout(ctx, opts.ContextTimeout)
+		defer cancel()
+	}
+
+	extract, err := archive.FetchAndExtract(fetchCtx, opts.ContextURL)
 	if err != nil {
 		return err
 	}

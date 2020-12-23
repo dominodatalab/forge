@@ -81,6 +81,10 @@ type ContainerImageBuildSpec struct {
 	// Build context for the image. This can be a local path or url.
 	Context string `json:"context"`
 
+	// If the build context is a URL, the timeout in seconds for fetching. Defaults to 0, which disables the timeout.
+	// +kubebuilder:validation:Optional
+	ContextTimeoutSeconds uint16 `json:"contextTimeoutSeconds"`
+
 	// Push to one or more registries.
 	// +kubebuilder:validation:MinItems=1
 	PushRegistries []string `json:"pushTo"`
@@ -105,7 +109,7 @@ type ContainerImageBuildSpec struct {
 	// +kubebuilder:validation:Optional
 	Memory string `json:"memory"`
 
-	// Optional deadline in seconds for image build to complete (defaults to 300).
+	// Optional deadline in seconds for image build to complete.
 	// +kubebuilder:validation:Optional
 	TimeoutSeconds uint16 `json:"timeoutSeconds"`
 
