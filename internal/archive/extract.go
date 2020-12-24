@@ -103,7 +103,7 @@ func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, 
 	resp, err := c.Get(fileUrl)
 	if err != nil {
 		if urlError, ok := err.(*url.Error); ok && (urlError.Timeout() || urlError.Temporary()) {
-			log.Error(urlError, "Received temporary or transient error, will attempt to retry", "url", fileUrl, "file", fp)
+			log.Error(urlError, "Received temporary or transient error while fetching context, will attempt to retry", "url", fileUrl, "file", fp)
 			return false, nil
 		}
 
@@ -112,8 +112,8 @@ func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, 
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case http.StatusBadGateway, http.StatusGatewayTimeout:
-		log.Info("Received transient status code, will attempt to retry", "url", fileUrl, "file", fp, "code", resp.StatusCode)
+	case http.StatusBadGateway, http.StatusGatewayTimeout, http.StatusServiceUnavailable:
+		log.Info("Received transient status code while fetching context, will attempt to retry", "url", fileUrl, "file", fp, "code", resp.StatusCode)
 		return false, nil
 	case http.StatusOK:
 	default:

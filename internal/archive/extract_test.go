@@ -129,6 +129,7 @@ func Test_downloadFile(t *testing.T) {
 	}{
 		{http.StatusGatewayTimeout, true, false},
 		{http.StatusBadGateway, true, false},
+		{http.StatusServiceUnavailable, true, false},
 		{http.StatusBadRequest, true, true},
 		{http.StatusInternalServerError, true, true},
 		{http.StatusOK, false, false},
