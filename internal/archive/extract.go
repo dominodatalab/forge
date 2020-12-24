@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/h2non/filetype"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -37,7 +38,7 @@ type fileDownloader interface {
 	Get(string) (*http.Response, error)
 }
 
-type Extractor func(ctx context.Context, url string) (*Extraction, error)
+type Extractor func(logr.Logger, context.Context, string, time.Duration) (*Extraction, error)
 
 type Extraction struct {
 	RootDir     string
@@ -45,7 +46,13 @@ type Extraction struct {
 	ContentsDir string
 }
 
-func FetchAndExtract(ctx context.Context, url string) (*Extraction, error) {
+func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout time.Duration) (*Extraction, error) {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
 	wd, err := ioutil.TempDir("", "forge-")
 	if err != nil {
 		return nil, err
@@ -61,7 +68,7 @@ func FetchAndExtract(ctx context.Context, url string) (*Extraction, error) {
 		default:
 		}
 
-		return downloadFile(http.DefaultClient, url, archive)
+		return downloadFile(log, http.DefaultClient, url, archive)
 	})
 	if err != nil {
 		return nil, err
@@ -92,10 +99,11 @@ func FetchAndExtract(ctx context.Context, url string) (*Extraction, error) {
 
 // downloadFile takes a file URL and local location to download it to.
 // It returns "done" (retryable or not) and an error.
-func downloadFile(c fileDownloader, fileUrl, fp string) (bool, error) {
+func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, error) {
 	resp, err := c.Get(fileUrl)
 	if err != nil {
 		if urlError, ok := err.(*url.Error); ok && (urlError.Timeout() || urlError.Temporary()) {
+			log.Error(urlError, "Received temporary or transient error, will attempt to retry", "url", fileUrl, "file", fp)
 			return false, nil
 		}
 
@@ -105,6 +113,7 @@ func downloadFile(c fileDownloader, fileUrl, fp string) (bool, error) {
 
 	switch resp.StatusCode {
 	case http.StatusBadGateway, http.StatusGatewayTimeout:
+		log.Info("Received transient status code, will attempt to retry", "url", fileUrl, "file", fp, "code", resp.StatusCode)
 		return false, nil
 	case http.StatusOK:
 	default:
@@ -113,7 +122,7 @@ func downloadFile(c fileDownloader, fileUrl, fp string) (bool, error) {
 
 	out, err := os.Create(fp)
 	if err != nil {
-		return true, err
+		return false, err
 	}
 	defer out.Close()
 

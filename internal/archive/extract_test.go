@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type errClient struct {
@@ -32,6 +33,8 @@ func (tempError) Temporary() bool {
 func (tempError) Error() string {
 	return "temp"
 }
+
+var logger = log.NullLogger{}
 
 func TestFetchAndExtract(t *testing.T) {
 	srv := httptest.NewServer(nil)
@@ -58,7 +61,7 @@ func TestFetchAndExtract(t *testing.T) {
 				}
 			})
 
-			ext, err := FetchAndExtract(context.TODO(), srv.URL)
+			ext, err := FetchAndExtract(logger, context.TODO(), srv.URL, 0)
 			if err != nil {
 				t.Error(err)
 			}
@@ -106,14 +109,14 @@ func Test_downloadFile(t *testing.T) {
 	defer srv.Close()
 
 	t.Run("timeout", func(t *testing.T) {
-		done, err := downloadFile(&errClient{context.DeadlineExceeded}, "http://my-fake-url", "")
+		done, err := downloadFile(logger, &errClient{context.DeadlineExceeded}, "http://my-fake-url", "")
 		if done || err != nil {
 			t.Errorf("Expected download timeout to retry: %v", err)
 		}
 	})
 
 	t.Run("temporary failure", func(t *testing.T) {
-		done, err := downloadFile(&errClient{tempError{}}, "http://my-fake-url", "")
+		done, err := downloadFile(logger, &errClient{tempError{}}, "http://my-fake-url", "")
 		if done || err != nil {
 			t.Errorf("Expected temporary failure to retry: %v", err)
 		}
@@ -138,7 +141,7 @@ func Test_downloadFile(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			done, err := downloadFile(srv.Client(), srv.URL, filepath.Join(os.TempDir(), fmt.Sprintf("test-%d.tar", tc.statusCode)))
+			done, err := downloadFile(logger, srv.Client(), srv.URL, filepath.Join(os.TempDir(), fmt.Sprintf("test-%d.tar", tc.statusCode)))
 			if done != tc.retry && (err != nil) != tc.error {
 				t.Errorf("Expected status code %d (retry=%v, error=%v): got (done=%v, error=%v)", tc.statusCode, tc.retry, tc.error, done, err)
 			}
