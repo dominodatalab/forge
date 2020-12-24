@@ -106,7 +106,7 @@ func Test_downloadFile(t *testing.T) {
 	defer srv.Close()
 
 	t.Run("timeout", func(t *testing.T) {
-		done, err := downloadFile(&errClient{os.ErrDeadlineExceeded}, "http://my-fake-url", "")
+		done, err := downloadFile(&errClient{context.DeadlineExceeded}, "http://my-fake-url", "")
 		if done || err != nil {
 			t.Errorf("Expected download timeout to retry: %v", err)
 		}
