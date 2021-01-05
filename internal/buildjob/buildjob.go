@@ -169,6 +169,7 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.Contain
 
 	opts := &config.BuildOptions{
 		ContextURL:              cib.Spec.Context,
+		ContextTimeout:          time.Duration(cib.Spec.ContextTimeoutSeconds) * time.Second,
 		ImageName:               cib.Spec.ImageName,
 		ImageSizeLimit:          cib.Spec.ImageSizeLimit,
 		Labels:                  cib.Spec.Labels,

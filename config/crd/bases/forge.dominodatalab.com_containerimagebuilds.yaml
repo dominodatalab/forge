@@ -62,6 +62,10 @@ spec:
               description: Build context for the image. This can be a local path or
                 url.
               type: string
+            contextTimeoutSeconds:
+              description: If the build context is a URL, the timeout in seconds for
+                fetching. Defaults to 0, which disables the timeout.
+              type: integer
             cpu:
               description: Limits build cpu consumption.
               type: string
@@ -146,8 +150,7 @@ spec:
                 type: object
               type: array
             timeoutSeconds:
-              description: Optional deadline in seconds for image build to complete
-                (defaults to 300).
+              description: Optional deadline in seconds for image build to complete.
               type: integer
           required:
           - context

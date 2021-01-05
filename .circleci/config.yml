@@ -75,8 +75,8 @@ jobs:
       image: ubuntu-1604:202004-01
     environment:
       KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
-      HELM_VERSION: "v3.2.1"
-      KUSTOMIZE_VERSION: "v3.5.5"
+      HELM_VERSION: "v3.4.2"
+      KUSTOMIZE_VERSION: "v3.8.8"
       K3S_KUBECONFIG_MODE: "644"
     steps:
       - checkout

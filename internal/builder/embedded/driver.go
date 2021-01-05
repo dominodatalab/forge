@@ -108,7 +108,7 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) (*
 
 func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
 	// download and extract remote OCI context
-	extract, err := archive.FetchAndExtract(opts.ContextURL)
+	extract, err := d.contextExtractor(d.logger, ctx, opts.ContextURL, opts.ContextTimeout)
 	if err != nil {
 		return err
 	}
