@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -105,7 +106,8 @@ func retryable(err *url.Error) bool {
 
 	// If we get any sort of operational error before an HTTP response we
 	// retry it. Generally have seen this with ECONNREFUSED.
-	if _, ok := err.Err.(*net.OpError); ok {
+	var opError *net.OpError
+	if errors.As(err, &opError) {
 		return true
 	}
 
@@ -117,7 +119,8 @@ func retryable(err *url.Error) bool {
 func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, error) {
 	resp, err := c.Get(fileUrl)
 	if err != nil {
-		if urlError, ok := err.(*url.Error); ok && retryable(urlError) {
+		var urlError *url.Error
+		if errors.As(err, &urlError) && retryable(urlError) {
 			log.Error(urlError, "Received temporary or transient error while fetching context, will attempt to retry", "url", fileUrl, "file", fp)
 			return false, nil
 		}
