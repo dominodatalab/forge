@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,12 +98,26 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout t
 	}, nil
 }
 
+func retryable(err *url.Error) bool {
+	if err.Timeout() || err.Temporary() {
+		return true
+	}
+
+	// If we get any sort of operational error before an HTTP response we
+	// retry it. Generally have seen this with ECONNREFUSED.
+	if _, ok := err.Err.(*net.OpError); ok {
+		return true
+	}
+
+	return false
+}
+
 // downloadFile takes a file URL and local location to download it to.
 // It returns "done" (retryable or not) and an error.
 func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, error) {
 	resp, err := c.Get(fileUrl)
 	if err != nil {
-		if urlError, ok := err.(*url.Error); ok && (urlError.Timeout() || urlError.Temporary()) {
+		if urlError, ok := err.(*url.Error); ok && retryable(urlError) {
 			log.Error(urlError, "Received temporary or transient error while fetching context, will attempt to retry", "url", fileUrl, "file", fp)
 			return false, nil
 		}
