@@ -100,18 +100,9 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout t
 }
 
 func retryable(err *url.Error) bool {
-	if err.Timeout() || err.Temporary() {
-		return true
-	}
-
-	// If we get any sort of operational error before an HTTP response we
-	// retry it. Generally have seen this with ECONNREFUSED.
+	// If we get any sort of operational error before an HTTP response we retry it.
 	var opError *net.OpError
-	if errors.As(err, &opError) {
-		return true
-	}
-
-	return false
+	return err.Timeout() || err.Temporary() || errors.As(err, &opError)
 }
 
 // downloadFile takes a file URL and local location to download it to.
