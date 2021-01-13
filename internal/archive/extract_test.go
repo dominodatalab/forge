@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,6 +119,21 @@ func Test_downloadFile(t *testing.T) {
 
 	t.Run("temporary failure", func(t *testing.T) {
 		done, err := downloadFile(logger, &errClient{tempError{}}, "http://my-fake-url", "")
+		if done || err != nil {
+			t.Errorf("Expected temporary failure to retry: %v", err)
+		}
+	})
+
+	t.Run("connection refused", func(t *testing.T) {
+		done, err := downloadFile(logger, &errClient{&net.OpError{
+			Op:   "dial",
+			Net:  "tcp",
+			Addr: nil,
+			Err: &os.SyscallError{
+				Syscall: "connect",
+				Err:     syscall.ECONNREFUSED,
+			},
+		}}, "http://my-fake-url", "")
 		if done || err != nil {
 			t.Errorf("Expected temporary failure to retry: %v", err)
 		}
