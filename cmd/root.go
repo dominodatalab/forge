@@ -63,6 +63,7 @@ var (
 
 	buildJobImage                      string
 	buildJobCAImage                    string
+	buildJobImagePullSecret            string
 	buildJobLabels                     map[string]string
 	buildJobAnnotations                map[string]string
 	buildJobNodeSelector               map[string]string
@@ -103,6 +104,7 @@ var (
 				JobConfig: &controllers.BuildJobConfig{
 					Image:                      buildJobImage,
 					CAImage:                    buildJobCAImage,
+					ImagePullSecret:            buildJobImagePullSecret,
 					CustomCASecret:             buildJobCustomCASecret,
 					PreparerPluginPath:         preparerPluginsPath,
 					Labels:                     buildJobLabels,
@@ -175,6 +177,7 @@ func init() {
 
 	rootCmd.Flags().StringVar(&buildJobImage, "build-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().StringVar(&buildJobCAImage, "build-job-ca-image", defaultBuildJobCAImage, "Image used to initialize SSL certificates using a custom CA. You should not have to override this.")
+	rootCmd.Flags().StringVar(&buildJobImagePullSecret, "build-job-image-pull-secret", "", "Pull secret used to fetch build job images.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
