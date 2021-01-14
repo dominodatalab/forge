@@ -5,9 +5,11 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,12 +99,19 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout t
 	}, nil
 }
 
+func retryable(err *url.Error) bool {
+	// If we get any sort of operational error before an HTTP response we retry it.
+	var opError *net.OpError
+	return err.Timeout() || err.Temporary() || errors.As(err, &opError)
+}
+
 // downloadFile takes a file URL and local location to download it to.
 // It returns "done" (retryable or not) and an error.
 func downloadFile(log logr.Logger, c fileDownloader, fileUrl, fp string) (bool, error) {
 	resp, err := c.Get(fileUrl)
 	if err != nil {
-		if urlError, ok := err.(*url.Error); ok && (urlError.Timeout() || urlError.Temporary()) {
+		var urlError *url.Error
+		if errors.As(err, &urlError) && retryable(urlError) {
 			log.Error(urlError, "Received temporary or transient error while fetching context, will attempt to retry", "url", fileUrl, "file", fp)
 			return false, nil
 		}
