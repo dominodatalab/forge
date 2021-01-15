@@ -28,6 +28,7 @@ const gcDeleteOpt = client.PropagationPolicy(metav1.DeletePropagationForeground)
 type BuildJobConfig struct {
 	Image                      string
 	CAImage                    string
+	ImagePullSecret            string
 	CustomCASecret             string
 	PreparerPluginPath         string
 	Labels                     map[string]string

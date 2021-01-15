@@ -341,6 +341,11 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		resources.Requests["memory"] = memory
 	}
 
+	var imagePullSecrets []corev1.LocalObjectReference
+	if r.JobConfig.ImagePullSecret != "" {
+		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: r.JobConfig.ImagePullSecret})
+	}
+
 	// construct final job object
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -358,6 +363,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					RestartPolicy:      corev1.RestartPolicyNever,
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
+					ImagePullSecrets:   imagePullSecrets,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
