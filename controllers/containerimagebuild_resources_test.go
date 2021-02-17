@@ -21,23 +21,7 @@ import (
 )
 
 func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
-	require.NoError(t, batchv1.AddToScheme(scheme))
-
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
-	fakeRecorder := record.NewFakeRecorder(10)
-
-	controller := &ContainerImageBuildReconciler{
-		Log:      log.NullLogger{},
-		Client:   fakeClient,
-		Recorder: fakeRecorder,
-		JobConfig: &BuildJobConfig{
-			Labels:      make(map[string]string),
-			Annotations: make(map[string]string),
-		},
-		Scheme: scheme,
-	}
+	controller := makeController(t)
 
 	testCases := []struct {
 		cib       *forgev1alpha1.ContainerImageBuild
@@ -88,6 +72,35 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 	}
 }
 
+func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
+	controller := makeController(t)
+	cib := forgev1alpha1.ContainerImageBuild{}
+	require.NoError(t, controller.createJobForBuild(context.TODO(), &cib))
+	job := batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: cib.Name}, &job))
+	expectedBuildContextVolume := corev1.Volume{
+		Name: "build-context-dir",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	assert.Equal(t, expectedBuildContextVolume, volumesToMap(job.Spec.Template.Spec.Volumes)["build-context-dir"])
+}
+
+func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
+	controller := makeController(t)
+	cib := forgev1alpha1.ContainerImageBuild{}
+	require.NoError(t, controller.createJobForBuild(context.TODO(), &cib))
+	job := batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.TODO(), types.NamespacedName{Name: cib.Name}, &job))
+	expectedBuildContextVolumeMount := corev1.VolumeMount{
+		Name:      "build-context-dir",
+		ReadOnly:  false,
+		MountPath: "/mnt/build",
+	}
+	assert.Equal(t, expectedBuildContextVolumeMount, volumeMountsToMap(job.Spec.Template.Spec.Containers[0].VolumeMounts)["build-context-dir"])
+}
+
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -136,4 +149,40 @@ func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 			assert.Equal(t, []string{"-c", tt.want}, got)
 		})
 	}
+}
+
+func makeController(t *testing.T) ContainerImageBuildReconciler {
+	scheme := runtime.NewScheme()
+	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+
+	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeRecorder := record.NewFakeRecorder(10)
+
+	return ContainerImageBuildReconciler{
+		Log:      log.NullLogger{},
+		Client:   fakeClient,
+		Recorder: fakeRecorder,
+		JobConfig: &BuildJobConfig{
+			Labels:      make(map[string]string),
+			Annotations: make(map[string]string),
+		},
+		Scheme: scheme,
+	}
+}
+
+func volumesToMap(volumes []corev1.Volume) map[string]corev1.Volume {
+	volumesMap := map[string]corev1.Volume{}
+	for _, v := range volumes {
+		volumesMap[v.Name] = v
+	}
+	return volumesMap
+}
+
+func volumeMountsToMap(volumeMounts []corev1.VolumeMount) map[string]corev1.VolumeMount {
+	volumeMountsMap := map[string]corev1.VolumeMount{}
+	for _, vm := range volumeMounts {
+		volumeMountsMap[vm.Name] = vm
+	}
+	return volumeMountsMap
 }
