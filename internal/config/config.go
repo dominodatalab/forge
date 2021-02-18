@@ -10,6 +10,8 @@ const (
 	DynamicCredentialsPath = "/tmp/docker"
 	// DynamicCredentialsFilename is the name of the file housing dynamic cloud registry credentials.
 	DynamicCredentialsFilename = "config.json"
+	// BuildContextPath is the path where the build context directory will be mounted.
+	BuildContextPath = "/mnt/build"
 )
 
 // DynamicCredentialsFilepath is the full path to the dynamic cloud registry credentials.

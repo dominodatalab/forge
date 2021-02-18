@@ -273,7 +273,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 
 	buildContextDirVolumeMount := corev1.VolumeMount{
 		Name:      buildContextDirVolume.Name,
-		MountPath: "/mnt/build",
+		MountPath: config.BuildContextPath,
 	}
 	stateDirVolumeMount := corev1.VolumeMount{
 		Name:      stateDirVolume.Name,
