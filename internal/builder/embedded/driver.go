@@ -3,7 +3,6 @@ package embedded
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/containerd/containerd/namespaces"
@@ -108,11 +107,10 @@ func (d *driver) BuildAndPush(ctx context.Context, opts *config.BuildOptions) (*
 
 func (d *driver) build(ctx context.Context, image string, opts *config.BuildOptions) error {
 	// download and extract remote OCI context
-	extract, err := d.contextExtractor(d.logger, ctx, opts.ContextURL, opts.ContextTimeout)
+	extract, err := d.contextExtractor(d.logger, ctx, opts.ContextURL, "/mnt/build", opts.ContextTimeout)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(extract.RootDir)
 
 	for _, preparerPlugin := range d.preparerPlugins {
 		defer func() {

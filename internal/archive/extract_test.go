@@ -63,7 +63,13 @@ func TestFetchAndExtract(t *testing.T) {
 				}
 			})
 
-			ext, err := FetchAndExtract(logger, context.TODO(), srv.URL, 0)
+			wd, err := ioutil.TempDir("", "forge-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(wd)
+
+			ext, err := FetchAndExtract(logger, context.TODO(), srv.URL, wd, 0)
 			if err != nil {
 				t.Error(err)
 			}
@@ -96,8 +102,6 @@ func TestFetchAndExtract(t *testing.T) {
 			}
 
 			assert.ElementsMatch(t, tc.files, actual, "expected archive contents to match")
-
-			os.RemoveAll(ext.RootDir)
 		})
 	}
 

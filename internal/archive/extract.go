@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -40,29 +39,29 @@ type fileDownloader interface {
 	Get(string) (*http.Response, error)
 }
 
-type Extractor func(logr.Logger, context.Context, string, time.Duration) (*Extraction, error)
+type Extractor func(logr.Logger, context.Context, string, string, time.Duration) (*Extraction, error)
 
 type Extraction struct {
-	RootDir     string
 	Archive     string
 	ContentsDir string
 }
 
-func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout time.Duration) (*Extraction, error) {
+func FetchAndExtract(log logr.Logger, ctx context.Context, url string, wd string, timeout time.Duration) (*Extraction, error) {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	wd, err := ioutil.TempDir("", "forge-")
-	if err != nil {
+	if isDir, err := IsDirectory(wd); err != nil {
 		return nil, err
+	} else if !isDir {
+		return nil, fmt.Errorf("%v is not a directory", wd)
 	}
 
 	archive := filepath.Join(wd, "archive")
 
-	err = wait.ExponentialBackoff(defaultBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(defaultBackoff, func() (bool, error) {
 		// TODO in client-go v0.21.0 ExponentialBackoffWithContext can handle this for us
 		select {
 		case <-ctx.Done():
@@ -93,10 +92,20 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout t
 	}
 
 	return &Extraction{
-		RootDir:     wd,
 		Archive:     archive,
 		ContentsDir: dest,
 	}, nil
+}
+
+func IsDirectory(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	} else {
+		return info.IsDir(), nil
+	}
 }
 
 func retryable(err *url.Error) bool {
