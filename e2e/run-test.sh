@@ -41,7 +41,7 @@ function run_test {
       break
     fi
 
-      if [[ $state == "Failed" ]]; then
+    if [[ $state == "Failed" ]]; then
       error "Test failed"
       kubectl logs --namespace "$namespace" --selector app.kubernetes.io/name=forge
       kubectl get cib "$resource_name" -o yaml
@@ -73,7 +73,7 @@ function verify_image {
   info "Comparing files from the image with expected files"
   if ! diff "$test_dir/expected/app.py" "$test_dir/actual/app.py"; then
     error  "diff failed"
-    ls -lahr "$test_dir"
+    ls -lahR "$test_dir"
     exit 1
   fi
 
