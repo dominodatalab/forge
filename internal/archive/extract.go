@@ -53,7 +53,7 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, wd string
 		defer cancel()
 	}
 
-	if isDir, err := IsDirectory(wd); err != nil {
+	if isDir, err := isDirectory(wd); err != nil {
 		return nil, err
 	} else if !isDir {
 		return nil, fmt.Errorf("%v is not a directory", wd)
@@ -97,7 +97,7 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, wd string
 	}, nil
 }
 
-func IsDirectory(path string) (bool, error) {
+func isDirectory(path string) (bool, error) {
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil

@@ -21,7 +21,7 @@ import (
 )
 
 func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
-	controller := MakeController(t)
+	controller := makeController(t)
 
 	testCases := []struct {
 		cib       *forgev1alpha1.ContainerImageBuild
@@ -73,7 +73,7 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 }
 
 func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
-	controller := MakeController(t)
+	controller := makeController(t)
 	cib := forgev1alpha1.ContainerImageBuild{}
 	require.NoError(t, controller.createJobForBuild(context.TODO(), &cib))
 	job := batchv1.Job{}
@@ -84,11 +84,11 @@ func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
-	assert.Equal(t, expectedBuildContextVolume, VolumesToMap(job.Spec.Template.Spec.Volumes)["build-context-dir"])
+	assert.Equal(t, expectedBuildContextVolume, volumesToMap(job.Spec.Template.Spec.Volumes)["build-context-dir"])
 }
 
 func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
-	controller := MakeController(t)
+	controller := makeController(t)
 	cib := forgev1alpha1.ContainerImageBuild{}
 	require.NoError(t, controller.createJobForBuild(context.TODO(), &cib))
 	job := batchv1.Job{}
@@ -98,7 +98,7 @@ func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
 		ReadOnly:  false,
 		MountPath: "/mnt/build",
 	}
-	assert.Equal(t, expectedBuildContextVolumeMount, VolumeMountsToMap(job.Spec.Template.Spec.Containers[0].VolumeMounts)["build-context-dir"])
+	assert.Equal(t, expectedBuildContextVolumeMount, volumeMountsToMap(job.Spec.Template.Spec.Containers[0].VolumeMounts)["build-context-dir"])
 }
 
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
@@ -151,7 +151,7 @@ func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	}
 }
 
-func MakeController(t *testing.T) ContainerImageBuildReconciler {
+func makeController(t *testing.T) ContainerImageBuildReconciler {
 	scheme := runtime.NewScheme()
 	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
@@ -171,7 +171,7 @@ func MakeController(t *testing.T) ContainerImageBuildReconciler {
 	}
 }
 
-func VolumesToMap(volumes []corev1.Volume) map[string]corev1.Volume {
+func volumesToMap(volumes []corev1.Volume) map[string]corev1.Volume {
 	volumesMap := map[string]corev1.Volume{}
 	for _, v := range volumes {
 		volumesMap[v.Name] = v
@@ -179,7 +179,7 @@ func VolumesToMap(volumes []corev1.Volume) map[string]corev1.Volume {
 	return volumesMap
 }
 
-func VolumeMountsToMap(volumeMounts []corev1.VolumeMount) map[string]corev1.VolumeMount {
+func volumeMountsToMap(volumeMounts []corev1.VolumeMount) map[string]corev1.VolumeMount {
 	volumeMountsMap := map[string]corev1.VolumeMount{}
 	for _, vm := range volumeMounts {
 		volumeMountsMap[vm.Name] = vm
