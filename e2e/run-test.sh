@@ -2,6 +2,9 @@
 
 set -e
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+BASE_DIR=$(cd "${SCRIPT_DIR}/../" && pwd)
+
 function info {
   echo -e "--> \033[1;32m$1\033[0m"
 }
@@ -38,7 +41,7 @@ function run_test {
       break
     fi
 
-      if [[ $state == "Failed" ]]; then
+    if [[ $state == "Failed" ]]; then
       error "Test failed"
       kubectl logs --namespace "$namespace" --selector app.kubernetes.io/name=forge
       kubectl get cib "$resource_name" -o yaml
@@ -47,6 +50,34 @@ function run_test {
 
     counter=$((counter+1))
   done
+}
+
+function verify_image {
+  info "Verifying that the image built by Forge has the expected files at the expected paths"
+  local test_dir="/tmp/$namespace/verify_image"
+
+  info "Creating a service exposing the Docker registry with no TLS on node port 32002"
+  kubectl apply -f "$SCRIPT_DIR/docker-registry-2-nodeport-service.yaml" --namespace "$namespace"
+
+  info "Logging in to Docker"
+  echo "simpson" | docker login localhost:32002 -u=marge --password-stdin
+
+  info "Copying files from image"
+  mkdir -p "$test_dir/actual"
+  docker cp $(docker create localhost:32002/variable-base-app:latest):/app/app.py "$test_dir/actual/app.py"
+
+  info "Extracting files that are expected to be in the image"
+  mkdir -p "$test_dir/expected"
+  tar -xf "$BASE_DIR/internal/archive/testdata/simple-app.tar" -C "$test_dir/expected"
+
+  info "Comparing files from the image with expected files"
+  if ! diff "$test_dir/expected/app.py" "$test_dir/actual/app.py"; then
+    error  "diff failed"
+    ls -lahR "$test_dir"
+    exit 1
+  fi
+
+  info "Test succeeded"
 }
 
 if [[ -z $1 ]]; then
@@ -150,5 +181,6 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
+verify_image
 
 info "All tests ran successfully"
