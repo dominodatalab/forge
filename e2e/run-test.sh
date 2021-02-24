@@ -56,9 +56,6 @@ function verify_image {
   info "Verifying that the image built by Forge has the expected files at the expected paths"
   local test_dir="/tmp/$namespace/verify_image"
 
-  info "Creating a service exposing the Docker registry with no TLS on node port 32002"
-  kubectl apply -f "$SCRIPT_DIR/docker-registry-2-nodeport-service.yaml" --namespace "$namespace"
-
   info "Logging in to Docker"
   echo "simpson" | docker login localhost:32002 -u=marge --password-stdin
 
