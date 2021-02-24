@@ -368,6 +368,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 						{
 							Name:            "forge-build",
 							Image:           r.JobConfig.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"/bin/sh"},
 							Args:            r.prepareJobArgs(cib),
 							Env:             r.JobConfig.EnvVar,
