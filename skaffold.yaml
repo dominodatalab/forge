@@ -1,0 +1,24 @@
+apiVersion: skaffold/v2beta4
+kind: Config
+metadata:
+  name: forge
+build:
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    - image: forge-dev
+      docker:
+        buildArgs:
+          BUILD_FLAGS: "-gcflags='all=-N -l' -ldflags='-X github.com/dominodatalab/forge/cmd.defaultBuildJobImage=forge-dev'"
+profiles:
+- name: job
+  deploy:
+    kustomize:
+      paths:
+        - config/controller/build-dev
+- name: controller
+  deploy:
+    kustomize:
+      paths:
+        - config/crd
+        - config/controller/overlays/controller-dev

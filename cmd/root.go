@@ -24,7 +24,7 @@ const (
 Forge is a Kubernetes controller that builds and pushes OCI-compliant images to one or more distribution registries.
 Communication with the controller is achieved via the ContainerImageBuild CRD defined by the project. Forge will watch
 for these resources, launch an image build using the directives provided therein, and update the resource status with
-relevant information such as build state, errors and the final location(s) of the 
+relevant information such as build state, errors and the final location(s) of the
 
 If you need to run preparation steps against a context directory prior to a build, then you can configure one or more
 plugins. This allows users to hook into the build process and add/modify/delete files according to their business
@@ -56,6 +56,8 @@ forge --enable-layer-caching`
 )
 
 var (
+	defaultBuildJobImage = ""
+
 	debug bool
 
 	gcInterval     time.Duration
@@ -175,7 +177,7 @@ func init() {
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-addr", ":8080", "Metrics endpoint will bind to this address")
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
-	rootCmd.Flags().StringVar(&buildJobImage, "build-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
+	rootCmd.Flags().StringVar(&buildJobImage, "build-job-image", defaultBuildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
 	rootCmd.Flags().StringVar(&buildJobCAImage, "build-job-ca-image", defaultBuildJobCAImage, "Image used to initialize SSL certificates using a custom CA. You should not have to override this.")
 	rootCmd.Flags().StringVar(&buildJobImagePullSecret, "build-job-image-pull-secret", "", "Pull secret used to fetch build job images.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")

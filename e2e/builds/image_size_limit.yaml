@@ -1,10 +1,11 @@
 apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
-  generateName: test-tls-with-basic-auth-
+  generateName: test-image-size-limit-
 spec:
   imageName: simple-app
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz
+  imageSizeLimit: 1
   pushTo:
     - docker-registry:5000
   registries:

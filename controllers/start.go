@@ -35,7 +35,7 @@ func StartManager(cfg ControllerConfig) {
 
 	zapLogger := ctrlzap.NewRaw(func(opts *ctrlzap.Options) {
 		opts.Level = &atom
-		opts.Development = true
+		opts.Development = cfg.Debug
 	})
 	logger := zapr.NewLogger(zapLogger)
 	ctrl.SetLogger(logger)
@@ -73,6 +73,7 @@ func StartManager(cfg ControllerConfig) {
 		NewRelic:  newrelicApp,
 	}
 
+	setupLog.V(1).Info("Hi")
 	if err = controller.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
 		os.Exit(1)
