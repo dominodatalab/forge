@@ -46,7 +46,7 @@ type Extraction struct {
 	ContentsDir string
 }
 
-func FetchAndExtract(log logr.Logger, ctx context.Context, url string, wd string, timeout time.Duration) (*Extraction, error) {
+func FetchAndExtract(log logr.Logger, ctx context.Context, url, wd string, timeout time.Duration) (*Extraction, error) {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
