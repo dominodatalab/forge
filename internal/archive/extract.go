@@ -53,10 +53,9 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url, wd string, timeo
 		defer cancel()
 	}
 
-	if isDir, err := isDirectory(wd); err != nil {
-		return nil, err
-	} else if !isDir {
-		return nil, fmt.Errorf("%v is not a directory", wd)
+if err := AssertDir(wd); err != nil {
+      // we "wrap" the original error to give some more context
+      return nil, fmt.Errorf("invalid build contex directory: %w", err)
 	}
 
 	archive := filepath.Join(wd, "archive")
