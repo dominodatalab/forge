@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
@@ -14,7 +13,9 @@ func TestAssertDir_isDir(t *testing.T) {
 	tempDir := t.TempDir()
 	testDir := tempDir + "/test-dir"
 
-	os.Mkdir(testDir, 0755)
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Errorf("error creating diretory: %v", err)
+	}
 
 	err := AssertDir(testDir)
 
@@ -27,7 +28,7 @@ func TestAssertDir_isFile(t *testing.T) {
 	testFile := tempDir + "/test-file"
 
 	if file, err := os.Create(testFile); err != nil {
-		log.Fatal(err)
+		t.Errorf("error creating file: %v", err)
 	} else {
 		defer file.Close()
 	}
