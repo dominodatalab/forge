@@ -17,12 +17,106 @@ build dispatch via a [custom resource definition][crd].
 - go 1.13
 - golangci-lint
 - kubebuilder
-- A Kubernetes cluster with kubectl access configured
+- A Kubernetes cluster with kubectl access configured (minikube suggested)
 
-### Running tests
+### Local setup
+
+Start Kubernetes cluster:
+
+```
+minikube start
+```
+
+Install helm on the host:
+
+```
+export HELM_VERSION="v3.4.2"
+curl -L https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz | tar -xvz -C /tmp
+sudo mv /tmp/linux-amd64/helm /usr/local/bin/
+helm repo add stable https://charts.helm.sh/stable
+helm repo update
+```
+
+Install Docker registry:
+
+```
+helm upgrade -i docker-registry stable/docker-registry \
+  --values e2e/helm_values/docker-registry-auth-only.yaml \
+  --wait
+```
+
+Create Docker registry auth secret:
+
+```
+kubectl apply -f config/samples/docker-registry-auth.yaml
+```
+
+Prepare cluster for running Forge builds:
+
+```
+make install
+```
+
+(Repeat this step if you modify the custom resource definition.)
+
+### Local edit / compile / test workflow
+
+Run tests:
 
 ```
 make test
+```
+
+Connect the host's Docker client to minikube's Docker server so that the image that will be built will be available in minikube:
+
+```
+eval $(minikube docker-env)
+```
+
+Build Forge image with a custom name:
+
+```
+export IMG=test-forge:$(date +%s)
+make docker-build
+```
+
+Run Forge's controller on the host, using the image from the previous step for build jobs:
+
+```
+go run main.go --build-job-image $IMG
+```
+
+On a different terminal, create a CIB (container image build) resource to trigger a build:
+
+```
+kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+```
+
+Watch for build pods:
+
+```
+kubectl get pods | grep build
+```
+
+Follow the build logs:
+
+```
+kubectl logs -f example-build-lnf4v
+```
+
+Confirm that the image was built and uploaded to the Docker registry:
+
+```
+curl -u marge:simpson $(minikube ip):32002/v2/_catalog
+```
+
+To try again with the same CIB resource name, first delete the old resource so that the Forge controller will destroy
+the job and pod, and then create it again:
+
+```
+kubectl delete cib example-build
+
+kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
 ```
 
 ## Preparer Plugins
