@@ -18,6 +18,8 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/h2non/filetype"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/dominodatalab/forge/internal/util"
 )
 
 type mimeType string
@@ -53,9 +55,8 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url, wd string, timeo
 		defer cancel()
 	}
 
-if err := AssertDir(wd); err != nil {
-      // we "wrap" the original error to give some more context
-      return nil, fmt.Errorf("invalid build contex directory: %w", err)
+	if err := util.AssertDir(wd); err != nil {
+		return nil, fmt.Errorf("invalid build context directory: %w", err)
 	}
 
 	archive := filepath.Join(wd, "archive")
@@ -94,17 +95,6 @@ if err := AssertDir(wd); err != nil {
 		Archive:     archive,
 		ContentsDir: dest,
 	}, nil
-}
-
-func isDirectory(path string) (bool, error) {
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	} else {
-		return info.IsDir(), nil
-	}
 }
 
 func retryable(err *url.Error) bool {
