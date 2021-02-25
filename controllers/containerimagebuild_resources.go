@@ -25,10 +25,12 @@ import (
 )
 
 const (
-	rootlesskitCommand = "rootlesskit"
-	forgeCommand       = "/usr/bin/forge"
-	cloudCredentialsID = "dynamic-cloud-credentials"
-	istioCmdArg        = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
+	rootlesskitCommand        = "rootlesskit"
+	forgeCommand              = "/usr/bin/forge"
+	cloudCredentialsID        = "dynamic-cloud-credentials"
+	istioCmdArg               = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
+	buildContextDirVolumeName = "build-context-dir"
+	stateDirVolumeName        = "state-dir"
 )
 
 // creates all supporting resources required by build job
@@ -253,13 +255,13 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 
 	// setup volumes and mounts used by main container
 	buildContextDirVolume := corev1.Volume{
-		Name: "build-context-dir",
+		Name: buildContextDirVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
 	stateDirVolume := corev1.Volume{
-		Name: "state-dir",
+		Name: stateDirVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
