@@ -5,6 +5,9 @@ CRD_OPTIONS ?= "crd:trivialVersions=true"
 # Add extra build flags
 BUILD_FLAGS ?=
 
+# Custom variables
+GOLANGCI_LINT_VERSION=v1.37.1
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -20,7 +23,7 @@ static:
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor $(BUILD_FLAGS)
 
 # Run tests
-test: generate fmt vet golangci-lint manifests
+test: generate fmt vet lint manifests
 	go test ./... -coverprofile cover.out
 
 # Build manager binary
@@ -55,8 +58,9 @@ fmt:
 vet:
 	go vet ./...
 
-golangci-lint:
-	golangci-lint run --skip-dirs docs
+# Run project linters
+lint: golangci-lint-install
+	$(GOLANGCI_LINT) run
 
 # Generate code
 generate: controller-gen
@@ -91,4 +95,16 @@ ifeq (, $(shell which controller-gen))
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+# Install the linter
+golangci-lint-install:
+ifeq (, $(shell which golangci-lint))
+	@{ \
+	set -e;\
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_LINT_VERSION);\
+	}
+GOLANGCI_LINT=$(GOBIN)/golangci-lint
+else
+GOLANGCI_LINT=$(shell which golangci-lint)
 endif
