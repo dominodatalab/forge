@@ -30,23 +30,29 @@ spec:
 
   # push image to one or more registries after build
   pushTo:
-    - my-docker-registry:5000
+    - docker-registry:5000
 
   # configure auth/https for one or more registries (used to pull/push/resolve images)
   registries:
-    # inline basic auth credentials
-    - server: quay.io
-      basicAuth:
-          username: foo
-          password: bar
-    # secret with dockerconfigjson auth credentials
-    - server: docker.io
-      basicAuth:
-        secretName: docker-io-auth
-        secretNamespace: your-ns
-    # registry w/o tls encryption and basic auth
-    - server: my-docker-registry:5000
+    # registry w/o tls encryption with dockerconfigjson auth credentials
+    - server: docker-registry:5000
       nonSSL: true
+      basicAuth:
+        secretName: docker-registry-auth
+        secretNamespace: default
+    # inline basic auth credentials
+    # - server: quay.io
+    #   basicAuth:
+    #       username: foo
+    #       password: bar
+    # secret with dockerconfigjson auth credentials
+    # - server: docker.io
+    #   basicAuth:
+    #     secretName: docker-io-auth
+    #     secretNamespace: your-ns
+    # registry w/o tls encryption and basic auth
+    # - server: my-docker-registry:5000
+    #   nonSSL: true
 
   # override default status update queue name
   messageQueueName: some-different-queue
