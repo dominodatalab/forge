@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -19,6 +18,8 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/h2non/filetype"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/dominodatalab/forge/internal/util"
 )
 
 type mimeType string
@@ -40,29 +41,27 @@ type fileDownloader interface {
 	Get(string) (*http.Response, error)
 }
 
-type Extractor func(logr.Logger, context.Context, string, time.Duration) (*Extraction, error)
+type Extractor func(logr.Logger, context.Context, string, string, time.Duration) (*Extraction, error)
 
 type Extraction struct {
-	RootDir     string
 	Archive     string
 	ContentsDir string
 }
 
-func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout time.Duration) (*Extraction, error) {
+func FetchAndExtract(log logr.Logger, ctx context.Context, url, wd string, timeout time.Duration) (*Extraction, error) {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	wd, err := ioutil.TempDir("", "forge-")
-	if err != nil {
-		return nil, err
+	if err := util.AssertDir(wd); err != nil {
+		return nil, fmt.Errorf("invalid build context directory: %w", err)
 	}
 
 	archive := filepath.Join(wd, "archive")
 
-	err = wait.ExponentialBackoff(defaultBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(defaultBackoff, func() (bool, error) {
 		// TODO in client-go v0.21.0 ExponentialBackoffWithContext can handle this for us
 		select {
 		case <-ctx.Done():
@@ -93,7 +92,6 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url string, timeout t
 	}
 
 	return &Extraction{
-		RootDir:     wd,
 		Archive:     archive,
 		ContentsDir: dest,
 	}, nil

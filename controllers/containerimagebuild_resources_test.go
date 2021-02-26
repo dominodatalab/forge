@@ -21,23 +21,7 @@ import (
 )
 
 func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
-	require.NoError(t, batchv1.AddToScheme(scheme))
-
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
-	fakeRecorder := record.NewFakeRecorder(10)
-
-	controller := &ContainerImageBuildReconciler{
-		Log:      log.NullLogger{},
-		Client:   fakeClient,
-		Recorder: fakeRecorder,
-		JobConfig: &BuildJobConfig{
-			Labels:      make(map[string]string),
-			Annotations: make(map[string]string),
-		},
-		Scheme: scheme,
-	}
+	controller := makeController(t)
 
 	testCases := []struct {
 		cib       *forgev1alpha1.ContainerImageBuild
@@ -88,6 +72,43 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 	}
 }
 
+func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
+	controller := makeController(t)
+
+	cib := &forgev1alpha1.ContainerImageBuild{}
+	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+
+	job := &batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
+
+	expected := corev1.Volume{
+		Name: "build-context-dir",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
+	assert.Contains(t, job.Spec.Template.Spec.Volumes, expected)
+}
+
+func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
+	controller := makeController(t)
+
+	cib := &forgev1alpha1.ContainerImageBuild{}
+	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+
+	job := &batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
+
+	expected := corev1.VolumeMount{
+		Name:      "build-context-dir",
+		ReadOnly:  false,
+		MountPath: "/mnt/build",
+	}
+
+	assert.Contains(t, job.Spec.Template.Spec.Containers[0].VolumeMounts, expected)
+}
+
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -135,5 +156,25 @@ func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 
 			assert.Equal(t, []string{"-c", tt.want}, got)
 		})
+	}
+}
+
+func makeController(t *testing.T) ContainerImageBuildReconciler {
+	scheme := runtime.NewScheme()
+	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+
+	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeRecorder := record.NewFakeRecorder(10)
+
+	return ContainerImageBuildReconciler{
+		Log:      log.NullLogger{},
+		Client:   fakeClient,
+		Recorder: fakeRecorder,
+		JobConfig: &BuildJobConfig{
+			Labels:      make(map[string]string),
+			Annotations: make(map[string]string),
+		},
+		Scheme: scheme,
 	}
 }

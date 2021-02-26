@@ -25,10 +25,12 @@ import (
 )
 
 const (
-	rootlesskitCommand = "rootlesskit"
-	forgeCommand       = "/usr/bin/forge"
-	cloudCredentialsID = "dynamic-cloud-credentials"
-	istioCmdArg        = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
+	rootlesskitCommand        = "rootlesskit"
+	forgeCommand              = "/usr/bin/forge"
+	cloudCredentialsID        = "dynamic-cloud-credentials"
+	istioCmdArg               = "\nEXIT_CODE=$?; wget -qO- --post-data \"\" http://localhost:15020/quitquitquit; exit $EXIT_CODE"
+	buildContextDirVolumeName = "build-context-dir"
+	stateDirVolumeName        = "state-dir"
 )
 
 // creates all supporting resources required by build job
@@ -252,22 +254,36 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	}
 
 	// setup volumes and mounts used by main container
-	volumes := []corev1.Volume{
-		{
-			Name: "state-dir",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
+	buildContextDirVolume := corev1.Volume{
+		Name: buildContextDirVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
+	}
+	stateDirVolume := corev1.Volume{
+		Name: stateDirVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	volumes := []corev1.Volume{
+		buildContextDirVolume,
+		stateDirVolume,
 	}
 	volumes = append(volumes, r.JobConfig.Volumes...)
 	volumes = append(volumes, r.JobConfig.DynamicVolumes...)
 
+	buildContextDirVolumeMount := corev1.VolumeMount{
+		Name:      buildContextDirVolume.Name,
+		MountPath: config.BuildContextPath,
+	}
+	stateDirVolumeMount := corev1.VolumeMount{
+		Name:      stateDirVolume.Name,
+		MountPath: config.GetStateDir(),
+	}
 	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "state-dir",
-			MountPath: config.GetStateDir(),
-		},
+		buildContextDirVolumeMount,
+		stateDirVolumeMount,
 	}
 	volumeMounts = append(volumeMounts, r.JobConfig.VolumeMounts...)
 	volumeMounts = append(volumeMounts, r.JobConfig.DynamicVolumeMounts...)
