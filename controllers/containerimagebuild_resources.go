@@ -333,6 +333,25 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		volumeMounts = append(volumeMounts, *forgeBuildMount)
 	}
 
+	// include any init containers provided in the custom resource
+	for order, initContainer := range cib.Spec.InitContainers {
+		var env []corev1.EnvVar
+		for _, envVar := range initContainer.Env {
+			env = append(env, corev1.EnvVar{
+				Name:  envVar.Name,
+				Value: envVar.Value,
+			})
+		}
+		initContainers = append(initContainers, corev1.Container{
+			Name:         fmt.Sprintf("spec-init-%v", order),
+			Image:        initContainer.Image,
+			Command:      initContainer.Command,
+			Args:         initContainer.Args,
+			Env:          env,
+			VolumeMounts: []corev1.VolumeMount{buildContextDirVolumeMount},
+		})
+	}
+
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
