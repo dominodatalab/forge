@@ -1,0 +1,26 @@
+apiVersion: forge.dominodatalab.com/v1alpha1
+kind: ContainerImageBuild
+metadata:
+  name: build-init-container-sample
+spec:
+  imageName: init-container-sample
+  context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz
+  pushTo:
+    - docker-registry:5000
+  registries:
+    - server: docker-registry:5000
+      nonSSL: true
+      basicAuth:
+        secretName: docker-registry-auth
+        secretNamespace: default
+  initContainers:
+    - image: "busybox"
+      command: ["/bin/sh"]
+      args:
+        - "-c"
+        - "mkdir -p $TARGET_DIR && echo $(date) $MESSAGE > $TARGET_DIR/init-container-output.txt"
+      env:
+        - name: MESSAGE
+          value: "Hello from init container"
+        - name: TARGET_DIR
+          value: "/mnt/build"
