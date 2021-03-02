@@ -84,7 +84,7 @@ func FetchAndExtract(log logr.Logger, ctx context.Context, url, wd string, timeo
 	}
 
 	dest := filepath.Join(wd, "extracted")
-	if err := os.Mkdir(dest, 0755); err != nil {
+	if err := os.MkdirAll(dest, 0755); err != nil {
 		return nil, err
 	}
 	if err := extract(archive, ct, dest); err != nil {

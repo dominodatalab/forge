@@ -18,9 +18,9 @@ spec:
       command: ["/bin/sh"]
       args:
         - "-c"
-        - "mkdir -p $TARGET_DIR && echo $(date) $MESSAGE > $TARGET_DIR/init-container-output.txt"
+        - "mkdir -p $TARGET_DIR && chmod 0777 $TARGET_DIR && echo $(date) $MESSAGE > $TARGET_DIR/init-container-output.txt"
       env:
         - name: MESSAGE
           value: "Hello from init container"
         - name: TARGET_DIR
-          value: "/mnt/build"
+          value: "/mnt/build/extracted"
