@@ -352,13 +352,6 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		})
 	}
 
-	/*
-	TODO Do not mount:
-	  - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-	    name: build-cib3-token-bxxvr
-	    readOnly: true
-	 */
-
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
