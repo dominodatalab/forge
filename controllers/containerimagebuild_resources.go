@@ -343,7 +343,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			})
 		}
 		initContainers = append(initContainers, corev1.Container{
-			Name:         fmt.Sprintf("spec-init-%v", order),
+			Name:         fmt.Sprintf("cib-init-%v", order),
 			Image:        initContainer.Image,
 			Command:      initContainer.Command,
 			Args:         initContainer.Args,
@@ -351,6 +351,13 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			VolumeMounts: []corev1.VolumeMount{buildContextDirVolumeMount},
 		})
 	}
+
+	/*
+	TODO Do not mount:
+	  - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+	    name: build-cib3-token-bxxvr
+	    readOnly: true
+	 */
 
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
