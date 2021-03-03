@@ -54,30 +54,28 @@ function run_test {
 
 function verify_image {
   local image_name=$1
-  local src_path=$2
-  local expected_tarball=$3
+  local src_dir=$2
+  local expected_dir=$3
 
   info "Verifying that the image built by Forge has the expected files at the expected paths"
-  local test_dir="/tmp/$namespace/verify_image"
+  local registry="localhost:32002"
+  local registry_user=marge
+  local registry_password=simpson
 
   info "Logging in to Docker"
-  echo "simpson" | docker login localhost:32002 -u=marge --password-stdin
+  echo "$registry_password" | docker login $registry -u=$registry_user --password-stdin
 
   info "Copying files from image"
-  mkdir -p "$test_dir/actual"
-  docker cp $(docker create localhost:32002/$image_name):$src_path "$test_dir/actual"
-
-  info "Extracting files that are expected to be in the image"
-  mkdir -p "$test_dir/expected"
-  tar -xf "$BASE_DIR/internal/archive/testdata/$expected_tarball" -C "$test_dir/expected"
+  local actual_dir=$(mktemp -d -t actual-XXXXXXXXXX)
+  docker cp $(docker create $registry/$image_name):$src_dir "$actual_dir"
 
   info "Comparing files from the image with expected files"
-  if ! diff "$test_dir/expected/app.py" "$test_dir/actual/app.py"; then
+  if ! diff -r "$expected_dir" "$actual_dir"; then
     error  "diff failed"
     echo "EXPECTED:"
-    ls -lahR "$test_dir/expected"
+    ls -lahR "$expected_dir"
     echo "ACTUAL:"
-    ls -lahR "$test_dir/actual"
+    ls -lahR "$actual_dir"
     exit 1
   fi
 
@@ -185,7 +183,7 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
-verify_image variable-base-app /app simple-app.tar
+verify_image variable-base-app /app $BASE_DIR/internal/archive/testdata/simple-app
 run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
