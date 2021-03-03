@@ -178,6 +178,10 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
+run_test "Build should run custom init container" \
+          e2e/builds/init_container.yaml \
+          test-init-container \
+          "$namespace"
 verify_image
 
 info "All tests ran successfully"
