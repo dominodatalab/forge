@@ -109,6 +109,93 @@ func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
 	assert.Contains(t, job.Spec.Template.Spec.Containers[0].VolumeMounts, expected)
 }
 
+func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
+	controller := makeController(t)
+
+	cib := &forgev1alpha1.ContainerImageBuild{
+		Spec: forgev1alpha1.ContainerImageBuildSpec{
+			InitContainers: []forgev1alpha1.InitContainer{
+				{
+					Image:   "init-container-0-image",
+					Command: []string{"command0"},
+					Args:    []string{"arg0.0", "arg0.1"},
+					Env: []forgev1alpha1.EnvVar{
+						{
+							Name:  "env0.0",
+							Value: "value0.0",
+						},
+						{
+							Name:  "env0.1",
+							Value: "value0.1",
+						},
+					},
+				},
+				{
+					Image:   "init-container-1-image",
+					Command: []string{"command1"},
+					Args:    []string{"arg1.0", "arg1.1"},
+					Env: []forgev1alpha1.EnvVar{
+						{
+							Name:  "env1.0",
+							Value: "value1.0",
+						},
+						{
+							Name:  "env1.1",
+							Value: "value1.1",
+						},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+
+	job := &batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
+
+	expectedVolumeMount := corev1.VolumeMount{
+		Name:      "build-context-dir",
+		MountPath: "/mnt/build",
+	}
+	expected0 := corev1.Container{
+		Name:    "cib-init-0",
+		Image:   "init-container-0-image",
+		Command: []string{"command0"},
+		Args:    []string{"arg0.0", "arg0.1"},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "env0.0",
+				Value: "value0.0",
+			},
+			{
+				Name:  "env0.1",
+				Value: "value0.1",
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{expectedVolumeMount},
+	}
+	expected1 := corev1.Container{
+		Name:    "cib-init-1",
+		Image:   "init-container-1-image",
+		Command: []string{"command1"},
+		Args:    []string{"arg1.0", "arg1.1"},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "env1.0",
+				Value: "value1.0",
+			},
+			{
+				Name:  "env1.1",
+				Value: "value1.1",
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{expectedVolumeMount},
+	}
+
+	assert.Contains(t, job.Spec.Template.Spec.InitContainers, expected0)
+	assert.Contains(t, job.Spec.Template.Spec.InitContainers, expected1)
+}
+
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	tests := []struct {
 		name      string
