@@ -4,7 +4,7 @@ metadata:
   name: build-init-container-sample
 spec:
   imageName: init-container-sample
-  context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz
+  context: https://forge-builder-test.s3-us-west-2.amazonaws.com/test-init-container.tar.gz
   pushTo:
     - docker-registry:5000
   registries:
