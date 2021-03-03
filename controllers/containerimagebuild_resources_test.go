@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -172,6 +173,10 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 				Value: "value0.1",
 			},
 		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: pointer.Int64Ptr(1000),
+		},
+		WorkingDir:   "/mnt/build",
 		VolumeMounts: []corev1.VolumeMount{expectedVolumeMount},
 	}
 	expected1 := corev1.Container{
@@ -189,6 +194,10 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 				Value: "value1.1",
 			},
 		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: pointer.Int64Ptr(1000),
+		},
+		WorkingDir:   "/mnt/build",
 		VolumeMounts: []corev1.VolumeMount{expectedVolumeMount},
 	}
 
