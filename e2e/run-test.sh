@@ -53,6 +53,10 @@ function run_test {
 }
 
 function verify_image {
+  local image_name=$1
+  local src_path=$2
+  local expected_tarball=$3
+
   info "Verifying that the image built by Forge has the expected files at the expected paths"
   local test_dir="/tmp/$namespace/verify_image"
 
@@ -61,16 +65,19 @@ function verify_image {
 
   info "Copying files from image"
   mkdir -p "$test_dir/actual"
-  docker cp $(docker create localhost:32002/variable-base-app:latest):/app/app.py "$test_dir/actual/app.py"
+  docker cp $(docker create localhost:32002/$image_name):$src_path "$test_dir/actual"
 
   info "Extracting files that are expected to be in the image"
   mkdir -p "$test_dir/expected"
-  tar -xf "$BASE_DIR/internal/archive/testdata/simple-app.tar" -C "$test_dir/expected"
+  tar -xf "$BASE_DIR/internal/archive/testdata/$expected_tarball" -C "$test_dir/expected"
 
   info "Comparing files from the image with expected files"
   if ! diff "$test_dir/expected/app.py" "$test_dir/actual/app.py"; then
     error  "diff failed"
-    ls -lahR "$test_dir"
+    echo "EXPECTED:"
+    ls -lahR "$test_dir/expected"
+    echo "ACTUAL:"
+    ls -lahR "$test_dir/actual"
     exit 1
   fi
 
@@ -178,10 +185,10 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
+verify_image variable-base-app:latest /app simple-app.tar
 run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
           "$namespace"
-verify_image
 
 info "All tests ran successfully"
