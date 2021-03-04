@@ -179,11 +179,13 @@ run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
           test-tls-with-basic-auth \
           "$namespace"
+
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
 verify_image variable-base-app /app $BASE_DIR/internal/archive/testdata/expected/simple-app
+
 run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
