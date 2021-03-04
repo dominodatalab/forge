@@ -79,7 +79,7 @@ function verify_image {
     exit 1
   fi
 
-  info "Test succeeded"
+  info "Files in $expected_dir match files in $actual_dir"
 }
 
 if [[ -z $1 ]]; then
@@ -190,5 +190,6 @@ run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
           "$namespace"
+verify_image init-container-files /app $BASE_DIR/internal/archive/testdata/expected/init-container
 
 info "All tests ran successfully"
