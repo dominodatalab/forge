@@ -57,7 +57,7 @@ function verify_image {
   local src_dir=$2
   local expected_dir=$3
 
-  info "Verifying that the image built by Forge has the expected files at the expected paths"
+  info "Verifying that the $image_name image built by Forge has the expected files"
   local registry="localhost:32002"
   local registry_user=marge
   local registry_password=simpson
@@ -69,7 +69,7 @@ function verify_image {
   local actual_dir=$(mktemp -d -t actual-XXXXXXXXXX)
   docker cp $(docker create $registry/$image_name):$src_dir "$actual_dir"
 
-  info "Comparing files from the image with expected files"
+  info "Comparing files from the $image_name image with expected files"
   if ! diff -r "$expected_dir" "$actual_dir"; then
     error  "diff failed"
     echo "EXPECTED:"
