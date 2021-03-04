@@ -1,18 +1,19 @@
 apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
-  name: build-init-container-sample
+  name: test-init-container
 spec:
-  imageName: init-container-sample
+  imageName: init-container-files
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/test-init-container.tar.gz
+  disableBuildCache: true
   pushTo:
-    - docker-registry:5000
+    - docker-registry-2:5000
   registries:
-    - server: docker-registry:5000
+    - server: docker-registry-2:5000
       nonSSL: true
       basicAuth:
-        secretName: docker-registry-auth
-        secretNamespace: default
+        username: marge
+        password: simpson
   initContainers:
     - image: "busybox"
       command: ["/bin/sh"]

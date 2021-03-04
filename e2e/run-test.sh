@@ -53,28 +53,33 @@ function run_test {
 }
 
 function verify_image {
-  info "Verifying that the image built by Forge has the expected files at the expected paths"
-  local test_dir="/tmp/$namespace/verify_image"
+  local image_name=$1
+  local src_dir=$2
+  local expected_dir=$3
+
+  info "Verifying that the $image_name image built by Forge has the expected files"
+  local registry="localhost:32002"
+  local registry_user=marge
+  local registry_password=simpson
 
   info "Logging in to Docker"
-  echo "simpson" | docker login localhost:32002 -u=marge --password-stdin
+  echo "$registry_password" | docker login $registry -u=$registry_user --password-stdin
 
   info "Copying files from image"
-  mkdir -p "$test_dir/actual"
-  docker cp $(docker create localhost:32002/variable-base-app:latest):/app/app.py "$test_dir/actual/app.py"
+  local actual_dir=$(mktemp -d -t actual-XXXXXXXXXX)
+  docker cp $(docker create $registry/$image_name):$src_dir "$actual_dir"
 
-  info "Extracting files that are expected to be in the image"
-  mkdir -p "$test_dir/expected"
-  tar -xf "$BASE_DIR/internal/archive/testdata/simple-app.tar" -C "$test_dir/expected"
-
-  info "Comparing files from the image with expected files"
-  if ! diff "$test_dir/expected/app.py" "$test_dir/actual/app.py"; then
+  info "Comparing files from the $image_name image with expected files"
+  if ! diff -r "$expected_dir" "$actual_dir"; then
     error  "diff failed"
-    ls -lahR "$test_dir"
+    echo "EXPECTED:"
+    ls -lahR "$expected_dir"
+    echo "ACTUAL:"
+    ls -lahR "$actual_dir"
     exit 1
   fi
 
-  info "Test succeeded"
+  info "Files in $expected_dir match files in $actual_dir"
 }
 
 if [[ -z $1 ]]; then
@@ -174,10 +179,17 @@ run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
           test-tls-with-basic-auth \
           "$namespace"
+
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
-verify_image
+verify_image variable-base-app /app $BASE_DIR/internal/archive/testdata/expected/simple-app
+
+run_test "Build should run custom init container" \
+          e2e/builds/init_container.yaml \
+          test-init-container \
+          "$namespace"
+verify_image init-container-files /app $BASE_DIR/internal/archive/testdata/expected/init-container
 
 info "All tests ran successfully"

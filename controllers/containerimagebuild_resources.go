@@ -343,11 +343,15 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			})
 		}
 		initContainers = append(initContainers, corev1.Container{
-			Name:         fmt.Sprintf("cib-init-%v", order),
-			Image:        initContainer.Image,
-			Command:      initContainer.Command,
-			Args:         initContainer.Args,
-			Env:          env,
+			Name:    fmt.Sprintf("cib-init-%v", order),
+			Image:   initContainer.Image,
+			Command: initContainer.Command,
+			Args:    initContainer.Args,
+			Env:     env,
+			SecurityContext: &corev1.SecurityContext{
+				RunAsUser: secCtx.RunAsUser, // Same user as main build container
+			},
+			WorkingDir:   config.BuildContextPath,
 			VolumeMounts: []corev1.VolumeMount{buildContextDirVolumeMount},
 		})
 	}
