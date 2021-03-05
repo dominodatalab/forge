@@ -184,12 +184,12 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
-verify_image variable-base-app /app $BASE_DIR/internal/archive/testdata/expected/simple-app
+verify_image variable-base-app /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
           "$namespace"
-verify_image init-container-files /app $BASE_DIR/internal/archive/testdata/expected/init-container
+verify_image init-container-files /app $BASE_DIR/e2e/testdata/expected/init-container
 
 info "All tests ran successfully"
