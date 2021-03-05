@@ -69,7 +69,7 @@ function verify_image {
   local actual_dir=$(mktemp -d -t actual-XXXXXXXXXX)
   docker cp $(docker create $registry/$image_name):$src_dir "$actual_dir"
 
-  info "Comparing files from the $image_name image with expected files"
+  info "Comparing files in $expected_dir with $actual_dir"
   if ! diff -r "$expected_dir" "$actual_dir"; then
     error  "diff failed"
     echo "EXPECTED:"
@@ -79,7 +79,7 @@ function verify_image {
     exit 1
   fi
 
-  info "Files in $expected_dir match files in $actual_dir"
+  info "Test succeeded for image $image_name"
 }
 
 if [[ -z $1 ]]; then
