@@ -24,7 +24,7 @@ build dispatch via a [custom resource definition][crd].
 Start Kubernetes cluster:
 
 ```
-minikube start
+minikube start --insecure-registry="localhost:32002"
 ```
 
 Install helm on the host:
@@ -89,7 +89,7 @@ go run main.go --build-job-image $IMG
 On a different terminal, create a CIB (container image build) resource to trigger a build:
 
 ```
-kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+kubectl apply -f config/samples/init-container-sample.yaml
 ```
 
 Watch for build pods:
@@ -101,7 +101,7 @@ kubectl get pods | grep build
 Follow the build logs:
 
 ```
-kubectl logs -f example-build-lnf4v
+kubectl logs -f build-init-container-sample-jmnjf
 ```
 
 Confirm that the image was built and uploaded to the Docker registry:
@@ -117,6 +117,17 @@ the job and pod, and then create it again:
 kubectl delete cib example-build
 
 kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+```
+
+### Inspecting generated images
+
+Since minikube was started with an option to allow a local insecure Docker registry on port 32002, a minikube shell
+session will be able to work with images that were pushed to that registry:
+
+```
+minikube ssh
+echo 'simpson' | docker login localhost:32002 -u marge --password-stdin
+docker pull localhost:32002/init-container-sample
 ```
 
 ## Preparer Plugins

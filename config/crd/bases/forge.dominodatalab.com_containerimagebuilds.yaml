@@ -84,6 +84,56 @@ spec:
                 pushed to a registry. By default, an image of any size will be pushed.
               format: int64
               type: integer
+            initContainers:
+              description: Specifies zero or more containers that will run before
+                the build container. This is deliberately not of the Container type
+                to prevent an account with permission for creating the build custom
+                resource from elevating its privilege to what the account running
+                the build job can do. E.g. by being able to specify volume mounts,
+                devices, capabilities, SELinux options, etc.
+              items:
+                description: InitContainer specifies a container that will run before
+                  the build container.
+                properties:
+                  args:
+                    description: Arguments to the entrypoint. The Docker image's CMD
+                      is used if this is not provided.
+                    items:
+                      type: string
+                    type: array
+                  command:
+                    description: Entrypoint array. The Docker image's ENTRYPOINT is
+                      used if this is not provided.
+                    items:
+                      type: string
+                    type: array
+                  env:
+                    description: Environment variables.
+                    items:
+                      description: EnvVar defines a single environment variable.
+                      properties:
+                        name:
+                          description: Name of the environment variable. Must be a
+                            C_IDENTIFIER.
+                          minLength: 1
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          minLength: 1
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
+                  image:
+                    description: Docker image name.
+                    minLength: 1
+                    type: string
+                required:
+                - image
+                type: object
+              type: array
             labels:
               additionalProperties:
                 type: string

@@ -72,6 +72,36 @@ type Registry struct {
 	DynamicCloudCredentials bool `json:"dynamicCloudCredentials"`
 }
 
+// EnvVar defines a single environment variable.
+type EnvVar struct {
+	// Name of the environment variable. Must be a C_IDENTIFIER.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Value of the environment variable.
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value"`
+}
+
+// InitContainer specifies a container that will run before the build container.
+type InitContainer struct {
+	// Docker image name.
+	// +kubebuilder:validation:MinLength=1
+	Image string `json:"image"`
+
+	// Entrypoint array. The Docker image's ENTRYPOINT is used if this is not provided.
+	// +kubebuilder:validation:Optional
+	Command []string `json:"command"`
+
+	// Arguments to the entrypoint. The Docker image's CMD is used if this is not provided.
+	// +kubebuilder:validation:Optional
+	Args []string `json:"args"`
+
+	// Environment variables.
+	// +kubebuilder:validation:Optional
+	Env []EnvVar `json:"env"`
+}
+
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
 type ContainerImageBuildSpec struct {
 	// Name used to build an image.
@@ -134,6 +164,13 @@ type ContainerImageBuildSpec struct {
 	// and the message configuration is missing, then no messages will be published.
 	// +kubebuilder:validation:Optional
 	MessageQueueName string `json:"messageQueueName"`
+
+	// Specifies zero or more containers that will run before the build container.
+	// This is deliberately not of the Container type to prevent an account with permission for creating the build
+	// custom resource from elevating its privilege to what the account running the build job can do. E.g. by being
+	// able to specify volume mounts, devices, capabilities, SELinux options, etc.
+	// +kubebuilder:validation:Optional
+	InitContainers []InitContainer `json:"initContainers"`
 }
 
 // ContainerImageBuildStatus defines the observed state of ContainerImageBuild
