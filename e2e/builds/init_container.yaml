@@ -15,7 +15,8 @@ spec:
         username: marge
         password: simpson
   initContainers:
-    - image: "busybox"
+    - name: "test-init"
+      image: "busybox"
       command: ["/bin/sh"]
       args:
         - "-c"

@@ -130,8 +130,13 @@ spec:
                     description: Docker image name.
                     minLength: 1
                     type: string
+                  name:
+                    description: Name of the init container.
+                    minLength: 1
+                    type: string
                 required:
                 - image
+                - name
                 type: object
               type: array
             labels:
