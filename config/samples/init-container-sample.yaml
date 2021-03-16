@@ -14,7 +14,8 @@ spec:
         secretName: docker-registry-auth
         secretNamespace: default
   initContainers:
-    - image: "busybox"
+    - name: "test-init"
+      image: "busybox"
       command: ["/bin/sh"]
       args:
         - "-c"

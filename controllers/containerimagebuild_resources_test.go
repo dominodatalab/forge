@@ -117,6 +117,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 		Spec: forgev1alpha1.ContainerImageBuildSpec{
 			InitContainers: []forgev1alpha1.InitContainer{
 				{
+					Name:    "init0",
 					Image:   "init-container-0-image",
 					Command: []string{"command0"},
 					Args:    []string{"arg0.0", "arg0.1"},
@@ -132,6 +133,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 					},
 				},
 				{
+					Name:    "init1",
 					Image:   "init-container-1-image",
 					Command: []string{"command1"},
 					Args:    []string{"arg1.0", "arg1.1"},
@@ -159,7 +161,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 		MountPath: "/mnt/build",
 	}
 	expected0 := corev1.Container{
-		Name:    "cib-init-0",
+		Name:    "init0",
 		Image:   "init-container-0-image",
 		Command: []string{"command0"},
 		Args:    []string{"arg0.0", "arg0.1"},
@@ -180,7 +182,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 		VolumeMounts: []corev1.VolumeMount{expectedVolumeMount},
 	}
 	expected1 := corev1.Container{
-		Name:    "cib-init-1",
+		Name:    "init1",
 		Image:   "init-container-1-image",
 		Command: []string{"command1"},
 		Args:    []string{"arg1.0", "arg1.1"},

@@ -85,6 +85,10 @@ type EnvVar struct {
 
 // InitContainer specifies a container that will run before the build container.
 type InitContainer struct {
+	// Name of the init container.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
 	// Docker image name.
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`

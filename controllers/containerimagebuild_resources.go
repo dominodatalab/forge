@@ -334,7 +334,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	}
 
 	// include any init containers provided in the custom resource
-	for order, initContainer := range cib.Spec.InitContainers {
+	for _, initContainer := range cib.Spec.InitContainers {
 		var env []corev1.EnvVar
 		for _, envVar := range initContainer.Env {
 			env = append(env, corev1.EnvVar{
@@ -343,7 +343,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			})
 		}
 		initContainers = append(initContainers, corev1.Container{
-			Name:    fmt.Sprintf("cib-init-%v", order),
+			Name:    initContainer.Name,
 			Image:   initContainer.Image,
 			Command: initContainer.Command,
 			Args:    initContainer.Args,
