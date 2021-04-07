@@ -121,7 +121,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 					Image:   "init-container-0-image",
 					Command: []string{"command0"},
 					Args:    []string{"arg0.0", "arg0.1"},
-					Env: []forgev1alpha1.EnvVar{
+					Env: []corev1.EnvVar{
 						{
 							Name:  "env0.0",
 							Value: "value0.0",
@@ -137,7 +137,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 					Image:   "init-container-1-image",
 					Command: []string{"command1"},
 					Args:    []string{"arg1.0", "arg1.1"},
-					Env: []forgev1alpha1.EnvVar{
+					Env: []corev1.EnvVar{
 						{
 							Name:  "env1.0",
 							Value: "value1.0",

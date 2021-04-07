@@ -335,19 +335,12 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 
 	// include any init containers provided in the custom resource
 	for _, initContainer := range cib.Spec.InitContainers {
-		var env []corev1.EnvVar
-		for _, envVar := range initContainer.Env {
-			env = append(env, corev1.EnvVar{
-				Name:  envVar.Name,
-				Value: envVar.Value,
-			})
-		}
 		initContainers = append(initContainers, corev1.Container{
 			Name:    initContainer.Name,
 			Image:   initContainer.Image,
 			Command: initContainer.Command,
 			Args:    initContainer.Args,
-			Env:     env,
+			Env:     initContainer.Env,
 			SecurityContext: &corev1.SecurityContext{
 				RunAsUser: secCtx.RunAsUser, // Same user as main build container
 			},

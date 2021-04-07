@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"errors"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -72,17 +73,6 @@ type Registry struct {
 	DynamicCloudCredentials bool `json:"dynamicCloudCredentials"`
 }
 
-// EnvVar defines a single environment variable.
-type EnvVar struct {
-	// Name of the environment variable. Must be a C_IDENTIFIER.
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Value of the environment variable.
-	// +kubebuilder:validation:MinLength=1
-	Value string `json:"value"`
-}
-
 // InitContainer specifies a container that will run before the build container.
 type InitContainer struct {
 	// Name of the init container.
@@ -103,7 +93,7 @@ type InitContainer struct {
 
 	// Environment variables.
 	// +kubebuilder:validation:Optional
-	Env []EnvVar `json:"env"`
+	Env []corev1.EnvVar `json:"env"`
 }
 
 // ContainerImageBuildSpec defines the desired state of ContainerImageBuild
