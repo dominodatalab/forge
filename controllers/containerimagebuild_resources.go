@@ -421,7 +421,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			Key: r.JobConfig.TolerationKey,
 			Operator: "Exists",
 		}
-		job.Spec.Tolerations = toleration
+		job.Spec.Template.Spec.Tolerations = toleration
 	}
 
 	return r.withOwnedResource(ctx, cib, job)
