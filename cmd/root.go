@@ -182,7 +182,7 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobImagePullSecret, "build-job-image-pull-secret", "", "Pull secret used to fetch build job images.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
-	rootCmd.Flags().StringToStringVar(&buildJobTolerationKey, "build-job-toleration-key", nil, "Toleration key added to build job pods with 'exists' operator")
+	rootCmd.Flags().StringVar(&buildJobTolerationKey, "build-job-toleration-key", nil, "Toleration key added to build job pods with 'exists' operator")
 	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
 	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
 	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")
