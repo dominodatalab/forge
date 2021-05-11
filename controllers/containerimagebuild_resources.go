@@ -416,13 +416,13 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	}
 
 	if r.JobConfig.ImagePullSecret != "" {
-		var toleration []corev1.Toleration
-    toleration[0] = corev1.Toleration{
+		var tolerations []corev1.Toleration
+    toleration = corev1.Toleration{
 			Effect: "NoSchedule",
 			Key: r.JobConfig.TolerationKey,
 			Operator: "Exists",
 		}
-		job.Spec.Template.Spec.Tolerations = toleration
+		job.Spec.Template.Spec.Tolerations = append(tolerations, toleration)
 	}
 
 	return r.withOwnedResource(ctx, cib, job)
