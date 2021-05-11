@@ -415,7 +415,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		},
 	}
 
-	if r.JobConfig.ImagePullSecret != "" {
+	if r.JobConfig.TolerationKey != "" {
 		var tolerations []corev1.Toleration
 		var toleration = corev1.Toleration{
 			Effect: "NoSchedule",
