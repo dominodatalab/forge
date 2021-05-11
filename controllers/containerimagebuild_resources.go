@@ -378,7 +378,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: r.JobConfig.ImagePullSecret})
 	}
 
-	// construct final job object
+	// construct job object
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cib.Name,
@@ -414,6 +414,15 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			},
 		},
 	}
+
+  if r.JobConfig.ImagePullSecret != "" {
+    var toleration = corev1.Toleration{
+			Effect: "NoSchedule",
+			Key: r.JobConfig.TolerationKey,
+      Operator: "Exists",
+		}
+    job.Spec.Tolerations = toleration
+  }
 
 	return r.withOwnedResource(ctx, cib, job)
 }
