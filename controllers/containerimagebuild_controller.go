@@ -34,7 +34,7 @@ type BuildJobConfig struct {
 	Labels                     map[string]string
 	Annotations                map[string]string
 	NodeSelector               map[string]string
-  TolerationKey              string
+	TolerationKey              string
 	GrantFullPrivilege         bool
 	EnableLayerCaching         bool
 	PodSecurityPolicy          string
