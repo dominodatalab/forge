@@ -378,7 +378,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: r.JobConfig.ImagePullSecret})
 	}
 
-  var tolerations []corev1.Toleration
+	var tolerations []corev1.Toleration
 	if r.JobConfig.TolerationKey != "" {
 		var toleration = corev1.Toleration{
 			Key: r.JobConfig.TolerationKey,
@@ -405,7 +405,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
 					ImagePullSecrets:   imagePullSecrets,
-          Tolerations:				tolerations,
+					Tolerations:				tolerations,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
