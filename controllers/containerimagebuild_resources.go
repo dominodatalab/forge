@@ -378,6 +378,15 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: r.JobConfig.ImagePullSecret})
 	}
 
+  var tolerations []corev1.Toleration
+	if r.JobConfig.TolerationKey != "" {
+		var toleration = corev1.Toleration{
+			Key: r.JobConfig.TolerationKey,
+			Operator: "Exists",
+		}
+		tolerations = append(tolerations, toleration)
+	}
+
 	// construct job object
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -396,6 +405,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
 					ImagePullSecrets:   imagePullSecrets,
+          Tolerations:				tolerations,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
@@ -413,16 +423,6 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 				},
 			},
 		},
-	}
-
-	if r.JobConfig.TolerationKey != "" {
-		var tolerations []corev1.Toleration
-		var toleration = corev1.Toleration{
-			Effect: "NoSchedule",
-			Key: r.JobConfig.TolerationKey,
-			Operator: "Exists",
-		}
-		job.Spec.Template.Spec.Tolerations = append(tolerations, toleration)
 	}
 
 	return r.withOwnedResource(ctx, cib, job)
