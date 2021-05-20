@@ -213,14 +213,14 @@ func TestContainerImageBuildReconciler_tolerations(t *testing.T) {
 	r := &ContainerImageBuildReconciler{
 		JobConfig: &BuildJobConfig{TolerationKey: "toleration1"},
 	}
-	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+	require.NoError(t, r.createJobForBuild(context.Background(), cib))
 	job := &batchv1.Job{}
 	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
 	expected := corev1.Toleration{
 			Key: "toleration1",
 			Operator: "Exists",
 	}
-	assert.Equal(t, job.Spec.Template.Spec.Tolerations, expected)
+	assert.Contains(t, job.Spec.Template.Spec.Tolerations, expected)
 }
 
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
