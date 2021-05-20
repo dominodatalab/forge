@@ -404,7 +404,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
 					ImagePullSecrets:   imagePullSecrets,
-					Tolerations:				tolerations,
+					Tolerations:	    tolerations,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
