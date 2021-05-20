@@ -380,11 +380,10 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 
 	var tolerations []corev1.Toleration
 	if r.JobConfig.TolerationKey != "" {
-		var toleration = corev1.Toleration{
+		tolerations = append(tolerations,  corev1.Toleration{
 			Key: r.JobConfig.TolerationKey,
 			Operator: "Exists",
-		}
-		tolerations = append(tolerations, toleration)
+		})
 	}
 
 	// construct job object
