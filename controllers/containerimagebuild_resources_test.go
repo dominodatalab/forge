@@ -207,6 +207,20 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 	assert.Contains(t, job.Spec.Template.Spec.InitContainers, expected1)
 }
 
+func TestContainerImageBuildReconciler_tolerations(t *testing.T) {
+	controller := makeController(t)
+	cib := &forgev1alpha1.ContainerImageBuild{}
+	controller.JobConfig.TolerationKey = "toleration1"
+	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+	job := &batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
+	expected := corev1.Toleration{
+			Key: "toleration1",
+			Operator: "Exists",
+	}
+	assert.Contains(t, job.Spec.Template.Spec.Tolerations, expected)
+}
+
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	tests := []struct {
 		name      string

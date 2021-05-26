@@ -24,7 +24,7 @@ const (
 Forge is a Kubernetes controller that builds and pushes OCI-compliant images to one or more distribution registries.
 Communication with the controller is achieved via the ContainerImageBuild CRD defined by the project. Forge will watch
 for these resources, launch an image build using the directives provided therein, and update the resource status with
-relevant information such as build state, errors and the final location(s) of the 
+relevant information such as build state, errors and the final location(s) of the
 
 If you need to run preparation steps against a context directory prior to a build, then you can configure one or more
 plugins. This allows users to hook into the build process and add/modify/delete files according to their business
@@ -67,6 +67,7 @@ var (
 	buildJobLabels                     map[string]string
 	buildJobAnnotations                map[string]string
 	buildJobNodeSelector               map[string]string
+	buildJobTolerationKey              string
 	buildJobCustomCASecret             string
 	buildJobPodSecurityPolicy          string
 	buildJobSecurityContextConstraints string
@@ -108,6 +109,7 @@ var (
 					CustomCASecret:             buildJobCustomCASecret,
 					PreparerPluginPath:         preparerPluginsPath,
 					Labels:                     buildJobLabels,
+					TolerationKey:              buildJobTolerationKey,
 					Annotations:                buildJobAnnotations,
 					NodeSelector:               buildJobNodeSelector,
 					PodSecurityPolicy:          buildJobPodSecurityPolicy,
@@ -180,6 +182,7 @@ func init() {
 	rootCmd.Flags().StringVar(&buildJobImagePullSecret, "build-job-image-pull-secret", "", "Pull secret used to fetch build job images.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
+	rootCmd.Flags().StringVar(&buildJobTolerationKey, "build-job-toleration-key", "", "Toleration key added to build job pods with 'exists' operator")
 	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
 	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
 	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")

@@ -378,7 +378,15 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: r.JobConfig.ImagePullSecret})
 	}
 
-	// construct final job object
+	var tolerations []corev1.Toleration
+	if r.JobConfig.TolerationKey != "" {
+		tolerations = append(tolerations,  corev1.Toleration{
+			Key: r.JobConfig.TolerationKey,
+			Operator: "Exists",
+		})
+	}
+
+	// construct job object
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cib.Name,
@@ -396,6 +404,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
 					ImagePullSecrets:   imagePullSecrets,
+					Tolerations:	    tolerations,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
