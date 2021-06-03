@@ -31,6 +31,27 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 		{
 			cib: &forgev1alpha1.ContainerImageBuild{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cib-resources",
+				},
+				Spec: forgev1alpha1.ContainerImageBuildSpec{
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("666m"),
+							"memory": resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+			resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"cpu":    resource.MustParse("666m"),
+					"memory": resource.MustParse("1G"),
+				},
+			},
+		},
+		{
+			cib: &forgev1alpha1.ContainerImageBuild{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cib-resource-quota",
 				},
 				Spec: forgev1alpha1.ContainerImageBuildSpec{
@@ -215,8 +236,8 @@ func TestContainerImageBuildReconciler_tolerations(t *testing.T) {
 	job := &batchv1.Job{}
 	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
 	expected := corev1.Toleration{
-			Key: "toleration1",
-			Operator: "Exists",
+		Key:      "toleration1",
+		Operator: "Exists",
 	}
 	assert.Contains(t, job.Spec.Template.Spec.Tolerations, expected)
 }
