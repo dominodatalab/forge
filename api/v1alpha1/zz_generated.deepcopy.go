@@ -108,6 +108,7 @@ func (in *ContainerImageBuildSpec) DeepCopyInto(out *ContainerImageBuildSpec) {
 			(*out)[key] = val
 		}
 	}
+	in.Resources.DeepCopyInto(&out.Resources)
 	if in.PluginData != nil {
 		in, out := &in.PluginData, &out.PluginData
 		*out = make(map[string]string, len(*in))

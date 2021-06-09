@@ -133,6 +133,10 @@ type ContainerImageBuildSpec struct {
 	// +kubebuilder:validation:Optional
 	Memory string `json:"memory"`
 
+	// Resources are the requests and limits applied to image builds.
+	// +kubebuilder:validation:Optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
 	// Optional deadline in seconds for image build to complete.
 	// +kubebuilder:validation:Optional
 	TimeoutSeconds uint16 `json:"timeoutSeconds"`

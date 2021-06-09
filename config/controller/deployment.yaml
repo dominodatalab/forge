@@ -21,7 +21,6 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - crd-apply
-      terminationGracePeriodSeconds: 10
       containers:
         - name: controller
           image: quay.io/domino/forge:latest

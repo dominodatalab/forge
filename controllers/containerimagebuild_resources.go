@@ -349,10 +349,16 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 		})
 	}
 
-	resources := corev1.ResourceRequirements{
-		Limits:   corev1.ResourceList{},
-		Requests: corev1.ResourceList{},
+	resources := cib.Spec.Resources
+
+	if resources.Limits == nil {
+		resources.Limits = corev1.ResourceList{}
 	}
+
+	if resources.Requests == nil {
+		resources.Requests = corev1.ResourceList{}
+	}
+
 	if cib.Spec.CPU != "" {
 		cpu, err := resource.ParseQuantity(cib.Spec.CPU)
 		if err != nil {
@@ -380,8 +386,8 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 
 	var tolerations []corev1.Toleration
 	if r.JobConfig.TolerationKey != "" {
-		tolerations = append(tolerations,  corev1.Toleration{
-			Key: r.JobConfig.TolerationKey,
+		tolerations = append(tolerations, corev1.Toleration{
+			Key:      r.JobConfig.TolerationKey,
 			Operator: "Exists",
 		})
 	}
@@ -404,7 +410,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 					InitContainers:     initContainers,
 					SecurityContext:    podSecCtx,
 					ImagePullSecrets:   imagePullSecrets,
-					Tolerations:	    tolerations,
+					Tolerations:        tolerations,
 					Containers: []corev1.Container{
 						{
 							Name:            "forge-build",
