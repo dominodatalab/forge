@@ -365,8 +365,8 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			return errors.Wrap(err, fmt.Sprintf("could not parse `cpu` field: %s", cib.Spec.CPU))
 		}
 
-		resources.Limits["cpu"] = cpu
-		resources.Requests["cpu"] = cpu
+		resources.Limits[corev1.ResourceCPU] = cpu
+		resources.Requests[corev1.ResourceCPU] = cpu
 	}
 
 	if cib.Spec.Memory != "" {
@@ -375,8 +375,8 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 			return errors.Wrap(err, fmt.Sprintf("could not parse `memory` field: %s", cib.Spec.Memory))
 		}
 
-		resources.Limits["memory"] = memory
-		resources.Requests["memory"] = memory
+		resources.Limits[corev1.ResourceMemory] = memory
+		resources.Requests[corev1.ResourceMemory] = memory
 	}
 
 	var imagePullSecrets []corev1.LocalObjectReference
@@ -388,7 +388,7 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	if r.JobConfig.TolerationKey != "" {
 		tolerations = append(tolerations, corev1.Toleration{
 			Key:      r.JobConfig.TolerationKey,
-			Operator: "Exists",
+			Operator: corev1.TolerationOpExists,
 		})
 	}
 
