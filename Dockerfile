@@ -20,7 +20,7 @@ RUN ./autogen.sh --disable-nls --disable-man --without-audit --without-selinux -
     make && \
     cp src/newuidmap src/newgidmap /usr/bin/
 
-FROM golang:1.13-alpine3.12 AS gobase
+FROM golang:1.15-alpine3.12 AS gobase
 RUN apk add --no-cache \
         bash \
         build-base \
