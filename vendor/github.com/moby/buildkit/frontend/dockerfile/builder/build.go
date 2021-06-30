@@ -14,13 +14,15 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/platforms"
-	"github.com/docker/docker/builder/dockerignore"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/exporter/containerimage/exptypes"
 	"github.com/moby/buildkit/frontend/dockerfile/dockerfile2llb"
+	"github.com/moby/buildkit/frontend/dockerfile/dockerignore"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/moby/buildkit/frontend/gateway/client"
 	gwpb "github.com/moby/buildkit/frontend/gateway/pb"
+	"github.com/moby/buildkit/solver/errdefs"
 	"github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/apicaps"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -51,15 +53,23 @@ const (
 	keyNameDockerfile          = "dockerfilekey"
 	keyContextSubDir           = "contextsubdir"
 	keyContextKeepGitDir       = "build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR"
+	keySyntax                  = "build-arg:BUILDKIT_SYNTAX"
+	keyMultiPlatformArg        = "build-arg:BUILDKIT_MULTI_PLATFORM"
+	keyHostname                = "hostname"
 )
 
 var httpPrefix = regexp.MustCompile(`^https?://`)
-var gitUrlPathWithFragmentSuffix = regexp.MustCompile(`\.git(?:#.+)?$`)
+var gitURLPathWithFragmentSuffix = regexp.MustCompile(`\.git(?:#.+)?$`)
 
 func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	opts := c.BuildOpts().Opts
 	caps := c.BuildOpts().LLBCaps
 	gwcaps := c.BuildOpts().Caps
+
+	allowForward, capsError := validateCaps(opts["frontend.caps"])
+	if !allowForward && capsError != nil {
+		return nil, capsError
+	}
 
 	marshalOpts := []llb.ConstraintsOpt{llb.WithCaps(caps)}
 
@@ -121,8 +131,15 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 
 	name := "load build definition from " + filename
 
+	filenames := []string{filename, filename + ".dockerignore"}
+
+	// dockerfile is also supported casing moby/moby#10858
+	if path.Base(filename) == defaultDockerfileName {
+		filenames = append(filenames, path.Join(path.Dir(filename), strings.ToLower(defaultDockerfileName)))
+	}
+
 	src := llb.Local(localNameDockerfile,
-		llb.FollowPaths([]string{filename, filename + ".dockerignore"}),
+		llb.FollowPaths(filenames),
 		llb.SessionID(c.BuildOpts().SessionID),
 		llb.SharedKeyHint(localNameDockerfile),
 		dockerfile2llb.WithInternalName(name),
@@ -139,7 +156,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 		buildContext = st
 	} else if httpPrefix.MatchString(opts[localNameContext]) {
 		httpContext := llb.HTTP(opts[localNameContext], llb.Filename("context"), dockerfile2llb.WithInternalName("load remote build context"))
-		def, err := httpContext.Marshal(marshalOpts...)
+		def, err := httpContext.Marshal(ctx, marshalOpts...)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to marshal httpcontext")
 		}
@@ -162,7 +179,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 			},
 		})
 		if err != nil {
-			return nil, errors.Errorf("failed to read downloaded context")
+			return nil, errors.Wrapf(err, "failed to read downloaded context")
 		}
 		if isArchive(dt) {
 			if fileop {
@@ -221,10 +238,12 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 		}
 	}
 
-	def, err := src.Marshal(marshalOpts...)
+	def, err := src.Marshal(ctx, marshalOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal local source")
 	}
+
+	var sourceMap *llb.SourceMap
 
 	eg, ctx2 := errgroup.WithContext(ctx)
 	var dtDockerfile []byte
@@ -247,8 +266,23 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 			Filename: filename,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "failed to read dockerfile")
+			fallback := false
+			if path.Base(filename) == defaultDockerfileName {
+				var err1 error
+				dtDockerfile, err1 = ref.ReadFile(ctx2, client.ReadRequest{
+					Filename: path.Join(path.Dir(filename), strings.ToLower(defaultDockerfileName)),
+				})
+				if err1 == nil {
+					fallback = true
+				}
+			}
+			if !fallback {
+				return errors.Wrapf(err, "failed to read dockerfile")
+			}
 		}
+
+		sourceMap = llb.NewSourceMap(&src, filename, dtDockerfile)
+		sourceMap.Definition = def
 
 		dt, err := ref.ReadFile(ctx2, client.ReadRequest{
 			Filename: filename + ".dockerignore",
@@ -271,7 +305,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 				)
 				dockerignoreState = &st
 			}
-			def, err := dockerignoreState.Marshal(marshalOpts...)
+			def, err := dockerignoreState.Marshal(ctx, marshalOpts...)
 			if err != nil {
 				return err
 			}
@@ -310,14 +344,35 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	}
 
 	if _, ok := opts["cmdline"]; !ok {
-		ref, cmdline, ok := dockerfile2llb.DetectSyntax(bytes.NewBuffer(dtDockerfile))
-		if ok {
-			return forwardGateway(ctx, c, ref, cmdline)
+		if cmdline, ok := opts[keySyntax]; ok {
+			p := strings.SplitN(strings.TrimSpace(cmdline), " ", 2)
+			res, err := forwardGateway(ctx, c, p[0], cmdline)
+			if err != nil && len(errdefs.Sources(err)) == 0 {
+				return nil, errors.Wrapf(err, "failed with %s = %s", keySyntax, cmdline)
+			}
+			return res, err
+		} else if ref, cmdline, loc, ok := dockerfile2llb.DetectSyntax(bytes.NewBuffer(dtDockerfile)); ok {
+			res, err := forwardGateway(ctx, c, ref, cmdline)
+			if err != nil && len(errdefs.Sources(err)) == 0 {
+				return nil, wrapSource(err, sourceMap, loc)
+			}
+			return res, err
 		}
+	}
+
+	if capsError != nil {
+		return nil, capsError
+	}
+
+	if res, ok, err := checkSubRequest(ctx, opts); ok {
+		return res, err
 	}
 
 	exportMap := len(targetPlatforms) > 1
 
+	if v := opts[keyMultiPlatformArg]; v != "" {
+		opts[keyMultiPlatform] = v
+	}
 	if v := opts[keyMultiPlatform]; v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
@@ -338,7 +393,13 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 
 	for i, tp := range targetPlatforms {
 		func(i int, tp *specs.Platform) {
-			eg.Go(func() error {
+			eg.Go(func() (err error) {
+				defer func() {
+					var el *parser.ErrorLocation
+					if errors.As(err, &el) {
+						err = wrapSource(err, sourceMap, el.Location)
+					}
+				}()
 				st, img, err := dockerfile2llb.Dockerfile2LLB(ctx, dtDockerfile, dockerfile2llb.ConvertOpt{
 					Target:            opts[keyTarget],
 					MetaResolver:      c,
@@ -357,13 +418,15 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 					ForceNetMode:      defaultNetMode,
 					OverrideCopyImage: opts[keyOverrideCopyImage],
 					LLBCaps:           &caps,
+					SourceMap:         sourceMap,
+					Hostname:          opts[keyHostname],
 				})
 
 				if err != nil {
 					return errors.Wrapf(err, "failed to create LLB definition")
 				}
 
-				def, err := st.Marshal()
+				def, err := st.Marshal(ctx)
 				if err != nil {
 					return errors.Wrapf(err, "failed to marshal LLB definition")
 				}
@@ -467,7 +530,7 @@ func forwardGateway(ctx context.Context, c client.Client, ref string, cmdline st
 
 		frontendInputs = make(map[string]*pb.Definition)
 		for name, state := range inputs {
-			def, err := state.Marshal()
+			def, err := state.Marshal(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -494,7 +557,7 @@ func filter(opt map[string]string, key string) map[string]string {
 
 func detectGitContext(ref, gitContext string) (*llb.State, bool) {
 	found := false
-	if httpPrefix.MatchString(ref) && gitUrlPathWithFragmentSuffix.MatchString(ref) {
+	if httpPrefix.MatchString(ref) && gitURLPathWithFragmentSuffix.MatchString(ref) {
 		found = true
 	}
 
@@ -638,4 +701,31 @@ func scopeToSubDir(c *llb.State, fileop bool, dir string) *llb.State {
 	unpack.AddMount("/src", *c, llb.Readonly)
 	bc := unpack.AddMount("/out", llb.Scratch())
 	return &bc
+}
+
+func wrapSource(err error, sm *llb.SourceMap, ranges []parser.Range) error {
+	if sm == nil {
+		return err
+	}
+	s := errdefs.Source{
+		Info: &pb.SourceInfo{
+			Data:       sm.Data,
+			Filename:   sm.Filename,
+			Definition: sm.Definition.ToPB(),
+		},
+		Ranges: make([]*pb.Range, 0, len(ranges)),
+	}
+	for _, r := range ranges {
+		s.Ranges = append(s.Ranges, &pb.Range{
+			Start: pb.Position{
+				Line:      int32(r.Start.Line),
+				Character: int32(r.Start.Character),
+			},
+			End: pb.Position{
+				Line:      int32(r.End.Line),
+				Character: int32(r.End.Character),
+			},
+		})
+	}
+	return errdefs.WithSource(err, s)
 }

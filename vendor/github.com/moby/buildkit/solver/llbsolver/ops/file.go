@@ -12,8 +12,10 @@ import (
 
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/cache/metadata"
+	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/solver"
 	"github.com/moby/buildkit/solver/llbsolver"
+	"github.com/moby/buildkit/solver/llbsolver/errdefs"
 	"github.com/moby/buildkit/solver/llbsolver/file"
 	"github.com/moby/buildkit/solver/llbsolver/ops/fileoptypes"
 	"github.com/moby/buildkit/solver/pb"
@@ -22,33 +24,36 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 const fileCacheType = "buildkit.file.v0"
 
 type fileOp struct {
-	op        *pb.FileOp
-	md        *metadata.Store
-	w         worker.Worker
-	solver    *FileOpSolver
-	numInputs int
+	op          *pb.FileOp
+	md          *metadata.Store
+	w           worker.Worker
+	solver      *FileOpSolver
+	numInputs   int
+	parallelism *semaphore.Weighted
 }
 
-func NewFileOp(v solver.Vertex, op *pb.Op_File, cm cache.Manager, md *metadata.Store, w worker.Worker) (solver.Op, error) {
+func NewFileOp(v solver.Vertex, op *pb.Op_File, cm cache.Manager, parallelism *semaphore.Weighted, md *metadata.Store, w worker.Worker) (solver.Op, error) {
 	if err := llbsolver.ValidateOp(&pb.Op{Op: op}); err != nil {
 		return nil, err
 	}
 	return &fileOp{
-		op:        op.File,
-		md:        md,
-		numInputs: len(v.Inputs()),
-		w:         w,
-		solver:    NewFileOpSolver(&file.Backend{}, file.NewRefManager(cm)),
+		op:          op.File,
+		md:          md,
+		numInputs:   len(v.Inputs()),
+		w:           w,
+		solver:      NewFileOpSolver(w, &file.Backend{}, file.NewRefManager(cm)),
+		parallelism: parallelism,
 	}, nil
 }
 
-func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, bool, error) {
-	selectors := map[int]map[llbsolver.Selector]struct{}{}
+func (f *fileOp) CacheMap(ctx context.Context, g session.Group, index int) (*solver.CacheMap, bool, error) {
+	selectors := map[int][]llbsolver.Selector{}
 	invalidSelectors := map[int]struct{}{}
 
 	actions := make([][]byte, 0, len(f.op.Actions))
@@ -58,6 +63,8 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 			invalidSelectors[int(idx)] = struct{}{}
 		}
 	}
+
+	indexes := make([][]int, 0, len(f.op.Actions))
 
 	for _, action := range f.op.Actions {
 		var dt []byte
@@ -91,7 +98,7 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 			markInvalid(action.Input)
 			processOwner(p.Owner, selectors)
 			if action.SecondaryInput != -1 && int(action.SecondaryInput) < f.numInputs {
-				addSelector(selectors, int(action.SecondaryInput), p.Src, p.AllowWildcard, p.FollowSymlink)
+				addSelector(selectors, int(action.SecondaryInput), p.Src, p.AllowWildcard, p.FollowSymlink, p.IncludePatterns, p.ExcludePatterns)
 				p.Src = path.Base(p.Src)
 			}
 			dt, err = json.Marshal(p)
@@ -101,14 +108,21 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 		}
 
 		actions = append(actions, dt)
+		indexes = append(indexes, []int{int(action.Input), int(action.SecondaryInput), int(action.Output)})
+	}
+
+	if isDefaultIndexes(indexes) {
+		indexes = nil
 	}
 
 	dt, err := json.Marshal(struct {
 		Type    string
 		Actions [][]byte
+		Indexes [][]int `json:"indexes,omitempty"`
 	}{
 		Type:    fileCacheType,
 		Actions: actions,
+		Indexes: indexes,
 	})
 	if err != nil {
 		return nil, false, err
@@ -119,6 +133,7 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 		Deps: make([]struct {
 			Selector          digest.Digest
 			ComputeDigestFunc solver.ResultBasedCacheFunc
+			PreprocessFunc    solver.PreprocessFunc
 		}, f.numInputs),
 	}
 
@@ -127,7 +142,7 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 			continue
 		}
 		dgsts := make([][]byte, 0, len(m))
-		for k := range m {
+		for _, k := range m {
 			dgsts = append(dgsts, []byte(k.Path))
 		}
 		sort.Slice(dgsts, func(i, j int) bool {
@@ -137,11 +152,14 @@ func (f *fileOp) CacheMap(ctx context.Context, index int) (*solver.CacheMap, boo
 
 		cm.Deps[idx].ComputeDigestFunc = llbsolver.NewContentHashFunc(dedupeSelectors(m))
 	}
+	for idx := range cm.Deps {
+		cm.Deps[idx].PreprocessFunc = llbsolver.UnlazyResultFunc
+	}
 
 	return cm, true, nil
 }
 
-func (f *fileOp) Exec(ctx context.Context, inputs []solver.Result) ([]solver.Result, error) {
+func (f *fileOp) Exec(ctx context.Context, g session.Group, inputs []solver.Result) ([]solver.Result, error) {
 	inpRefs := make([]fileoptypes.Ref, 0, len(inputs))
 	for _, inp := range inputs {
 		workerRef, ok := inp.Sys().(*worker.WorkerRef)
@@ -151,7 +169,7 @@ func (f *fileOp) Exec(ctx context.Context, inputs []solver.Result) ([]solver.Res
 		inpRefs = append(inpRefs, workerRef.ImmutableRef)
 	}
 
-	outs, err := f.solver.Solve(ctx, inpRefs, f.op.Actions)
+	outs, err := f.solver.Solve(ctx, inpRefs, f.op.Actions, g)
 	if err != nil {
 		return nil, err
 	}
@@ -164,21 +182,29 @@ func (f *fileOp) Exec(ctx context.Context, inputs []solver.Result) ([]solver.Res
 	return outResults, nil
 }
 
-func addSelector(m map[int]map[llbsolver.Selector]struct{}, idx int, sel string, wildcard, followLinks bool) {
-	mm, ok := m[idx]
-	if !ok {
-		mm = map[llbsolver.Selector]struct{}{}
-		m[idx] = mm
+func (f *fileOp) Acquire(ctx context.Context) (solver.ReleaseFunc, error) {
+	if f.parallelism == nil {
+		return func() {}, nil
 	}
-	s := llbsolver.Selector{Path: sel}
+	err := f.parallelism.Acquire(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	return func() {
+		f.parallelism.Release(1)
+	}, nil
+}
 
-	if wildcard && containsWildcards(sel) {
-		s.Wildcard = true
+func addSelector(m map[int][]llbsolver.Selector, idx int, sel string, wildcard, followLinks bool, includePatterns, excludePatterns []string) {
+	s := llbsolver.Selector{
+		Path:            sel,
+		FollowLinks:     followLinks,
+		Wildcard:        wildcard && containsWildcards(sel),
+		IncludePatterns: includePatterns,
+		ExcludePatterns: excludePatterns,
 	}
-	if followLinks {
-		s.FollowLinks = true
-	}
-	mm[s] = struct{}{}
+
+	m[idx] = append(m[idx], s)
 }
 
 func containsWildcards(name string) bool {
@@ -194,11 +220,11 @@ func containsWildcards(name string) bool {
 	return false
 }
 
-func dedupeSelectors(m map[llbsolver.Selector]struct{}) []llbsolver.Selector {
+func dedupeSelectors(m []llbsolver.Selector) []llbsolver.Selector {
 	paths := make([]string, 0, len(m))
 	pathsFollow := make([]string, 0, len(m))
-	for sel := range m {
-		if !sel.Wildcard {
+	for _, sel := range m {
+		if !sel.HasWildcardOrFilters() {
 			if sel.FollowLinks {
 				pathsFollow = append(pathsFollow, sel.Path)
 			} else {
@@ -217,8 +243,8 @@ func dedupeSelectors(m map[llbsolver.Selector]struct{}) []llbsolver.Selector {
 		selectors = append(selectors, llbsolver.Selector{Path: p, FollowLinks: true})
 	}
 
-	for sel := range m {
-		if sel.Wildcard {
+	for _, sel := range m {
+		if sel.HasWildcardOrFilters() {
 			selectors = append(selectors, sel)
 		}
 	}
@@ -230,7 +256,7 @@ func dedupeSelectors(m map[llbsolver.Selector]struct{}) []llbsolver.Selector {
 	return selectors
 }
 
-func processOwner(chopt *pb.ChownOpt, selectors map[int]map[llbsolver.Selector]struct{}) error {
+func processOwner(chopt *pb.ChownOpt, selectors map[int][]llbsolver.Selector) error {
 	if chopt == nil {
 		return nil
 	}
@@ -239,7 +265,7 @@ func processOwner(chopt *pb.ChownOpt, selectors map[int]map[llbsolver.Selector]s
 			if u.ByName.Input < 0 {
 				return errors.Errorf("invalid user index %d", u.ByName.Input)
 			}
-			addSelector(selectors, int(u.ByName.Input), "/etc/passwd", false, true)
+			addSelector(selectors, int(u.ByName.Input), "/etc/passwd", false, true, nil, nil)
 		}
 	}
 	if chopt.Group != nil {
@@ -247,14 +273,15 @@ func processOwner(chopt *pb.ChownOpt, selectors map[int]map[llbsolver.Selector]s
 			if u.ByName.Input < 0 {
 				return errors.Errorf("invalid user index %d", u.ByName.Input)
 			}
-			addSelector(selectors, int(u.ByName.Input), "/etc/group", false, true)
+			addSelector(selectors, int(u.ByName.Input), "/etc/group", false, true, nil, nil)
 		}
 	}
 	return nil
 }
 
-func NewFileOpSolver(b fileoptypes.Backend, r fileoptypes.RefManager) *FileOpSolver {
+func NewFileOpSolver(w worker.Worker, b fileoptypes.Backend, r fileoptypes.RefManager) *FileOpSolver {
 	return &FileOpSolver{
+		w:    w,
 		b:    b,
 		r:    r,
 		outs: map[int]int{},
@@ -263,6 +290,7 @@ func NewFileOpSolver(b fileoptypes.Backend, r fileoptypes.RefManager) *FileOpSol
 }
 
 type FileOpSolver struct {
+	w worker.Worker
 	b fileoptypes.Backend
 	r fileoptypes.RefManager
 
@@ -278,7 +306,7 @@ type input struct {
 	ref            fileoptypes.Ref
 }
 
-func (s *FileOpSolver) Solve(ctx context.Context, inputs []fileoptypes.Ref, actions []*pb.FileAction) ([]fileoptypes.Ref, error) {
+func (s *FileOpSolver) Solve(ctx context.Context, inputs []fileoptypes.Ref, actions []*pb.FileAction, g session.Group) ([]fileoptypes.Ref, error) {
 	for i, a := range actions {
 		if int(a.Input) < -1 || int(a.Input) >= len(inputs)+len(actions) {
 			return nil, errors.Errorf("invalid input index %d, %d provided", a.Input, len(inputs)+len(actions))
@@ -336,9 +364,9 @@ func (s *FileOpSolver) Solve(ctx context.Context, inputs []fileoptypes.Ref, acti
 				if err := s.validate(idx, inputs, actions, nil); err != nil {
 					return err
 				}
-				inp, err := s.getInput(ctx, idx, inputs, actions)
+				inp, err := s.getInput(ctx, idx, inputs, actions, g)
 				if err != nil {
-					return err
+					return errdefs.WithFileActionError(err, idx-len(inputs))
 				}
 				outs[i] = inp.ref
 				return nil
@@ -377,7 +405,7 @@ func (s *FileOpSolver) validate(idx int, inputs []fileoptypes.Ref, actions []*pb
 	return nil
 }
 
-func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptypes.Ref, actions []*pb.FileAction) (input, error) {
+func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptypes.Ref, actions []*pb.FileAction, g session.Group) (input, error) {
 	inp, err := s.g.Do(ctx, fmt.Sprintf("inp-%d", idx), func(ctx context.Context) (_ interface{}, err error) {
 		s.mu.Lock()
 		inp := s.ins[idx]
@@ -396,31 +424,53 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 
 		var inpMount, inpMountSecondary fileoptypes.Mount
 		var toRelease []fileoptypes.Mount
-		var inpMountPrepared bool
+		action := actions[idx-len(inputs)]
+
 		defer func() {
+			if err != nil && inpMount != nil {
+				inputRes := make([]solver.Result, len(inputs))
+				for i, input := range inputs {
+					inputRes[i] = worker.NewWorkerRefResult(input.(cache.ImmutableRef), s.w)
+				}
+
+				outputRes := make([]solver.Result, len(actions))
+
+				// Commit the mutable for the primary input of the failed action.
+				if !inpMount.Readonly() {
+					ref, cerr := s.r.Commit(ctx, inpMount)
+					if cerr == nil {
+						outputRes[idx-len(inputs)] = worker.NewWorkerRefResult(ref.(cache.ImmutableRef), s.w)
+					}
+				}
+
+				// If the action has a secondary input, commit it and set the ref on
+				// the output results.
+				if inpMountSecondary != nil && !inpMountSecondary.Readonly() {
+					ref2, cerr := s.r.Commit(ctx, inpMountSecondary)
+					if cerr == nil {
+						outputRes[int(action.SecondaryInput)-len(inputs)] = worker.NewWorkerRefResult(ref2.(cache.ImmutableRef), s.w)
+					}
+				}
+
+				err = errdefs.WithExecError(err, inputRes, outputRes)
+			}
 			for _, m := range toRelease {
 				m.Release(context.TODO())
 			}
-			if err != nil && inpMount != nil && inpMountPrepared {
-				inpMount.Release(context.TODO())
-			}
 		}()
-
-		action := actions[idx-len(inputs)]
 
 		loadInput := func(ctx context.Context) func() error {
 			return func() error {
-				inp, err := s.getInput(ctx, int(action.Input), inputs, actions)
+				inp, err := s.getInput(ctx, int(action.Input), inputs, actions, g)
 				if err != nil {
 					return err
 				}
 				if inp.ref != nil {
-					m, err := s.r.Prepare(ctx, inp.ref, false)
+					m, err := s.r.Prepare(ctx, inp.ref, false, g)
 					if err != nil {
 						return err
 					}
 					inpMount = m
-					inpMountPrepared = true
 					return nil
 				}
 				inpMount = inp.mount
@@ -430,12 +480,12 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 
 		loadSecondaryInput := func(ctx context.Context) func() error {
 			return func() error {
-				inp, err := s.getInput(ctx, int(action.SecondaryInput), inputs, actions)
+				inp, err := s.getInput(ctx, int(action.SecondaryInput), inputs, actions, g)
 				if err != nil {
 					return err
 				}
 				if inp.ref != nil {
-					m, err := s.r.Prepare(ctx, inp.ref, true)
+					m, err := s.r.Prepare(ctx, inp.ref, true, g)
 					if err != nil {
 						return err
 					}
@@ -458,12 +508,12 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 				if u.ByName.Input < 0 {
 					return nil, errors.Errorf("invalid user index: %d", u.ByName.Input)
 				}
-				inp, err := s.getInput(ctx, int(u.ByName.Input), inputs, actions)
+				inp, err := s.getInput(ctx, int(u.ByName.Input), inputs, actions, g)
 				if err != nil {
 					return nil, err
 				}
 				if inp.ref != nil {
-					mm, err := s.r.Prepare(ctx, inp.ref, true)
+					mm, err := s.r.Prepare(ctx, inp.ref, true, g)
 					if err != nil {
 						return nil, err
 					}
@@ -514,12 +564,11 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 		}
 
 		if inpMount == nil {
-			m, err := s.r.Prepare(ctx, nil, false)
+			m, err := s.r.Prepare(ctx, nil, false, g)
 			if err != nil {
 				return nil, err
 			}
 			inpMount = m
-			inpMountPrepared = true
 		}
 
 		switch a := action.Action.(type) {
@@ -545,7 +594,7 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 			}
 		case *pb.FileAction_Copy:
 			if inpMountSecondary == nil {
-				m, err := s.r.Prepare(ctx, nil, true)
+				m, err := s.r.Prepare(ctx, nil, true, g)
 				if err != nil {
 					return nil, err
 				}
@@ -580,4 +629,40 @@ func (s *FileOpSolver) getInput(ctx context.Context, idx int, inputs []fileoptyp
 		return input{}, err
 	}
 	return inp.(input), err
+}
+
+func isDefaultIndexes(idxs [][]int) bool {
+	// Older version of checksum did not contain indexes for actions resulting in possibility for a wrong cache match.
+	// We detect the most common pattern for indexes and maintain old checksum for that case to minimize cache misses on upgrade.
+	// If a future change causes braking changes in instruction cache consider removing this exception.
+	if len(idxs) == 0 {
+		return false
+	}
+
+	for i, idx := range idxs {
+		if len(idx) != 3 {
+			return false
+		}
+		// input for first action is first input
+		if i == 0 && idx[0] != 0 {
+			return false
+		}
+		// input for other actions is previous action
+		if i != 0 && idx[0] != len(idxs)+(i-1) {
+			return false
+		}
+		// secondary input is second input or -1
+		if idx[1] != -1 && idx[1] != 1 {
+			return false
+		}
+		// last action creates output
+		if i == len(idxs)-1 && idx[2] != 0 {
+			return false
+		}
+		// other actions do not create an output
+		if i != len(idxs)-1 && idx[2] != -1 {
+			return false
+		}
+	}
+	return true
 }
