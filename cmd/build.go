@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/dominodatalab/forge/internal/buildjob"
@@ -41,7 +42,12 @@ var (
 				Debug:               debug,
 			}
 
-			stopper := make(chan os.Signal)
+			if debug {
+				// containerd debug
+				logrus.SetLevel(logrus.TraceLevel)
+			}
+
+			stopper := make(chan os.Signal, 1)
 			signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 
 			job, err := buildjob.New(cfg)

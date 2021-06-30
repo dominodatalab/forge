@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
 )
 
 type testClient struct {
@@ -24,14 +24,14 @@ type testClient struct {
 	deleteErr bool
 }
 
-func (c *testClient) List(ctx context.Context, list runtime.Object, opts ...client.ListOption) error {
+func (c *testClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if c.listErr {
 		return errors.New("something went wrong")
 	}
 	return c.Client.List(ctx, list, opts...)
 }
 
-func (c *testClient) Delete(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error {
+func (c *testClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if c.deleteErr {
 		return errors.New("something went wrong")
 	}
@@ -43,7 +43,7 @@ func TestContainerImageBuildReconciler_RunGC(t *testing.T) {
 	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
 
 	testController := func(listErr, deleteErr bool, testObjs ...runtime.Object) (*ContainerImageBuildReconciler, *record.FakeRecorder, func()) {
-		fakeClient := fake.NewFakeClientWithScheme(scheme, testObjs...)
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(testObjs...).Build()
 		fakeRecorder := record.NewFakeRecorder(10)
 		cleanup := func() { close(fakeRecorder.Events) }
 

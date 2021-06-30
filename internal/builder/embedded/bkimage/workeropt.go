@@ -14,12 +14,11 @@ import (
 	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/executor/runcexecutor"
 	containerdsnapshot "github.com/moby/buildkit/snapshot/containerd"
-	"github.com/moby/buildkit/util/binfmt_misc"
+	"github.com/moby/buildkit/util/archutil"
 	"github.com/moby/buildkit/util/leaseutil"
 	"github.com/moby/buildkit/util/network/netproviders"
 	"github.com/moby/buildkit/worker/base"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runc/libcontainer/system"
 )
 
 func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
@@ -29,7 +28,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 	}
 
 	// worker executor
-	unprivileged := system.GetParentNSeuid() != 0
+	unprivileged := true // no current way to determine privilege
 	c.logger.V(1).Info(fmt.Sprintf("Executor running unprivileged: %t", unprivileged))
 
 	exeOpt := runcexecutor.Opt{
@@ -57,7 +56,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 	executorLabels := base.Labels("oci", c.backend)
 
 	var supportedPlatforms []specs.Platform
-	for _, s := range binfmt_misc.SupportedPlatforms(false) {
+	for _, s := range archutil.SupportedPlatforms(false) {
 		p, err := platforms.Parse(s)
 		if err != nil {
 			return opt, err

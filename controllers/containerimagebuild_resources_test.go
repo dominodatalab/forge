@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
 	"github.com/dominodatalab/forge/internal/message"
 )
 
@@ -97,7 +97,7 @@ func TestContainerImageBuildReconciler_resourceLimits(t *testing.T) {
 func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
 	controller := makeController(t)
 
-	cib := &forgev1alpha1.ContainerImageBuild{}
+	cib := &forgev1alpha1.ContainerImageBuild{ObjectMeta: metav1.ObjectMeta{Name: "myimage"}}
 	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
 
 	job := &batchv1.Job{}
@@ -116,7 +116,7 @@ func TestContainerImageBuildReconciler_buildContextVolume(t *testing.T) {
 func TestContainerImageBuildReconciler_buildContextVolumeMount(t *testing.T) {
 	controller := makeController(t)
 
-	cib := &forgev1alpha1.ContainerImageBuild{}
+	cib := &forgev1alpha1.ContainerImageBuild{ObjectMeta: metav1.ObjectMeta{Name: "myimage"}}
 	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
 
 	job := &batchv1.Job{}
@@ -135,6 +135,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 	controller := makeController(t)
 
 	cib := &forgev1alpha1.ContainerImageBuild{
+		ObjectMeta: metav1.ObjectMeta{Name: "myimage"},
 		Spec: forgev1alpha1.ContainerImageBuildSpec{
 			InitContainers: []forgev1alpha1.InitContainer{
 				{
@@ -230,7 +231,7 @@ func TestContainerImageBuildReconciler_initContainers(t *testing.T) {
 
 func TestContainerImageBuildReconciler_tolerations(t *testing.T) {
 	controller := makeController(t)
-	cib := &forgev1alpha1.ContainerImageBuild{}
+	cib := &forgev1alpha1.ContainerImageBuild{ObjectMeta: metav1.ObjectMeta{Name: "myimage"}}
 	controller.JobConfig.TolerationKey = "toleration1"
 	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
 	job := &batchv1.Job{}
@@ -297,7 +298,7 @@ func makeController(t *testing.T) ContainerImageBuildReconciler {
 	require.NoError(t, forgev1alpha1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
 
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	fakeRecorder := record.NewFakeRecorder(10)
 
 	return ContainerImageBuildReconciler{

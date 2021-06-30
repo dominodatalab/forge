@@ -88,7 +88,7 @@ if [[ -z $1 ]]; then
 fi
 
 image="$1"
-namespace="forge-test-$(tr -cd 'a-z0-9' < /dev/urandom | fold -w10 | head -n1)"
+namespace="forge-test-$(head -c 1024 /dev/urandom | base64 | tr -cd "a-z0-9" | head -c 1)"
 
 info "Creating test namespace: $namespace"
 kubectl create ns "$namespace"
@@ -101,37 +101,43 @@ helm repo update
 
 info "Installing cert-manager chart"
 helm install cert-manager jetstack/cert-manager \
-  --version v0.15.0 \
+  --version v1.4.0 \
   --namespace "$namespace" \
   --set installCRDs=true \
   --wait
 
-info "Generate custom root CA"
-pushd e2e
-openssl genrsa -out rootCA.key 4096
-openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 365 -out rootCA.crt \
-  -subj "/C=US/ST=CA/L=San Francisco/O=Domino Data Lab, Inc./OU=Engineering/CN=dominodatalab.com"
-kubectl create secret tls custom-root-ca \
-  --namespace "$namespace" \
-  --key rootCA.key \
-  --cert rootCA.crt
-popd
+# install something to give the webhook time to start
 
 info "Creating self-signed issuer"
-cat <<EOH | kubectl apply -f -
-apiVersion: cert-manager.io/v1alpha2
+set +e
+retries=6
+while (( retries > 0 )); do
+  cat <<EOH | kubectl apply -f -
+apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: selfsigned-issuer
   namespace: $namespace
 spec:
-  ca:
-    secretName: custom-root-ca
+  selfSigned: {}
 EOH
+  if [ $? -eq 0 ]; then
+    break
+  fi
+  ((retries --))
+  echo "retrying"
+  sleep 10
+done
+if (( retries == 0 )); then
+  echo "Failed to install selfsigned issuer"
+  exit 1
+fi
+
+set -e
 
 info "Creating certificate for docker registry"
 cat <<EOH | kubectl apply -f -
-apiVersion: cert-manager.io/v1alpha2
+apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: docker-registry
@@ -158,19 +164,26 @@ helm install docker-registry-2 stable/docker-registry \
   --values e2e/helm_values/docker-registry-auth-only.yaml \
   --wait
 
-info "Installing rabbitmq chart"
-helm install rabbitmq bitnami/rabbitmq \
-  --version 6.18.2 \
-  --namespace "$namespace" \
-  --wait
 
 info "Launching Forge controller: $image"
 pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"
 kustomize edit set namespace "$namespace"
+# need kustomize v4.1.4 or higher -- https://github.com/kubernetes-sigs/kustomize/issues/4009
+cat <<EOF >> kustomization.yaml
+replacements:
+- source:
+    fieldPath: spec.template.spec.containers.[name=controller].image
+    kind: Deployment
+  targets:
+  - fieldPaths:
+    - spec.template.spec.containers.[name=controller].env.[name=BUILD_JOB_IMAGE].value
+    select:
+      kind: Deployment
++EOF
 popd
-kubectl apply -k config/controller
-kubectl wait pod --for=condition=ready \
+kustomize build config/controller | kubectl apply -f -
+kubectl wait deploy --for=condition=available \
   --namespace "$namespace" \
   --selector app.kubernetes.io/name=forge \
   --timeout 120s
