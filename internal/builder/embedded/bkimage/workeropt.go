@@ -28,7 +28,7 @@ func (c *Client) createWorkerOpt() (opt base.WorkerOpt, err error) {
 	}
 
 	// worker executor
-	unprivileged := system.GetParentNSeuid() != 0
+	unprivileged := true
 	c.logger.V(1).Info(fmt.Sprintf("Executor running unprivileged: %t", unprivileged))
 
 	exeOpt := runcexecutor.Opt{
