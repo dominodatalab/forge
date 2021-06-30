@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/util/push"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
-func (c *Client) PushImage(ctx context.Context, image string) error {
+func (c *Client) PushImage(ctx context.Context, id string, image string) error {
 	image, err := parseImageName(image)
 	if err != nil {
 		return err
@@ -31,10 +32,7 @@ func (c *Client) PushImage(ctx context.Context, image string) error {
 	c.logger.Info(fmt.Sprintf("Pushing image %q", image))
 	defer c.logger.Info(fmt.Sprintf("Pushed image %q", image))
 
-	// push with context absent session to avoid authorizer override
-	// see github.com/moby/buildkit@v0.7.1/util/resolver/resolver.go:158 for more details
-	ctx = context.Background()
-
+	annotations := map[digest.Digest]map[string]string{imgObj.Target.Digest: imgObj.Target.Annotations}
 	// NOTE: "insecure" param is not used in the following func call
-	return push.Push(ctx, sm, c.contentStore, imgObj.Target.Digest, image, false, c.getRegistryHosts(), false)
+	return push.Push(ctx, sm, id, c.contentStore, c.contentStore, imgObj.Target.Digest, image, false, c.getRegistryHosts(), false, annotations)
 }

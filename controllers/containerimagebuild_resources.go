@@ -13,12 +13,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
 	"github.com/dominodatalab/forge/internal/cloud"
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
@@ -72,12 +71,12 @@ func (r *ContainerImageBuildReconciler) checkRole(ctx context.Context, cib *forg
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
-				APIGroups: []string{forgev1alpha1.GroupVersion.Group},
+				APIGroups: []string{forgev1alpha1.SchemeGroupVersion.Group},
 				Resources: []string{"containerimagebuilds"},
 				Verbs:     []string{"get"},
 			},
 			{
-				APIGroups: []string{forgev1alpha1.GroupVersion.Group},
+				APIGroups: []string{forgev1alpha1.SchemeGroupVersion.Group},
 				Resources: []string{"containerimagebuilds/status"},
 				Verbs:     []string{"update"},
 			},
@@ -475,8 +474,8 @@ func (r *ContainerImageBuildReconciler) prepareJobArgs(cib *forgev1alpha1.Contai
 
 // checks if runtime object exists. if it does not exist, ownership is assigned to a container image build resource and
 // the object is then created. otherwise, this procedure results in a no-op.
-func (r *ContainerImageBuildReconciler) withOwnedResource(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild, obj metav1.Object) error {
-	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj.(runtime.Object).DeepCopyObject())
+func (r *ContainerImageBuildReconciler) withOwnedResource(ctx context.Context, cib *forgev1alpha1.ContainerImageBuild, obj client.Object) error {
+	err := r.Get(ctx, client.ObjectKeyFromObject(obj), obj)
 	if err == nil {
 		return nil
 	}
@@ -487,5 +486,5 @@ func (r *ContainerImageBuildReconciler) withOwnedResource(ctx context.Context, c
 	if err := controllerutil.SetControllerReference(cib, obj, r.Scheme); err != nil {
 		return err
 	}
-	return r.Create(ctx, obj.(runtime.Object))
+	return r.Create(ctx, obj)
 }

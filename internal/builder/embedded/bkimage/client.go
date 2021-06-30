@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 
-	fuseoverlayfs "github.com/AkihiroSuda/containerd-fuse-overlayfs"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/snapshots/overlay"
+	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
+	fuseoverlayfs "github.com/containerd/fuse-overlayfs-snapshotter"
 	"github.com/go-logr/logr"
 	"github.com/moby/buildkit/control"
 	"github.com/moby/buildkit/session"
@@ -46,7 +46,7 @@ func NewClient(rootDir, backend string, logger logr.Logger) (*Client, error) {
 	workDir := filepath.Join(rootDir, ociRuntime, backend)
 
 	autoSelectFn := func() string {
-		if err := overlay.Supported(workDir); err != nil {
+		if err := overlayutils.Supported(workDir); err != nil {
 			logger.Info("overlayfs not unsupported", "error", err)
 		} else {
 			return types.OverlayFSBackend

@@ -5,34 +5,34 @@ CRD_OPTIONS ?= "crd:trivialVersions=true"
 # Add extra build flags
 BUILD_FLAGS ?=
 
-# Custom variables
-GOLANGCI_LINT_VERSION=v1.37.1
-
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
 PWD=$(shell pwd)
 
-all: manager
+CONTROLLER_GEN=go run sigs.k8s.io/controller-tools/cmd/controller-gen
+CLIENT_GEN=go run k8s.io/code-generator/cmd/client-gen
+GOLANGCI_LINT=go run github.com/golangci/golangci-lint/cmd/golangci-lint
+
+all: forge
 
 static:
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/forge -a -mod vendor $(BUILD_FLAGS)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o bin/forge -a -mod vendor $(BUILD_FLAGS) ./cmd/forge
+
+precommit: generate fmt lint
+	go mod tidy -v
+	go mod vendor
+	git update-index --refresh
+	git diff-index --exit-code --name-status HEAD
 
 # Run tests
-test: generate fmt vet lint manifests
-	go test ./... -coverprofile cover.out
+test:
+	go test -race ./... -coverprofile cover.out
 
-# Build manager binary
-manager: generate fmt vet
-	go build -o bin/forge -mod vendor $(BUILD_FLAGS) main.go
+# Build binary
+forge:
+	go build -o bin/forge -mod vendor $(BUILD_FLAGS) ./cmd/forge/
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
-	go run ./main.go
+run:
+	go run ./cmd/forge
 
 # Install CRDs into a cluster
 install: manifests
@@ -47,24 +47,23 @@ deploy: manifests
 	kubectl apply -k config/controller
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests:
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt:
 	go fmt ./...
 
-# Run go vet against code
-vet:
-	go vet ./...
-
 # Run project linters
-lint: golangci-lint-install
-	$(GOLANGCI_LINT) run
+lint:
+	$(GOLANGCI_LINT) run --timeout=5m
 
 # Generate code
-generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
+generate:
+	$(CLIENT_GEN) -o ./tmp --output-package="github.com/dominodatalab/forge/internal" --clientset-name="clientset" --input-base="github.com/dominodatalab/forge/api" --input="forge/v1alpha1" --go-header-file="./hack/boilerplate.go.txt"
+	cp -r ./tmp/github.com/dominodatalab/forge/* .
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./api/..."
+	rm -rf ./tmp
 
 # Build the docker image
 docker-build:
@@ -76,35 +75,9 @@ docker-push:
 
 # Regenerate controller manifests and code using Docker (useful if on MacOS)
 controller-regen-docker:
-	docker run --rm -it -v ${PWD}:/forge \
-		--workdir /forge golang:1.13-alpine3.12 \
-		sh -c "apk add --no-cache build-base && make manifests generate"
+	docker run --rm -it -v ${PWD}:/go/src/github.com/dominodatalab/forge \
+		--workdir /go/src/github.com/dominodatalab/forge golang:1.16-buster \
+		sh -c "make manifests generate"
 
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
-endif
-
-# Install the linter
-golangci-lint-install:
-ifeq (, $(shell which golangci-lint))
-	@{ \
-	set -e;\
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_LINT_VERSION);\
-	}
-GOLANGCI_LINT=$(GOBIN)/golangci-lint
-else
-GOLANGCI_LINT=$(shell which golangci-lint)
-endif
+outdated:
+	go list -mod=readonly -u -m -f '{{if and .Update (not .Indirect)}}{{.}}{{end}}' all

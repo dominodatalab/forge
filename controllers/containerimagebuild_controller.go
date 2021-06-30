@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
 	"github.com/dominodatalab/forge/internal/message"
 )
 
@@ -128,12 +128,11 @@ func (r *ContainerImageBuildReconciler) SetupWithManager(mgr ctrl.Manager) error
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=forge.dominodatalab.com,resources=containerimagebuilds/status,verbs=get;update;patch
 
-func (r *ContainerImageBuildReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ContainerImageBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	txn := r.NewRelic.StartTransaction("Reconcile")
 	txn.AddAttribute("containerimagebuild", req.NamespacedName.String())
 	defer txn.End()
 
-	ctx := context.Background()
 	log := r.Log.WithValues("containerimagebuild", req.NamespacedName)
 
 	// attempt to load resource by name and ignore not-found errors

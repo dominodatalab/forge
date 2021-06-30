@@ -13,9 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	apiv1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/api/forge/v1alpha1"
 	"github.com/dominodatalab/forge/internal/builder"
-	clientv1alpha1 "github.com/dominodatalab/forge/internal/clientset/v1alpha1"
+	"github.com/dominodatalab/forge/internal/clientset"
+	forgev1alpha1 "github.com/dominodatalab/forge/internal/clientset/typed/forge/v1alpha1"
+
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	forgek8s "github.com/dominodatalab/forge/internal/kubernetes"
@@ -27,7 +29,7 @@ type Job struct {
 	log logr.Logger
 
 	clientk8s   kubernetes.Interface
-	clientforge clientv1alpha1.Interface
+	clientforge forgev1alpha1.ForgeV1alpha1Interface
 
 	producer message.Producer
 
@@ -55,7 +57,7 @@ func New(cfg Config) (*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create k8s api client")
 	}
-	clientforge, err := clientv1alpha1.NewForConfig(restCfg)
+	client, err := clientset.NewForConfig(restCfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create forge api client")
 	}
@@ -103,7 +105,7 @@ func New(cfg Config) (*Job, error) {
 		name:         cfg.ResourceName,
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
-		clientforge:  clientforge,
+		clientforge:  client.ForgeV1alpha1(),
 		producer:     producer,
 		plugins:      preparerPlugins,
 		builder:      ociBuilder,
@@ -115,12 +117,12 @@ func (j *Job) Run() error {
 	ctx := context.Background()
 
 	j.log.Info("Fetching ContainerImageBuild resource", "Name", j.name, "Namespace", j.namespace)
-	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(j.name)
+	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(ctx, j.name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
 	}
 
-	if cib, err = j.transitionToBuilding(cib); err != nil {
+	if cib, err = j.transitionToBuilding(ctx, cib); err != nil {
 		return err
 	}
 
@@ -131,7 +133,7 @@ func (j *Job) Run() error {
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate build options")
 
-		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+		if iErr := j.transitionToFailure(ctx, cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
 		return err
@@ -142,13 +144,13 @@ func (j *Job) Run() error {
 	if err != nil {
 		logError(j.log, err)
 
-		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+		if iErr := j.transitionToFailure(ctx, cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
 		return err
 	}
 
-	return j.transitionToComplete(cib, images)
+	return j.transitionToComplete(ctx, cib, images)
 }
 
 func (j *Job) Cleanup(forced bool) {
@@ -161,7 +163,7 @@ func (j *Job) Cleanup(forced bool) {
 	}
 }
 
-func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
+func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
 	registries, err := j.buildRegistryConfigs(ctx, cib.Spec.Registries)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build registry config")
@@ -185,7 +187,7 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.Contain
 }
 
 // uses api registry directives to generate a list of registry configurations for image building
-func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []apiv1alpha1.Registry) (configs []config.Registry, err error) {
+func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (configs []config.Registry, err error) {
 	for _, apiReg := range apiRegs {
 		conf := config.Registry{
 			Host:   apiReg.Server,
@@ -246,8 +248,7 @@ func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
 }
 
 func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
-	// ctx is currently unused: https://github.com/kubernetes/kubernetes/pull/87299
-	secret, err := j.clientk8s.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := j.clientk8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", errors.Wrap(err, "cannot find registry auth secret")
 	}
