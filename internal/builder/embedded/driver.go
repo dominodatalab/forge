@@ -9,8 +9,6 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/go-logr/logr"
 	controlapi "github.com/moby/buildkit/api/services/control"
-	"github.com/moby/buildkit/identity"
-	"github.com/moby/buildkit/session"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
@@ -147,7 +145,6 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 	}
 
 	// add build metadata to context
-	ctx = session.NewContext(ctx, sess.ID())
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -167,8 +164,6 @@ func (d *driver) build(ctx context.Context, image string, opts *config.BuildOpti
 }
 
 func (d *driver) tag(ctx context.Context, image, target string) error {
-	id := identity.NewID()
-	ctx = session.NewContext(ctx, id)
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 
 	return d.bk.TagImage(ctx, image, target)
@@ -180,7 +175,6 @@ func (d *driver) push(ctx context.Context, image string) error {
 		return err
 	}
 
-	ctx = session.NewContext(ctx, sess.ID())
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -189,7 +183,7 @@ func (d *driver) push(ctx context.Context, image string) error {
 	})
 	eg.Go(func() error {
 		defer sess.Close()
-		return d.bk.PushImage(ctx, image)
+		return d.bk.PushImage(ctx, sess.ID(), image)
 	})
 	if err := eg.Wait(); err != nil {
 		return err
@@ -199,8 +193,6 @@ func (d *driver) push(ctx context.Context, image string) error {
 }
 
 func (d *driver) validateImageSize(ctx context.Context, name string, limit uint64) (uint64, error) {
-	id := identity.NewID()
-	ctx = session.NewContext(ctx, id)
 	ctx = namespaces.WithNamespace(ctx, "buildkit")
 
 	image, err := d.bk.GetImage(ctx, name)

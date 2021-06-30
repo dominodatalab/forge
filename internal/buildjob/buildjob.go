@@ -13,9 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	apiv1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	"github.com/dominodatalab/forge/api/forge/v1alpha1"
 	"github.com/dominodatalab/forge/internal/builder"
-	clientv1alpha1 "github.com/dominodatalab/forge/internal/clientset/v1alpha1"
+	"github.com/dominodatalab/forge/internal/clientset"
+	forgev1alpha1 "github.com/dominodatalab/forge/internal/clientset/typed/forge/v1alpha1"
+
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 	forgek8s "github.com/dominodatalab/forge/internal/kubernetes"
@@ -27,7 +29,7 @@ type Job struct {
 	log logr.Logger
 
 	clientk8s   kubernetes.Interface
-	clientforge clientv1alpha1.Interface
+	clientforge forgev1alpha1.ForgeV1alpha1Interface
 
 	producer message.Producer
 
@@ -55,7 +57,7 @@ func New(cfg Config) (*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create k8s api client")
 	}
-	clientforge, err := clientv1alpha1.NewForConfig(restCfg)
+	client, err := clientset.NewForConfig(restCfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create forge api client")
 	}
@@ -103,7 +105,7 @@ func New(cfg Config) (*Job, error) {
 		name:         cfg.ResourceName,
 		namespace:    cfg.ResourceNamespace,
 		clientk8s:    clientsk8s,
-		clientforge:  clientforge,
+		clientforge:  client.ForgeV1alpha1(),
 		producer:     producer,
 		plugins:      preparerPlugins,
 		builder:      ociBuilder,
@@ -111,58 +113,58 @@ func New(cfg Config) (*Job, error) {
 	}, nil
 }
 
-func (j *Job) Run() error {
+func (job *Job) Run() error {
 	ctx := context.Background()
 
-	j.log.Info("Fetching ContainerImageBuild resource", "Name", j.name, "Namespace", j.namespace)
-	cib, err := j.clientforge.ContainerImageBuilds(j.namespace).Get(j.name)
+	job.log.Info("Fetching ContainerImageBuild resource", "Name", job.name, "Namespace", job.namespace)
+	cib, err := job.clientforge.ContainerImageBuilds(job.namespace).Get(ctx, job.name, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "cannot find containerimagebuild %s", j.name)
+		return errors.Wrapf(err, "cannot find containerimagebuild %s", job.name)
 	}
 
-	if cib, err = j.transitionToBuilding(cib); err != nil {
+	if cib, err = job.transitionToBuilding(ctx, cib); err != nil {
 		return err
 	}
 
-	j.log = j.log.WithValues("annotations", cib.Annotations)
+	job.log = job.log.WithValues("annotations", cib.Annotations)
 
-	j.log.Info("Creating build options using custom resource fields")
-	opts, err := j.generateBuildOptions(ctx, cib)
+	job.log.Info("Creating build options using custom resource fields")
+	opts, err := job.generateBuildOptions(ctx, cib)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate build options")
 
-		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+		if iErr := job.transitionToFailure(ctx, cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
 		return err
 	}
 
-	j.builder.SetLogger(j.log)
-	images, err := j.builder.BuildAndPush(ctx, opts)
+	job.builder.SetLogger(job.log)
+	images, err := job.builder.BuildAndPush(ctx, opts)
 	if err != nil {
-		logError(j.log, err)
+		logError(job.log, err)
 
-		if iErr := j.transitionToFailure(cib, err); iErr != nil {
+		if iErr := job.transitionToFailure(ctx, cib, err); iErr != nil {
 			err = errors.Wrap(err, iErr.Error())
 		}
 		return err
 	}
 
-	return j.transitionToComplete(cib, images)
+	return job.transitionToComplete(ctx, cib, images)
 }
 
-func (j *Job) Cleanup(forced bool) {
+func (job *Job) Cleanup(forced bool) {
 	if forced {
-		j.log.Info("Caught kill signal, cleaning up")
+		job.log.Info("Caught kill signal, cleaning up")
 	}
 
-	for _, fn := range j.cleanupSteps {
+	for _, fn := range job.cleanupSteps {
 		fn()
 	}
 }
 
-func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
-	registries, err := j.buildRegistryConfigs(ctx, cib.Spec.Registries)
+func (job *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerImageBuild) (*config.BuildOptions, error) {
+	registries, err := job.buildRegistryConfigs(ctx, cib.Spec.Registries)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot build registry config")
 	}
@@ -185,7 +187,7 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *apiv1alpha1.Contain
 }
 
 // uses api registry directives to generate a list of registry configurations for image building
-func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []apiv1alpha1.Registry) (configs []config.Registry, err error) {
+func (job *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (configs []config.Registry, err error) {
 	for _, apiReg := range apiRegs {
 		conf := config.Registry{
 			Host:   apiReg.Server,
@@ -205,11 +207,11 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []apiv1alpha1.Re
 			}
 		case apiReg.BasicAuth.IsSecret():
 			fetchAuth = func() (string, string, error) {
-				return j.getDockerAuthFromSecret(ctx, apiReg.Server, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
+				return job.getDockerAuthFromSecret(ctx, apiReg.Server, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
 			}
 		case apiReg.DynamicCloudCredentials:
 			fetchAuth = func() (string, string, error) {
-				return j.getDockerAuthFromFS(apiReg.Server)
+				return job.getDockerAuthFromFS(apiReg.Server)
 			}
 		}
 
@@ -227,7 +229,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []apiv1alpha1.Re
 	return configs, nil
 }
 
-func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
+func (job *Job) getDockerAuthFromFS(host string) (string, string, error) {
 	if _, err := os.Stat(config.DynamicCredentialsFilepath); os.IsNotExist(err) {
 		return "", "", errors.Wrap(err, "filesystem docker credentials missing")
 	}
@@ -245,9 +247,8 @@ func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
 	return username, password, nil
 }
 
-func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
-	// ctx is currently unused: https://github.com/kubernetes/kubernetes/pull/87299
-	secret, err := j.clientk8s.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+func (job *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
+	secret, err := job.clientk8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", errors.Wrap(err, "cannot find registry auth secret")
 	}

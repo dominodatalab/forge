@@ -11,7 +11,7 @@ type fakeLogger struct{ msg string }
 func (l *fakeLogger) Enabled() bool                         { return true }
 func (l *fakeLogger) Info(msg string, kv ...interface{})    { l.msg = msg }
 func (l *fakeLogger) Error(error, string, ...interface{})   {}
-func (l *fakeLogger) V(int) logr.InfoLogger                 { return nil }
+func (l *fakeLogger) V(int) logr.Logger                     { return nil }
 func (l *fakeLogger) WithValues(...interface{}) logr.Logger { return nil }
 func (l *fakeLogger) WithName(string) logr.Logger           { return nil }
 

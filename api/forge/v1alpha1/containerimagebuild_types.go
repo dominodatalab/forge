@@ -194,6 +194,7 @@ func (s *ContainerImageBuildStatus) SetState(state BuildState) {
 	s.State = state
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Namespaced,shortName=cib
 // +kubebuilder:subresource:status

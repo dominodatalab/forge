@@ -30,11 +30,14 @@ spec:
             - $(WATCH_NAMESPACE)
             - --build-job-custom-ca
             - docker-registry-tls
+            - --build-job-image=$(BUILD_JOB_IMAGE)
           env:
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: BUILD_JOB_IMAGE
+              value: quay.io/domino/forge:latest
           resources:
             requests:
               cpu: 1

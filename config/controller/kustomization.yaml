@@ -5,6 +5,15 @@ images:
   newName: quay.io/domino/forge
   newTag: latest
 namespace: default
+replacements:
+- source:
+    fieldPath: spec.template.spec.containers.[name=controller].image
+    kind: Deployment
+  targets:
+  - fieldPaths:
+    - spec.template.spec.containers.[name=controller].env.[name=BUILD_JOB_IMAGE].value
+    select:
+      kind: Deployment
 resources:
 - serviceaccount.yaml
 - rbac.yaml
