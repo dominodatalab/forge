@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/jaguilar/vt100"
 	"github.com/moby/buildkit/client"
 	"github.com/morikuni/aec"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/tonistiigi/units"
+	"github.com/tonistiigi/vt100"
 	"golang.org/x/time/rate"
 )
 
@@ -273,7 +273,14 @@ func (t *trace) update(s *client.SolveStatus, termWidth int) {
 				if v.Started != nil {
 					ts = l.Timestamp.Sub(*v.Started)
 				}
-				v.logs = append(v.logs, []byte(fmt.Sprintf("#%d %s %s", v.index, fmt.Sprintf("%#.4g", ts.Seconds())[:5], dt)))
+				prec := 1
+				sec := ts.Seconds()
+				if sec < 10 {
+					prec = 3
+				} else if sec < 100 {
+					prec = 2
+				}
+				v.logs = append(v.logs, []byte(fmt.Sprintf("#%d %s %s", v.index, fmt.Sprintf("%.[2]*[1]f", sec, prec), dt)))
 			}
 			i++
 		})
@@ -548,6 +555,9 @@ func align(l, r string, w int) string {
 }
 
 func wrapHeight(j []*job, limit int) []*job {
+	if limit < 0 {
+		return nil
+	}
 	var wrapped []*job
 	wrapped = append(wrapped, j...)
 	if len(j) > limit {

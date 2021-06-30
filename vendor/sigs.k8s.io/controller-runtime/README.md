@@ -2,15 +2,21 @@
 
 # Kubernetes controller-runtime Project
 
-The Kubernetes controller-runtime Project is a set of go libraries for building Controllers.
+The Kubernetes controller-runtime Project is a set of go libraries for building
+Controllers. It is leveraged by [Kubebuilder](https://book.kubebuilder.io/) and
+[Operator SDK](https://github.com/operator-framework/operator-sdk). Both are
+a great place to start for new projects. See
+[Kubebuilder's Quick Start](https://book.kubebuilder.io/quick-start.html) to
+see how it can be used.
 
 Documentation:
 
-- [Package overview](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg)
-- [Basic controller using builder](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg/builder#example-Builder)
-- [Creating a manager](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg/manager#example-New)
-- [Creating a controller](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg/controller#example-New)
+- [Package overview](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg)
+- [Basic controller using builder](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/builder#example-Builder)
+- [Creating a manager](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#example-New)
+- [Creating a controller](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/controller#example-New)
 - [Examples](https://github.com/kubernetes-sigs/controller-runtime/blob/master/examples)
+- [Designs](https://github.com/kubernetes-sigs/controller-runtime/blob/master/designs)
 
 # Versioning, Maintenance, and Compatibility
 
@@ -57,4 +63,3 @@ Before starting any work, please either comment on an existing issue, or file a 
 ## Code of conduct
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
-

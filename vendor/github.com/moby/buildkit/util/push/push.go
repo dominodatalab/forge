@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -17,14 +18,16 @@ import (
 	"github.com/moby/buildkit/util/flightcontrol"
 	"github.com/moby/buildkit/util/imageutil"
 	"github.com/moby/buildkit/util/progress"
+	"github.com/moby/buildkit/util/progress/logs"
 	"github.com/moby/buildkit/util/resolver"
+	"github.com/moby/buildkit/util/resolver/retryhandler"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-func Push(ctx context.Context, sm *session.Manager, cs content.Store, dgst digest.Digest, ref string, insecure bool, hosts docker.RegistryHosts, byDigest bool) error {
+func Push(ctx context.Context, sm *session.Manager, sid string, provider content.Provider, manager content.Manager, dgst digest.Digest, ref string, insecure bool, hosts docker.RegistryHosts, byDigest bool, annotations map[digest.Digest]map[string]string) error {
 	desc := ocispec.Descriptor{
 		Digest: dgst,
 	}
@@ -39,10 +42,28 @@ func Push(ctx context.Context, sm *session.Manager, cs content.Store, dgst diges
 	if byDigest {
 		ref = parsed.Name()
 	} else {
-		ref = reference.TagNameOnly(parsed).String()
+		// add digest to ref, this is what containderd uses to choose root manifest from all manifests
+		r, err := reference.WithDigest(reference.TagNameOnly(parsed), dgst)
+		if err != nil {
+			return errors.Wrapf(err, "failed to combine ref %s with digest %s", ref, dgst)
+		}
+		ref = r.String()
 	}
 
-	resolver := resolver.New(ctx, hosts, sm)
+	scope := "push"
+	if insecure {
+		insecureTrue := true
+		httpTrue := true
+		hosts = resolver.NewRegistryConfig(map[string]resolver.RegistryConfig{
+			reference.Domain(parsed): {
+				Insecure:  &insecureTrue,
+				PlainHTTP: &httpTrue,
+			},
+		})
+		scope += ":insecure"
+	}
+
+	resolver := resolver.DefaultPool.GetResolver(hosts, ref, scope, sm, session.NewGroup(sid))
 
 	pusher, err := resolver.Pusher(ctx, ref)
 	if err != nil {
@@ -65,19 +86,19 @@ func Push(ctx context.Context, sm *session.Manager, cs content.Store, dgst diges
 		}
 	})
 
-	pushHandler := remotes.PushHandler(pusher, cs)
-	pushUpdateSourceHandler, err := updateDistributionSourceHandler(cs, pushHandler, ref)
+	pushHandler := retryhandler.New(remotes.PushHandler(pusher, provider), logs.LoggerFromContext(ctx))
+	pushUpdateSourceHandler, err := updateDistributionSourceHandler(manager, pushHandler, ref)
 	if err != nil {
 		return err
 	}
 
 	handlers := append([]images.Handler{},
-		images.HandlerFunc(annotateDistributionSourceHandler(cs, childrenHandler(cs))),
+		images.HandlerFunc(annotateDistributionSourceHandler(manager, annotations, childrenHandler(provider))),
 		filterHandler,
 		dedupeHandler(pushUpdateSourceHandler),
 	)
 
-	ra, err := cs.ReaderAt(ctx, desc)
+	ra, err := provider.ReaderAt(ctx, desc)
 	if err != nil {
 		return err
 	}
@@ -93,24 +114,20 @@ func Push(ctx context.Context, sm *session.Manager, cs content.Store, dgst diges
 		Size:      ra.Size(),
 		MediaType: mtype,
 	})
-	layersDone(err)
-	if err != nil {
+	if err := layersDone(err); err != nil {
 		return err
 	}
 
 	mfstDone := oneOffProgress(ctx, fmt.Sprintf("pushing manifest for %s", ref))
 	for i := len(manifestStack) - 1; i >= 0; i-- {
-		_, err := pushHandler(ctx, manifestStack[i])
-		if err != nil {
-			mfstDone(err)
-			return err
+		if _, err := pushHandler(ctx, manifestStack[i]); err != nil {
+			return mfstDone(err)
 		}
 	}
-	mfstDone(nil)
-	return nil
+	return mfstDone(nil)
 }
 
-func annotateDistributionSourceHandler(cs content.Store, f images.HandlerFunc) func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+func annotateDistributionSourceHandler(manager content.Manager, annotations map[digest.Digest]map[string]string, f images.HandlerFunc) func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
@@ -128,8 +145,23 @@ func annotateDistributionSourceHandler(cs content.Store, f images.HandlerFunc) f
 		for i := range children {
 			child := children[i]
 
-			info, err := cs.Info(ctx, child.Digest)
-			if err != nil {
+			if m, ok := annotations[child.Digest]; ok {
+				for k, v := range m {
+					if !strings.HasPrefix(k, "containerd.io/distribution.source.") {
+						continue
+					}
+					if child.Annotations == nil {
+						child.Annotations = map[string]string{}
+					}
+					child.Annotations[k] = v
+				}
+			}
+			children[i] = child
+
+			info, err := manager.Info(ctx, child.Digest)
+			if errors.Is(err, errdefs.ErrNotFound) {
+				continue
+			} else if err != nil {
 				return nil, err
 			}
 
@@ -151,7 +183,7 @@ func annotateDistributionSourceHandler(cs content.Store, f images.HandlerFunc) f
 }
 
 func oneOffProgress(ctx context.Context, id string) func(err error) error {
-	pw, _, _ := progress.FromContext(ctx)
+	pw, _, _ := progress.NewFromContext(ctx)
 	now := time.Now()
 	st := progress.Status{
 		Started: &now,
@@ -220,8 +252,8 @@ func childrenHandler(provider content.Provider) images.HandlerFunc {
 //
 // FIXME(fuweid): There is race condition for current design of distribution
 // source label if there are pull/push jobs consuming same layer.
-func updateDistributionSourceHandler(cs content.Store, pushF images.HandlerFunc, ref string) (images.HandlerFunc, error) {
-	updateF, err := docker.AppendDistributionSourceLabel(cs, ref)
+func updateDistributionSourceHandler(manager content.Manager, pushF images.HandlerFunc, ref string) (images.HandlerFunc, error) {
+	updateF, err := docker.AppendDistributionSourceLabel(manager, ref)
 	if err != nil {
 		return nil, err
 	}

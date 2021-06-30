@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
@@ -13,44 +12,62 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/moby/buildkit/cmd/buildkitd/config"
-	"github.com/moby/buildkit/session"
-	"github.com/moby/buildkit/session/auth"
 	"github.com/moby/buildkit/util/tracing"
 	"github.com/pkg/errors"
 )
 
-func fillInsecureOpts(host string, c config.RegistryConfig, h *docker.RegistryHost) error {
+func fillInsecureOpts(host string, c RegistryConfig, h docker.RegistryHost) ([]docker.RegistryHost, error) {
+	var hosts []docker.RegistryHost
+
 	tc, err := loadTLSConfig(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var isHTTP bool
 
 	if c.PlainHTTP != nil && *c.PlainHTTP {
-		h.Scheme = "http"
-	} else if c.Insecure != nil && *c.Insecure {
-		tc.InsecureSkipVerify = true
-	} else if c.PlainHTTP == nil {
+		isHTTP = true
+	}
+	if c.PlainHTTP == nil {
 		if ok, _ := docker.MatchLocalhost(host); ok {
-			h.Scheme = "http"
+			isHTTP = true
 		}
 	}
 
-	transport := newDefaultTransport()
-	transport.TLSClientConfig = tc
-
-	h.Client = &http.Client{
-		Transport: tracing.NewTransport(transport),
+	if isHTTP {
+		h2 := h
+		h2.Scheme = "http"
+		hosts = append(hosts, h2)
 	}
-	return nil
+	if c.Insecure != nil && *c.Insecure {
+		h2 := h
+		transport := newDefaultTransport()
+		transport.TLSClientConfig = tc
+		h2.Client = &http.Client{
+			Transport: tracing.NewTransport(transport),
+		}
+		tc.InsecureSkipVerify = true
+		hosts = append(hosts, h2)
+	}
+
+	if len(hosts) == 0 {
+		transport := newDefaultTransport()
+		transport.TLSClientConfig = tc
+
+		h.Client = &http.Client{
+			Transport: tracing.NewTransport(transport),
+		}
+		hosts = append(hosts, h)
+	}
+
+	return hosts, nil
 }
 
-func loadTLSConfig(c config.RegistryConfig) (*tls.Config, error) {
+func loadTLSConfig(c RegistryConfig) (*tls.Config, error) {
 	for _, d := range c.TLSConfigDir {
 		fs, err := ioutil.ReadDir(d)
-		if err != nil && !os.IsNotExist(err) && !os.IsPermission(err) {
+		if err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, os.ErrPermission) {
 			return nil, errors.WithStack(err)
 		}
 		for _, f := range fs {
@@ -58,7 +75,7 @@ func loadTLSConfig(c config.RegistryConfig) (*tls.Config, error) {
 				c.RootCAs = append(c.RootCAs, filepath.Join(d, f.Name()))
 			}
 			if strings.HasSuffix(f.Name(), ".cert") {
-				c.KeyPairs = append(c.KeyPairs, config.TLSKeyPair{
+				c.KeyPairs = append(c.KeyPairs, TLSKeyPair{
 					Certificate: filepath.Join(d, f.Name()),
 					Key:         filepath.Join(d, strings.TrimSuffix(f.Name(), ".cert")+".key"),
 				})
@@ -97,7 +114,22 @@ func loadTLSConfig(c config.RegistryConfig) (*tls.Config, error) {
 	return tc, nil
 }
 
-func NewRegistryConfig(m map[string]config.RegistryConfig) docker.RegistryHosts {
+type RegistryConfig struct {
+	Mirrors      []string     `toml:"mirrors"`
+	PlainHTTP    *bool        `toml:"http"`
+	Insecure     *bool        `toml:"insecure"`
+	RootCAs      []string     `toml:"ca"`
+	KeyPairs     []TLSKeyPair `toml:"keypair"`
+	TLSConfigDir []string     `toml:"tlsconfigdir"`
+}
+
+type TLSKeyPair struct {
+	Key         string `toml:"key"`
+	Certificate string `toml:"cert"`
+}
+
+// NewRegistryConfig converts registry config to docker.RegistryHosts callback
+func NewRegistryConfig(m map[string]RegistryConfig) docker.RegistryHosts {
 	return docker.Registries(
 		func(host string) ([]docker.RegistryHost, error) {
 			c, ok := m[host]
@@ -116,11 +148,12 @@ func NewRegistryConfig(m map[string]config.RegistryConfig) docker.RegistryHosts 
 					Capabilities: docker.HostCapabilityPull | docker.HostCapabilityResolve,
 				}
 
-				if err := fillInsecureOpts(mirror, m[mirror], &h); err != nil {
+				hosts, err := fillInsecureOpts(mirror, m[mirror], h)
+				if err != nil {
 					return nil, err
 				}
 
-				out = append(out, h)
+				out = append(out, hosts...)
 			}
 
 			if host == "docker.io" {
@@ -135,11 +168,12 @@ func NewRegistryConfig(m map[string]config.RegistryConfig) docker.RegistryHosts 
 				Capabilities: docker.HostCapabilityPush | docker.HostCapabilityPull | docker.HostCapabilityResolve,
 			}
 
-			if err := fillInsecureOpts(host, c, &h); err != nil {
+			hosts, err := fillInsecureOpts(host, c, h)
+			if err != nil {
 				return nil, err
 			}
 
-			out = append(out, h)
+			out = append(out, hosts...)
 			return out, nil
 		},
 		docker.ConfigureDefaultRegistries(
@@ -149,48 +183,9 @@ func NewRegistryConfig(m map[string]config.RegistryConfig) docker.RegistryHosts 
 	)
 }
 
-func New(ctx context.Context, hosts docker.RegistryHosts, sm *session.Manager) remotes.Resolver {
-	return docker.NewResolver(docker.ResolverOptions{
-		Hosts: hostsWithCredentials(ctx, hosts, sm),
-	})
-}
-
-func hostsWithCredentials(ctx context.Context, hosts docker.RegistryHosts, sm *session.Manager) docker.RegistryHosts {
-	id := session.FromContext(ctx)
-	if id == "" {
-		return hosts
-	}
-	return func(domain string) ([]docker.RegistryHost, error) {
-		res, err := hosts(domain)
-		if err != nil {
-			return nil, err
-		}
-		if len(res) == 0 {
-			return nil, nil
-		}
-
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		caller, err := sm.Get(timeoutCtx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		a := docker.NewDockerAuthorizer(
-			docker.WithAuthClient(res[0].Client),
-			docker.WithAuthCreds(auth.CredentialsFunc(context.TODO(), caller)),
-		)
-		for i := range res {
-			res[i].Authorizer = a
-		}
-		return res, nil
-	}
-}
-
 func newDefaultClient() *http.Client {
 	return &http.Client{
-		Transport: newDefaultTransport(),
+		Transport: tracing.NewTransport(newDefaultTransport()),
 	}
 }
 
@@ -206,14 +201,12 @@ func newDefaultTransport() *http.Transport {
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
+			KeepAlive: 60 * time.Second,
 		}).DialContext,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       30 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 5 * time.Second,
-		DisableKeepAlives:     true,
 		TLSNextProto:          make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 	}
 }
