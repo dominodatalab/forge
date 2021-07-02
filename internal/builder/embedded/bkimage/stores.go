@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"path/filepath"
 
-	fuseoverlayfs "github.com/AkihiroSuda/containerd-fuse-overlayfs"
 	"github.com/containerd/containerd/content/local"
 	ctdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/overlay"
+	fuseoverlayfs "github.com/containerd/fuse-overlayfs-snapshotter"
 	containerdsnapshot "github.com/moby/buildkit/snapshot/containerd"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"

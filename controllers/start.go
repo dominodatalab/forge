@@ -15,7 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	forgev1alpha1 "github.com/dominodatalab/forge/api/v1alpha1"
+	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

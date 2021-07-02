@@ -16,11 +16,11 @@ import (
 	"github.com/moby/buildkit/frontend/gateway"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/solver"
+	"github.com/moby/buildkit/util/compression"
 	"github.com/moby/buildkit/util/entitlements"
 	"github.com/moby/buildkit/util/progress"
 	"github.com/moby/buildkit/worker"
 	digest "github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -43,7 +43,6 @@ type Solver struct {
 	eachWorker                func(func(worker.Worker) error) error
 	frontends                 map[string]frontend.Frontend
 	resolveCacheImporterFuncs map[string]remotecache.ResolveCacheImporterFunc
-	platforms                 []specs.Platform
 	gatewayForwarder          *controlgateway.GatewayForwarder
 	sm                        *session.Manager
 	entitlements              []string
@@ -60,13 +59,6 @@ func New(wc *worker.Controller, f map[string]frontend.Frontend, cache solver.Cac
 		sm:                        sm,
 		entitlements:              ents,
 	}
-
-	// executing is currently only allowed on default worker
-	w, err := wc.GetDefault()
-	if err != nil {
-		return nil, err
-	}
-	s.platforms = w.Platforms(false)
 
 	s.solver = solver.NewSolver(solver.SolverOpt{
 		ResolveOpFunc: s.resolver(),
@@ -93,12 +85,11 @@ func (s *Solver) Bridge(b solver.Builder) frontend.FrontendLLBBridge {
 		eachWorker:                s.eachWorker,
 		resolveCacheImporterFuncs: s.resolveCacheImporterFuncs,
 		cms:                       map[string]solver.CacheManager{},
-		platforms:                 s.platforms,
 		sm:                        s.sm,
 	}
 }
 
-func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest, exp ExporterRequest, ent []entitlements.Entitlement) (*client.SolveResponse, error) {
+func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req frontend.SolveRequest, exp ExporterRequest, ent []entitlements.Entitlement) (*client.SolveResponse, error) {
 	j, err := s.solver.NewJob(id)
 	if err != nil {
 		return nil, err
@@ -112,11 +103,11 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 	}
 	j.SetValue(keyEntitlements, set)
 
-	j.SessionID = session.FromContext(ctx)
+	j.SessionID = sessionID
 
 	var res *frontend.Result
 	if s.gatewayForwarder != nil && req.Definition == nil && req.Frontend == "" {
-		fwd := gateway.NewBridgeForwarder(ctx, s.Bridge(j), s.workerController, req.FrontendInputs)
+		fwd := gateway.NewBridgeForwarder(ctx, s.Bridge(j), s.workerController, req.FrontendInputs, sessionID, s.sm)
 		defer fwd.Discard()
 		if err := s.gatewayForwarder.RegisterBuild(ctx, id, fwd); err != nil {
 			return nil, err
@@ -134,10 +125,14 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 			return nil, err
 		}
 	} else {
-		res, err = s.Bridge(j).Solve(ctx, req)
+		res, err = s.Bridge(j).Solve(ctx, req, sessionID)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if res == nil {
+		res = &frontend.Result{}
 	}
 
 	defer func() {
@@ -178,7 +173,7 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 			}
 			inp.Ref = workerRef.ImmutableRef
 
-			dt, err := inlineCache(ctx, exp.CacheExporter, r)
+			dt, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
 			if err != nil {
 				return nil, err
 			}
@@ -202,7 +197,7 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 					}
 					m[k] = workerRef.ImmutableRef
 
-					dt, err := inlineCache(ctx, exp.CacheExporter, r)
+					dt, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
 					if err != nil {
 						return nil, err
 					}
@@ -214,17 +209,18 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 			inp.Refs = m
 		}
 
-		if err := inVertexContext(j.Context(ctx), e.Name(), "", func(ctx context.Context) error {
-			exporterResponse, err = e.Export(ctx, inp)
+		if err := inBuilderContext(ctx, j, e.Name(), "", func(ctx context.Context, _ session.Group) error {
+			exporterResponse, err = e.Export(ctx, inp, j.SessionID)
 			return err
 		}); err != nil {
 			return nil, err
 		}
 	}
 
+	g := session.NewGroup(j.SessionID)
 	var cacheExporterResponse map[string]string
 	if e := exp.CacheExporter; e != nil {
-		if err := inVertexContext(j.Context(ctx), "exporting cache", "", func(ctx context.Context) error {
+		if err := inBuilderContext(ctx, j, "exporting cache", "", func(ctx context.Context, _ session.Group) error {
 			prepareDone := oneOffProgress(ctx, "preparing build cache for export")
 			if err := res.EachRef(func(res solver.ResultProxy) error {
 				r, err := res.Result(ctx)
@@ -233,8 +229,9 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 				}
 				// all keys have same export chain so exporting others is not needed
 				_, err = r.CacheKeys()[0].Exporter.ExportTo(ctx, e, solver.CacheExportOpt{
-					Convert: workerRefConverter,
+					Convert: workerRefConverter(g),
 					Mode:    exp.CacheExportMode,
+					Session: g,
 				})
 				return err
 			}); err != nil {
@@ -268,7 +265,7 @@ func (s *Solver) Solve(ctx context.Context, id string, req frontend.SolveRequest
 	}, nil
 }
 
-func inlineCache(ctx context.Context, e remotecache.Exporter, res solver.CachedResult) ([]byte, error) {
+func inlineCache(ctx context.Context, e remotecache.Exporter, res solver.CachedResult, g session.Group) ([]byte, error) {
 	if efl, ok := e.(interface {
 		ExportForLayers([]digest.Digest) ([]byte, error)
 	}); ok {
@@ -277,7 +274,7 @@ func inlineCache(ctx context.Context, e remotecache.Exporter, res solver.CachedR
 			return nil, errors.Errorf("invalid reference: %T", res.Sys())
 		}
 
-		remote, err := workerRef.Worker.GetRemote(ctx, workerRef.ImmutableRef, true)
+		remote, err := workerRef.GetRemote(ctx, true, compression.Default, g)
 		if err != nil || remote == nil {
 			return nil, nil
 		}
@@ -288,8 +285,9 @@ func inlineCache(ctx context.Context, e remotecache.Exporter, res solver.CachedR
 		}
 
 		if _, err := res.CacheKeys()[0].Exporter.ExportTo(ctx, e, solver.CacheExportOpt{
-			Convert: workerRefConverter,
+			Convert: workerRefConverter(g),
 			Mode:    solver.CacheExportModeMin,
+			Session: g,
 		}); err != nil {
 			return nil, err
 		}
@@ -329,7 +327,7 @@ func allWorkers(wc *worker.Controller) func(func(w worker.Worker) error) error {
 }
 
 func oneOffProgress(ctx context.Context, id string) func(err error) error {
-	pw, _, _ := progress.FromContext(ctx)
+	pw, _, _ := progress.NewFromContext(ctx)
 	now := time.Now()
 	st := progress.Status{
 		Started: &now,
@@ -345,7 +343,7 @@ func oneOffProgress(ctx context.Context, id string) func(err error) error {
 	}
 }
 
-func inVertexContext(ctx context.Context, name, id string, f func(ctx context.Context) error) error {
+func inBuilderContext(ctx context.Context, b solver.Builder, name, id string, f func(ctx context.Context, g session.Group) error) error {
 	if id == "" {
 		id = name
 	}
@@ -353,16 +351,18 @@ func inVertexContext(ctx context.Context, name, id string, f func(ctx context.Co
 		Digest: digest.FromBytes([]byte(id)),
 		Name:   name,
 	}
-	pw, _, ctx := progress.FromContext(ctx, progress.WithMetadata("vertex", v.Digest))
-	notifyStarted(ctx, &v, false)
-	defer pw.Close()
-	err := f(ctx)
-	notifyCompleted(ctx, &v, err, false)
-	return err
+	return b.InContext(ctx, func(ctx context.Context, g session.Group) error {
+		pw, _, ctx := progress.NewFromContext(ctx, progress.WithMetadata("vertex", v.Digest))
+		notifyStarted(ctx, &v, false)
+		defer pw.Close()
+		err := f(ctx, g)
+		notifyCompleted(ctx, &v, err, false)
+		return err
+	})
 }
 
 func notifyStarted(ctx context.Context, v *client.Vertex, cached bool) {
-	pw, _, _ := progress.FromContext(ctx)
+	pw, _, _ := progress.NewFromContext(ctx)
 	defer pw.Close()
 	now := time.Now()
 	v.Started = &now
@@ -372,7 +372,7 @@ func notifyStarted(ctx context.Context, v *client.Vertex, cached bool) {
 }
 
 func notifyCompleted(ctx context.Context, v *client.Vertex, err error, cached bool) {
-	pw, _, _ := progress.FromContext(ctx)
+	pw, _, _ := progress.NewFromContext(ctx)
 	defer pw.Close()
 	now := time.Now()
 	if v.Started == nil {

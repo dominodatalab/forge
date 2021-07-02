@@ -57,11 +57,10 @@ func (p *textMux) printVtx(t *trace, dgst digest.Digest) {
 			p.notFirst = true
 		}
 
-		if os.Getenv("PROGRESS_NO_TRUNC") == "1" {
-			fmt.Fprintf(p.w, "#%d %s\n", v.index, v.Name)
-			fmt.Fprintf(p.w, "#%d %s\n", v.index, v.Digest)
-		} else {
+		if os.Getenv("PROGRESS_NO_TRUNC") == "0" {
 			fmt.Fprintf(p.w, "#%d %s\n", v.index, limitString(v.Name, 72))
+		} else {
+			fmt.Fprintf(p.w, "#%d %s\n", v.index, v.Name)
 		}
 
 	}

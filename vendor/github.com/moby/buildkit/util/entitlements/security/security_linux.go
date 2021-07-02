@@ -7,7 +7,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/containerd/containerd/pkg/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -57,13 +57,12 @@ func WithInsecureSpec() oci.SpecOpts {
 			"CAP_NET_ADMIN",
 			"CAP_NET_BROADCAST",
 		}
-		for _, cap := range addCaps {
-			s.Process.Capabilities.Bounding = append(s.Process.Capabilities.Bounding, cap)
-			s.Process.Capabilities.Ambient = append(s.Process.Capabilities.Ambient, cap)
-			s.Process.Capabilities.Effective = append(s.Process.Capabilities.Effective, cap)
-			s.Process.Capabilities.Inheritable = append(s.Process.Capabilities.Inheritable, cap)
-			s.Process.Capabilities.Permitted = append(s.Process.Capabilities.Permitted, cap)
-		}
+		s.Process.Capabilities.Bounding = append(s.Process.Capabilities.Bounding, addCaps...)
+		s.Process.Capabilities.Ambient = append(s.Process.Capabilities.Ambient, addCaps...)
+		s.Process.Capabilities.Effective = append(s.Process.Capabilities.Effective, addCaps...)
+		s.Process.Capabilities.Inheritable = append(s.Process.Capabilities.Inheritable, addCaps...)
+		s.Process.Capabilities.Permitted = append(s.Process.Capabilities.Permitted, addCaps...)
+
 		s.Linux.ReadonlyPaths = []string{}
 		s.Linux.MaskedPaths = []string{}
 		s.Process.ApparmorProfile = ""
@@ -81,7 +80,7 @@ func WithInsecureSpec() oci.SpecOpts {
 			},
 		}
 
-		if !system.RunningInUserNS() {
+		if !userns.RunningInUserNS() {
 			// Devices automatically mounted on insecure mode
 			s.Linux.Devices = append(s.Linux.Devices, []specs.LinuxDevice{
 				// Writes to this come out as printk's, reads export the buffered printk records. (dmesg)
@@ -154,7 +153,7 @@ func getFreeLoopID() (int, error) {
 	}
 	defer fd.Close()
 
-	const _LOOP_CTL_GET_FREE = 0x4C82
+	const _LOOP_CTL_GET_FREE = 0x4C82 //nolint:golint
 	r1, _, uerr := unix.Syscall(unix.SYS_IOCTL, fd.Fd(), _LOOP_CTL_GET_FREE, 0)
 	if uerr == 0 {
 		return int(r1), nil

@@ -35,11 +35,11 @@ func (g *Group) Do(ctx context.Context, key string, fn func(ctx context.Context)
 	var backoff time.Duration
 	for {
 		v, err = g.do(ctx, key, fn)
-		if err == nil || errors.Cause(err) != errRetry {
+		if err == nil || !errors.Is(err, errRetry) {
 			return v, err
 		}
 		// backoff logic
-		if backoff >= 3*time.Second {
+		if backoff >= 15*time.Second {
 			err = errors.Wrapf(errRetryTimeout, "flightcontrol")
 			return v, err
 		}
@@ -130,17 +130,33 @@ func (c *call) wait(ctx context.Context) (v interface{}, err error) {
 	c.mu.Lock()
 	// detect case where caller has just returned, let it clean up before
 	select {
-	case <-c.ready: // could return if no error
+	case <-c.ready:
+		c.mu.Unlock()
+		if c.err != nil { // on error retry
+			<-c.cleaned
+			return nil, errRetry
+		}
+		pw, ok, _ := progress.NewFromContext(ctx)
+		if ok {
+			c.progressState.add(pw)
+		}
+		return c.result, nil
+
+	case <-c.ctx.done: // could return if no error
 		c.mu.Unlock()
 		<-c.cleaned
 		return nil, errRetry
 	default:
 	}
 
-	pw, ok, ctx := progress.FromContext(ctx)
+	pw, ok, ctx := progress.NewFromContext(ctx)
 	if ok {
 		c.progressState.add(pw)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	c.ctxs = append(c.ctxs, ctx)
 
 	c.mu.Unlock()
@@ -149,18 +165,16 @@ func (c *call) wait(ctx context.Context) (v interface{}, err error) {
 
 	select {
 	case <-ctx.Done():
-		select {
-		case <-c.ctx.Done():
+		if c.ctx.checkDone() {
 			// if this cancelled the last context, then wait for function to shut down
 			// and don't accept any more callers
 			<-c.ready
 			return c.result, c.err
-		default:
-			if ok {
-				c.progressState.close(pw)
-			}
-			return nil, ctx.Err()
 		}
+		if ok {
+			c.progressState.close(pw)
+		}
+		return nil, ctx.Err()
 	case <-c.ready:
 		return c.result, c.err // shared not implemented yet
 	}
@@ -183,9 +197,6 @@ func (c *call) Deadline() (deadline time.Time, ok bool) {
 }
 
 func (c *call) Done() <-chan struct{} {
-	c.mu.Lock()
-	c.ctx.signal()
-	c.mu.Unlock()
 	return c.ctx.done
 }
 
@@ -238,23 +249,28 @@ func newContext(c *call) *sharedContext {
 	return &sharedContext{call: c, done: make(chan struct{})}
 }
 
-// call with lock
-func (c *sharedContext) signal() {
+func (sc *sharedContext) checkDone() bool {
+	sc.mu.Lock()
 	select {
-	case <-c.done:
+	case <-sc.done:
+		sc.mu.Unlock()
+		return true
 	default:
-		var err error
-		for _, ctx := range c.ctxs {
-			select {
-			case <-ctx.Done():
-				err = ctx.Err()
-			default:
-				return
-			}
-		}
-		c.err = err
-		close(c.done)
 	}
+	var err error
+	for _, ctx := range sc.ctxs {
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+		default:
+			sc.mu.Unlock()
+			return false
+		}
+	}
+	sc.err = err
+	close(sc.done)
+	sc.mu.Unlock()
+	return true
 }
 
 type rawProgressWriter interface {

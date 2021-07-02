@@ -14,7 +14,7 @@ build dispatch via a [custom resource definition][crd].
 ### Requirements
 
 - Linux
-- go 1.13
+- go 1.16
 - golangci-lint
 - kubebuilder
 - A Kubernetes cluster with kubectl access configured (minikube suggested)
@@ -30,7 +30,7 @@ minikube start --insecure-registry="localhost:32002"
 Install helm on the host:
 
 ```
-export HELM_VERSION="v3.4.2"
+export HELM_VERSION="v3.6.1"
 curl -L https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz | tar -xvz -C /tmp
 sudo mv /tmp/linux-amd64/helm /usr/local/bin/
 helm repo add stable https://charts.helm.sh/stable
@@ -83,7 +83,7 @@ make docker-build
 Run Forge's controller on the host, using the image from the previous step for build jobs:
 
 ```
-go run main.go --build-job-image $IMG
+go run ./cmd/forge --build-job-image $IMG
 ```
 
 On a different terminal, create a CIB (container image build) resource to trigger a build:

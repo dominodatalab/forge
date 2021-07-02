@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/solver/pb"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -60,6 +61,7 @@ type Result interface {
 	ID() string
 	Release(context.Context) error
 	Sys() interface{}
+	Clone() Result
 }
 
 // CachedResult is a result connected with its cache key
@@ -94,6 +96,8 @@ type CacheExportOpt struct {
 	Convert func(context.Context, Result) (*Remote, error)
 	// Mode defines a cache export algorithm
 	Mode CacheExportMode
+	// Session is the session group to client (for auth credentials etc)
+	Session session.Group
 }
 
 // CacheExporter can export the artifacts of the build chain
@@ -131,6 +135,8 @@ type CacheLink struct {
 	Selector digest.Digest `json:",omitempty"`
 }
 
+type ReleaseFunc func()
+
 // Op defines how the solver can evaluate the properties of a vertex operation.
 // An op is executed in the worker, and is retrieved from the vertex by the
 // value of `vertex.Sys()`. The solver is configured with a resolve function to
@@ -138,13 +144,17 @@ type CacheLink struct {
 type Op interface {
 	// CacheMap returns structure describing how the operation is cached.
 	// Currently only roots are allowed to return multiple cache maps per op.
-	CacheMap(context.Context, int) (*CacheMap, bool, error)
+	CacheMap(context.Context, session.Group, int) (*CacheMap, bool, error)
 
 	// Exec runs an operation given results from previous operations.
-	Exec(ctx context.Context, inputs []Result) (outputs []Result, err error)
+	Exec(ctx context.Context, g session.Group, inputs []Result) (outputs []Result, err error)
+
+	// Acquire acquires the necessary resources to execute the `Op`.
+	Acquire(ctx context.Context) (release ReleaseFunc, err error)
 }
 
-type ResultBasedCacheFunc func(context.Context, Result) (digest.Digest, error)
+type ResultBasedCacheFunc func(context.Context, Result, session.Group) (digest.Digest, error)
+type PreprocessFunc func(context.Context, Result, session.Group) error
 
 // CacheMap is a description for calculating the cache key of an operation.
 type CacheMap struct {
@@ -170,7 +180,16 @@ type CacheMap struct {
 		// For example, in LLB this is invoked to calculate the cache key based on
 		// the checksum of file contents from input snapshots.
 		ComputeDigestFunc ResultBasedCacheFunc
+
+		// PreprocessFunc is a function that runs on an input before it is passed to op
+		PreprocessFunc PreprocessFunc
 	}
+
+	// Opts specifies generic options that will be passed to cache load calls if/when
+	// the key associated with this CacheMap is used to load a ref. It allows options
+	// such as oci descriptor content providers and progress writers to be passed to
+	// the cache. Opts should not have any impact on the computed cache key.
+	Opts CacheOpts
 }
 
 // ExportableCacheKey is a cache key connected with an exporter that can export

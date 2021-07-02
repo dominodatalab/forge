@@ -2,6 +2,7 @@ package cacheimport
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -23,7 +24,7 @@ func (c *CacheChains) Add(dgst digest.Digest) solver.CacheExporterRecord {
 	if strings.HasPrefix(dgst.String(), "random:") {
 		return &nopRecord{}
 	}
-	it := &item{c: c, dgst: dgst}
+	it := &item{c: c, dgst: dgst, backlinks: map[*item]struct{}{}}
 	c.items = append(c.items, it)
 	return it
 }
@@ -44,12 +45,27 @@ func (c *CacheChains) normalize() error {
 		byKey: map[digest.Digest]*item{},
 	}
 
+	validated := make([]*item, 0, len(c.items))
+	for _, it := range c.items {
+		it.backlinksMu.Lock()
+		it.validate()
+		it.backlinksMu.Unlock()
+	}
+	for _, it := range c.items {
+		if !it.invalid {
+			validated = append(validated, it)
+		}
+	}
+	c.items = validated
+
 	for _, it := range c.items {
 		_, err := normalizeItem(it, st)
 		if err != nil {
 			return err
 		}
 	}
+
+	st.removeLoops()
 
 	items := make([]*item, 0, len(st.byKey))
 	for _, it := range st.byKey {
@@ -99,12 +115,34 @@ type item struct {
 	result     *solver.Remote
 	resultTime time.Time
 
-	links []map[link]struct{}
+	links       []map[link]struct{}
+	backlinksMu sync.Mutex
+	backlinks   map[*item]struct{}
+	invalid     bool
 }
 
 type link struct {
 	src      *item
 	selector string
+}
+
+func (c *item) removeLink(src *item) bool {
+	found := false
+	for idx := range c.links {
+		for l := range c.links[idx] {
+			if l.src == src {
+				delete(c.links[idx], l)
+				found = true
+			}
+		}
+	}
+	for idx := range c.links {
+		if len(c.links[idx]) == 0 {
+			c.links = nil
+			break
+		}
+	}
+	return found
 }
 
 func (c *item) AddResult(createdAt time.Time, result *solver.Remote) {
@@ -126,6 +164,32 @@ func (c *item) LinkFrom(rec solver.CacheExporterRecord, index int, selector stri
 	}
 
 	c.links[index][link{src: src, selector: selector}] = struct{}{}
+	src.backlinksMu.Lock()
+	src.backlinks[c] = struct{}{}
+	src.backlinksMu.Unlock()
+}
+
+func (c *item) validate() {
+	for _, m := range c.links {
+		if len(m) == 0 {
+			c.invalid = true
+			for bl := range c.backlinks {
+				changed := false
+				for _, m := range bl.links {
+					for l := range m {
+						if l.src == c {
+							delete(m, l)
+							changed = true
+						}
+					}
+				}
+				if changed {
+					bl.validate()
+				}
+			}
+			return
+		}
+	}
 }
 
 func (c *item) walkAllResults(fn func(i *item) error, visited map[*item]struct{}) error {

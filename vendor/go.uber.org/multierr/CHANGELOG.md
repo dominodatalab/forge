@@ -1,6 +1,31 @@
 Releases
 ========
 
+v1.7.0 (2021-05-06)
+===================
+
+-   Add `AppendInvoke` to append into errors from `defer` blocks.
+
+
+v1.6.0 (2020-09-14)
+===================
+
+-   Actually drop library dependency on development-time tooling.
+
+
+v1.5.0 (2020-02-24)
+===================
+
+-   Drop library dependency on development-time tooling.
+
+
+v1.4.0 (2019-11-04)
+===================
+
+-   Add `AppendInto` function to more ergonomically build errors inside a
+    loop.
+
+
 v1.3.0 (2019-10-29)
 ===================
 

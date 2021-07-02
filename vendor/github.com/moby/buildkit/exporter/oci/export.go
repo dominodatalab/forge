@@ -9,17 +9,19 @@ import (
 	archiveexporter "github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/leases"
 	"github.com/docker/distribution/reference"
-	"github.com/moby/buildkit/cache/blobs"
+	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/exporter"
 	"github.com/moby/buildkit/exporter/containerimage"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/filesync"
+	"github.com/moby/buildkit/util/compression"
+	"github.com/moby/buildkit/util/contentutil"
+	"github.com/moby/buildkit/util/grpcerrors"
 	"github.com/moby/buildkit/util/leaseutil"
 	"github.com/moby/buildkit/util/progress"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ExporterVariant string
@@ -49,24 +51,10 @@ func New(opt Opt) (exporter.Exporter, error) {
 }
 
 func (e *imageExporter) Resolve(ctx context.Context, opt map[string]string) (exporter.ExporterInstance, error) {
-	id := session.FromContext(ctx)
-	if id == "" {
-		return nil, errors.New("could not access local files without session")
-	}
-
-	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	caller, err := e.opt.SessionManager.Get(timeoutCtx, id)
-	if err != nil {
-		return nil, err
-	}
-
 	var ot *bool
 	i := &imageExporterInstance{
 		imageExporter:    e,
-		caller:           caller,
-		layerCompression: blobs.DefaultCompression,
+		layerCompression: compression.Default,
 	}
 	for k, v := range opt {
 		switch k {
@@ -75,9 +63,9 @@ func (e *imageExporter) Resolve(ctx context.Context, opt map[string]string) (exp
 		case keyLayerCompression:
 			switch v {
 			case "gzip":
-				i.layerCompression = blobs.Gzip
+				i.layerCompression = compression.Gzip
 			case "uncompressed":
-				i.layerCompression = blobs.Uncompressed
+				i.layerCompression = compression.Uncompressed
 			default:
 				return nil, errors.Errorf("unsupported layer compression type: %v", v)
 			}
@@ -110,17 +98,16 @@ func (e *imageExporter) Resolve(ctx context.Context, opt map[string]string) (exp
 type imageExporterInstance struct {
 	*imageExporter
 	meta             map[string][]byte
-	caller           session.Caller
 	name             string
 	ociTypes         bool
-	layerCompression blobs.CompressionType
+	layerCompression compression.Type
 }
 
 func (e *imageExporterInstance) Name() string {
 	return "exporting to oci image format"
 }
 
-func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source) (map[string]string, error) {
+func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source, sessionID string) (map[string]string, error) {
 	if e.opt.Variant == VariantDocker && len(src.Refs) > 0 {
 		return nil, errors.Errorf("docker exporter does not currently support exporting manifest lists")
 	}
@@ -138,7 +125,7 @@ func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source)
 	}
 	defer done(context.TODO())
 
-	desc, err := e.opt.ImageWriter.Commit(ctx, src, e.ociTypes, e.layerCompression)
+	desc, err := e.opt.ImageWriter.Commit(ctx, src, e.ociTypes, e.layerCompression, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +139,10 @@ func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source)
 
 	resp := make(map[string]string)
 	resp["containerimage.digest"] = desc.Digest.String()
+	if v, ok := desc.Annotations["config.digest"]; ok {
+		resp["containerimage.config.digest"] = v
+		delete(desc.Annotations, "config.digeest")
+	}
 
 	if n, ok := src.Metadata["image.name"]; e.name == "*" && ok {
 		e.name = string(n)
@@ -175,27 +166,70 @@ func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source)
 		return nil, errors.Errorf("invalid variant %q", e.opt.Variant)
 	}
 
-	w, err := filesync.CopyFileWriter(ctx, resp, e.caller)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	caller, err := e.opt.SessionManager.Get(timeoutCtx, sessionID, false)
 	if err != nil {
 		return nil, err
 	}
+
+	w, err := filesync.CopyFileWriter(ctx, resp, caller)
+	if err != nil {
+		return nil, err
+	}
+
+	mprovider := contentutil.NewMultiProvider(e.opt.ImageWriter.ContentStore())
+	if src.Ref != nil {
+		remote, err := src.Ref.GetRemote(ctx, false, e.layerCompression, session.NewGroup(sessionID))
+		if err != nil {
+			return nil, err
+		}
+		// unlazy before tar export as the tar writer does not handle
+		// layer blobs in parallel (whereas unlazy does)
+		if unlazier, ok := remote.Provider.(cache.Unlazier); ok {
+			if err := unlazier.Unlazy(ctx); err != nil {
+				return nil, err
+			}
+		}
+		for _, desc := range remote.Descriptors {
+			mprovider.Add(desc.Digest, remote.Provider)
+		}
+	}
+	if len(src.Refs) > 0 {
+		for _, r := range src.Refs {
+			remote, err := r.GetRemote(ctx, false, e.layerCompression, session.NewGroup(sessionID))
+			if err != nil {
+				return nil, err
+			}
+			if unlazier, ok := remote.Provider.(cache.Unlazier); ok {
+				if err := unlazier.Unlazy(ctx); err != nil {
+					return nil, err
+				}
+			}
+			for _, desc := range remote.Descriptors {
+				mprovider.Add(desc.Digest, remote.Provider)
+			}
+		}
+	}
+
 	report := oneOffProgress(ctx, "sending tarball")
-	if err := archiveexporter.Export(ctx, e.opt.ImageWriter.ContentStore(), w, expOpts...); err != nil {
+	if err := archiveexporter.Export(ctx, mprovider, w, expOpts...); err != nil {
 		w.Close()
-		if st, ok := status.FromError(errors.Cause(err)); ok && st.Code() == codes.AlreadyExists {
+		if grpcerrors.Code(err) == codes.AlreadyExists {
 			return resp, report(nil)
 		}
 		return nil, report(err)
 	}
 	err = w.Close()
-	if st, ok := status.FromError(errors.Cause(err)); ok && st.Code() == codes.AlreadyExists {
+	if grpcerrors.Code(err) == codes.AlreadyExists {
 		return resp, report(nil)
 	}
 	return resp, report(err)
 }
 
 func oneOffProgress(ctx context.Context, id string) func(err error) error {
-	pw, _, _ := progress.FromContext(ctx)
+	pw, _, _ := progress.NewFromContext(ctx)
 	now := time.Now()
 	st := progress.Status{
 		Started: &now,
