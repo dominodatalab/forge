@@ -169,18 +169,6 @@ info "Launching Forge controller: $image"
 pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"
 kustomize edit set namespace "$namespace"
-# need kustomize v4.1.4 or higher -- https://github.com/kubernetes-sigs/kustomize/issues/4009
-cat <<EOF >> kustomization.yaml
-replacements:
-- source:
-    fieldPath: spec.template.spec.containers.[name=controller].image
-    kind: Deployment
-  targets:
-  - fieldPaths:
-    - spec.template.spec.containers.[name=controller].env.[name=BUILD_JOB_IMAGE].value
-    select:
-      kind: Deployment
-+EOF
 popd
 kustomize build config/controller | kubectl apply -f -
 kubectl wait deploy --for=condition=available \
