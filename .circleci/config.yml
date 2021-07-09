@@ -26,6 +26,31 @@ jobs:
       GOLANGCI_LINT_VERSION: v1.30.0
     steps:
       - checkout
+      - azure-cli/install
+      - run:
+          name: Create ACR
+          command: |
+            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+
+            export ACR_VARS=/tmp/workspace/acr_vars
+            mkdir -p $(dirname $ACR_VARS)
+            echo "export ACR_NAME=forge${CIRCLE_BUILD_NUM}" >> $ACR_VARS
+            echo "export ACR_RG=forge${CIRCLE_BUILD_NUM}" >> $ACR_VARS
+            echo "export ACR_LOCATION=westus2" >> $ACR_VARS
+            . $ACR_VARS
+            az group create -n ${ACR_RG} -l ${ACR_LOCATION}
+            az acr create -n ${ACR_NAME} -g ${ACR_RG} -l ${ACR_LOCATION} --sku Basic
+            echo "export ACR_REGISTRY=$(az acr show -n ${ACR_NAME} -g ${ACR_RG} --query loginServer)" >> $ACR_VARS
+            cat $ACR_VARS >> $BASH_ENV
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+            - acr_vars
+      - run:
+          name: fix up GOPATH
+          command: |
+            mkdir -p /go/src/github.com/dominodatalab
+            ln -s $PWD /go/src/github.com/dominodatalab/forge
       - load_env
       - run:
           name: pre-commit
@@ -41,27 +66,9 @@ jobs:
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
-      - azure-cli/install
-      - run:
-          name: Create ACR
-          command: |
-            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
-
-            echo "export ACR_NAME=forge${CIRCLE_BUILD_NUM}" >> $BASH_ENV
-            echo "export ACR_RG=forge${CIRCLE_BUILD_NUM}" >> $BASH_ENV
-            echo "export ACR_LOCATION=westus2" >> $BASH_ENV
-            . $BASH_ENV
-            az group create -n ${ACR_RG} -l ${ACR_LOCATION}
-            az acr create -n ${ACR_NAME} -g ${ACR_RG} -l ${ACR_LOCATION} --sku Basic
-            echo "export ACR_REGISTRY=$(az acr show -n ${ACR_NAME} -g ${ACR_RG} --query loginServer)" >> $BASH_ENV
       - run:
           name: Run Unit Tests
           command: make all test BUILD_FLAGS="${BUILD_FLAGS}"
-      - run:
-          name: Destroy ACR
-          when: always
-          command: |
-            az group delete -y -n ${ACR_RG}
       - run:
           name: Prepare Artifacts
           command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/
@@ -90,6 +97,11 @@ jobs:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
             - /$GOPATH/pkg/mod
+      - run:
+          name: Destroy ACR
+          when: on_fail
+          command: |
+            az group delete -y -n ${ACR_RG}
   test:
     machine:
       image: ubuntu-2004:202104-01
@@ -101,6 +113,10 @@ jobs:
     steps:
       - checkout
       - load_env
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: cat /tmp/workspace/acr_vars >> $BASH_ENV
+      - azure-cli/install
       - run:
           name: Install and Launch Kubernetes
           command: curl -sfL https://get.k3s.io | sh -
@@ -116,13 +132,21 @@ jobs:
             sudo mv /tmp/kustomize /usr/local/bin/
       - run:
           name: Run e2e tests
-          command: ./e2e/run-test.sh ${IMG}
+          command: |
+            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+            ./e2e/run-test.sh ${IMG}
       - run:
           name: Debug Information
           command: kubectl cluster-info dump --all-namespaces --output-directory=./cluster-state/
           when: always
       - store_artifacts:
           path: cluster-state
+      - run:
+          name: Destroy ACR
+          when: always
+          command: |
+            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+            az group delete -y -n ${ACR_RG}
   publish_release:
     executor: golang
     environment:
@@ -149,7 +173,8 @@ workflows:
   main:
     jobs:
       - build:
-          context: org-global
+          context:
+            - org-global
           filters:
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
