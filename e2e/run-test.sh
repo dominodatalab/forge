@@ -52,22 +52,25 @@ function run_test {
   done
 }
 
+function registry_login {
+  local registry=$1
+  local registry_user=marge
+  local registry_password=simpson
+
+  info "Logging in to Docker"
+  echo "$registry_password" | docker login $registry -u=$registry_user --password-stdin
+}
+
 function verify_image {
   local image_name=$1
   local src_dir=$2
   local expected_dir=$3
 
   info "Verifying that the $image_name image built by Forge has the expected files"
-  local registry="localhost:32002"
-  local registry_user=marge
-  local registry_password=simpson
-
-  info "Logging in to Docker"
-  echo "$registry_password" | docker login $registry -u=$registry_user --password-stdin
 
   info "Copying files from image"
   local actual_dir=$(mktemp -d -t actual-XXXXXXXXXX)
-  docker cp $(docker create $registry/$image_name):$src_dir "$actual_dir"
+  docker cp $(docker create $image_name):$src_dir "$actual_dir"
 
   info "Comparing files in $expected_dir with $actual_dir"
   if ! diff -r "$expected_dir" "$actual_dir"; then
@@ -170,11 +173,15 @@ pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"
 kustomize edit set namespace "$namespace"
 popd
+kubectl -n "$namespace" create secret generic forge --from-literal=AZURE_TENANT_ID=$AZURE_TENANT_ID --from-literal=AZURE_CLIENT_ID=$AZURE_CLIENT_ID --from-literal=AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET
 kustomize build config/controller | kubectl apply -f -
 kubectl wait deploy --for=condition=available \
   --namespace "$namespace" \
   --selector app.kubernetes.io/name=forge \
   --timeout 120s
+
+registry="localhost:32002"
+registry_login $registry
 
 run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
@@ -185,12 +192,31 @@ run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
-verify_image variable-base-app /app $BASE_DIR/e2e/testdata/expected/simple-app
+
+verify_image "$registry/variable-base-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 run_test "Build should run custom init container" \
           e2e/builds/init_container.yaml \
           test-init-container \
           "$namespace"
-verify_image init-container-files /app $BASE_DIR/e2e/testdata/expected/init-container
+verify_image "$registry/init-container-files" /app $BASE_DIR/e2e/testdata/expected/init-container
+
+if [ -n "$ACR_REGISTRY" ]; then
+
+ sed -i -e "s/ACR/$ACR_REGISTRY/g" e2e/builds/acr/*.yaml
+
+ run_test "Build should push to ACR" \
+   e2e/builds/acr/push.yaml \
+   test-push-acr \
+   "$namespace"
+
+ run_test "Build should pull from ACR" \
+   e2e/builds/acr/pull.yaml \
+   test-pull-acr \
+   "$namespace"
+
+ az acr login -n ${ACR_REGISTRY%%.*}
+ verify_image "$ACR_REGISTRY/variable-base-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
+fi
 
 info "All tests ran successfully"
