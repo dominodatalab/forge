@@ -3,6 +3,8 @@ executors:
   golang:
     docker:
       - image: circleci/golang:1.16
+orbs:
+  azure-cli: circleci/azure-cli@1.2.0
 commands:
   load_env:
     steps:
@@ -39,9 +41,27 @@ jobs:
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
+      - azure-cli/install
+      - run:
+          name: Create ACR
+          command: |
+            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+
+            echo "export ACR_NAME=forge${CIRCLE_BUILD_NUM}" >> $BASH_ENV
+            echo "export ACR_RG=forge${CIRCLE_BUILD_NUM}" >> $BASH_ENV
+            echo "export ACR_LOCATION=westus2" >> $BASH_ENV
+            . $BASH_ENV
+            az group create -n ${ACR_RG} -l ${ACR_LOCATION}
+            az acr create -n ${ACR_NAME} -g ${ACR_RG} -l ${ACR_LOCATION} --sku Basic
+            echo "export ACR_REGISTRY=$(az acr show -n ${ACR_NAME} -g ${ACR_RG} --query loginServer)" >> $BASH_ENV
       - run:
           name: Run Unit Tests
           command: make all test BUILD_FLAGS="${BUILD_FLAGS}"
+      - run:
+          name: Destroy ACR
+          when: always
+          command: |
+            az group delete -y -n ${ACR_RG}
       - run:
           name: Prepare Artifacts
           command: mkdir -p artifacts && cp bin/* config/crd/bases/* artifacts/

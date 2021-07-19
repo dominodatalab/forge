@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
-	"github.com/dominodatalab/forge/internal/cloud"
 	"github.com/dominodatalab/forge/internal/config"
 	"github.com/dominodatalab/forge/internal/credentials"
 )
@@ -141,7 +140,7 @@ func (r *ContainerImageBuildReconciler) checkCloudRegistrySecrets(ctx context.Co
 			continue
 		}
 
-		ac, err := cloud.RetrieveRegistryAuthorization(ctx, reg.Server)
+		ac, err := r.registry.RetrieveAuthorization(ctx, reg.Server)
 		if err != nil {
 			return err
 		}

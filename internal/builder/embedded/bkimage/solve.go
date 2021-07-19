@@ -14,7 +14,7 @@ func (c *Client) Solve(ctx context.Context, req *controlapi.SolveRequest, ch cha
 	defer close(ch)
 
 	if c.controller == nil {
-		if err := c.createController(); err != nil {
+		if err := c.createController(ctx); err != nil {
 			return err
 		}
 	}
