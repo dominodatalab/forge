@@ -1,14 +1,13 @@
 package controllers
 
 import (
-	"os"
 	"time"
 
 	"github.com/go-logr/zapr"
 	"github.com/newrelic/go-agent/v3/integrations/nrzap"
 	"github.com/newrelic/go-agent/v3/newrelic"
-
 	"go.uber.org/zap"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -16,6 +15,9 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
+	"github.com/dominodatalab/forge/internal/cloud"
+	"github.com/dominodatalab/forge/internal/cloud/acr"
+	"github.com/dominodatalab/forge/internal/cloud/ecr"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -27,7 +29,7 @@ var (
 const newrelicShutdownTimeout = 5 * time.Second
 const leaderElectionID = "forge-leader-election"
 
-func StartManager(cfg ControllerConfig) {
+func StartManager(cfg ControllerConfig) error {
 	atom := zap.NewAtomicLevel()
 	if cfg.Debug {
 		atom.SetLevel(zap.DebugLevel)
@@ -40,6 +42,16 @@ func StartManager(cfg ControllerConfig) {
 	logger := zapr.NewLogger(zapLogger)
 	ctrl.SetLogger(logger)
 
+	registry := &cloud.Registry{}
+	if err := ecr.Register(logger, registry); err != nil {
+		logger.Error(err, "failed to register ECR")
+		return err
+	}
+	if err := acr.Register(logger, registry); err != nil {
+		logger.Error(err, "failed to register ACR")
+		return err
+	}
+
 	newrelicApp, err := newrelic.NewApplication(
 		newrelic.ConfigEnabled(false),
 		nrzap.ConfigLogger(zapLogger),
@@ -47,7 +59,7 @@ func StartManager(cfg ControllerConfig) {
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create New Relic Application")
-		os.Exit(1)
+		return err
 	}
 	defer newrelicApp.Shutdown(newrelicShutdownTimeout)
 
@@ -61,7 +73,7 @@ func StartManager(cfg ControllerConfig) {
 	})
 	if err != nil {
 		setupLog.Error(err, "Unable to start manager")
-		os.Exit(1)
+		return err
 	}
 
 	controller := &ContainerImageBuildReconciler{
@@ -71,11 +83,12 @@ func StartManager(cfg ControllerConfig) {
 		Recorder:  mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		JobConfig: cfg.JobConfig,
 		NewRelic:  newrelicApp,
+		registry:  registry,
 	}
 
 	if err = controller.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "ContainerImageBuild")
-		os.Exit(1)
+		return err
 	}
 	// +kubebuilder:scaffold:builder
 
@@ -98,8 +111,11 @@ func StartManager(cfg ControllerConfig) {
 	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "Problem running manager")
-		os.Exit(1)
+		return err
+
 	}
+
+	return nil
 }
 
 func init() {

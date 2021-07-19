@@ -123,7 +123,10 @@ var (
 					EnableIstioSupport:         buildJobIstioSupport,
 				},
 			}
-			controllers.StartManager(cfg)
+
+			if err := controllers.StartManager(cfg); err != nil {
+				os.Exit(1)
+			}
 		},
 	}
 )
