@@ -22,13 +22,13 @@ import (
 	"github.com/moby/buildkit/solver/llbsolver/errdefs"
 	"github.com/moby/buildkit/solver/llbsolver/mounts"
 	"github.com/moby/buildkit/solver/pb"
+	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/buildkit/util/progress/logs"
 	utilsystem "github.com/moby/buildkit/util/system"
 	"github.com/moby/buildkit/worker"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -306,7 +306,7 @@ func (e *execOp) Exec(ctx context.Context, g session.Group, inputs []solver.Resu
 		})
 	}
 	if err != nil {
-		logrus.Warn(err.Error()) // TODO: remove this with pull support
+		bklog.G(ctx).Warn(err.Error()) // TODO: remove this with pull support
 	}
 
 	meta := executor.Meta{
@@ -354,7 +354,7 @@ func (e *execOp) Exec(ctx context.Context, g session.Group, inputs []solver.Resu
 		// Prevent the result from being released.
 		p.OutputRefs[i].Ref = nil
 	}
-	return results, errors.Wrapf(execErr, "executor failed running %v", e.op.Meta.Args)
+	return results, errors.Wrapf(execErr, "process %q did not complete successfully", strings.Join(e.op.Meta.Args, " "))
 }
 
 func proxyEnvList(p *pb.ProxyEnv) []string {

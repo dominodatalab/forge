@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
+	"github.com/dominodatalab/forge/internal/cloud"
 	"github.com/dominodatalab/forge/internal/message"
 )
 
@@ -71,6 +72,7 @@ type ContainerImageBuildReconciler struct {
 	NewRelic *newrelic.Application
 
 	JobConfig *BuildJobConfig
+	registry  *cloud.Registry
 }
 
 var (
