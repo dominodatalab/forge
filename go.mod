@@ -16,9 +16,9 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Microsoft/go-winio v0.5.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.6.0
-	github.com/aws/aws-sdk-go-v2/config v1.3.0
-	github.com/aws/aws-sdk-go-v2/service/ecr v1.3.1
+	github.com/aws/aws-sdk-go-v2 v1.7.1
+	github.com/aws/aws-sdk-go-v2/config v1.5.0
+	github.com/aws/aws-sdk-go-v2/service/ecr v1.4.1
 	github.com/containerd/containerd v1.5.3
 	github.com/containerd/fuse-overlayfs-snapshotter v1.0.3
 	github.com/docker/cli v20.10.7+incompatible
