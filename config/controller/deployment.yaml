@@ -38,6 +38,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: BUILD_JOB_IMAGE
               value: quay.io/domino/forge:latest
+            - name: AWS_REGION
+              value: us-west-2
           envFrom:
             - secretRef:
                 name: forge

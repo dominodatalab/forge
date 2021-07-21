@@ -27,14 +27,16 @@ var (
 )
 
 func Register(logger logr.Logger, registry *cloud.Registry) error {
-	config, err := config.LoadDefaultConfig(context.Background())
+	config, err := config.LoadDefaultConfig(context.Background(), config.WithEC2IMDSRegion())
 	if err != nil {
-		return err
+		logger.Info("ECR not registered", "error", err)
+		return nil
 	}
 
 	client = ecr.NewFromConfig(config)
 
 	registry.Register(urlRegex, authenticate)
+	logger.Info("ECR registered")
 	return nil
 }
 
