@@ -11,7 +11,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	dockertypes "github.com/docker/docker/api/types"
+	"github.com/dominodatalab/forge/internal/cloud"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 )
+
+func TestRegister(t *testing.T) {
+	registry := &cloud.Registry{}
+
+	err := Register(newLogger(t), registry)
+	if err != nil {
+		t.Error(err)
+	}
+}
 
 func TestPatternMatching(t *testing.T) {
 	testcases := []struct {
@@ -115,4 +128,12 @@ type mockECRClient struct {
 
 func (m *mockECRClient) GetAuthorizationToken(ctx context.Context, params *ecr.GetAuthorizationTokenInput, optFns ...func(*ecr.Options)) (*ecr.GetAuthorizationTokenOutput, error) {
 	return m.out, m.err
+}
+
+func newLogger(t *testing.T) logr.Logger {
+	zlog, err := zap.NewDevelopment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return zapr.NewLogger(zlog)
 }
