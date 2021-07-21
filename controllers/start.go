@@ -16,6 +16,9 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	forgev1alpha1 "github.com/dominodatalab/forge/api/forge/v1alpha1"
+	"github.com/dominodatalab/forge/internal/cloud"
+	"github.com/dominodatalab/forge/internal/cloud/acr"
+	"github.com/dominodatalab/forge/internal/cloud/ecr"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -39,6 +42,18 @@ func StartManager(cfg ControllerConfig) {
 	})
 	logger := zapr.NewLogger(zapLogger)
 	ctrl.SetLogger(logger)
+
+	registry := &cloud.Registry{}
+	if err := ecr.Register(logger, registry); err != nil {
+		logger.Info("ECR not registered", "error", err)
+	} else {
+		logger.Info("ECR registered")
+	}
+	if err := acr.Register(logger, registry); err != nil {
+		logger.Info("ACR not registered", "error", err)
+	} else {
+		logger.Info("ACR registered")
+	}
 
 	newrelicApp, err := newrelic.NewApplication(
 		newrelic.ConfigEnabled(false),
@@ -71,6 +86,7 @@ func StartManager(cfg ControllerConfig) {
 		Recorder:  mgr.GetEventRecorderFor("containerimagebuild-controller"),
 		JobConfig: cfg.JobConfig,
 		NewRelic:  newrelicApp,
+		registry:  registry,
 	}
 
 	if err = controller.SetupWithManager(mgr); err != nil {

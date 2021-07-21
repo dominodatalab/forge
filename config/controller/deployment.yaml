@@ -38,6 +38,9 @@ spec:
                   fieldPath: metadata.namespace
             - name: BUILD_JOB_IMAGE
               value: quay.io/domino/forge:latest
+          envFrom:
+            - secretRef:
+                name: forge
           resources:
             requests:
               cpu: 1

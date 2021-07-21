@@ -1,6 +1,7 @@
 package bkimage
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/moby/buildkit/cache/remotecache"
@@ -16,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (c *Client) createController() error {
+func (c *Client) createController(ctx context.Context) error {
 	// grab the session manager
 	sm, err := c.getSessionManager()
 	if err != nil {
@@ -30,7 +31,7 @@ func (c *Client) createController() error {
 	}
 
 	// create a new worker
-	w, err := base.NewWorker(opt)
+	w, err := base.NewWorker(ctx, opt)
 	if err != nil {
 		return errors.Wrap(err, "creating worker failed")
 	}
