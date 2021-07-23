@@ -208,16 +208,11 @@ func TestPublisher_Push(t *testing.T) {
 			uri:       uri,
 			log:       logger,
 			queueName: queueName,
-			err:       make(chan error),
+			err:       make(chan error, 1),
 		}
 
-		ok := make(chan bool)
-		go func() {
-			ok <- true
-			pub.err <- errors.New("dang, conn be broke")
-		}()
+		pub.err <- errors.New("dang, conn be broke")
 
-		<-ok
 		assert.NoError(t, pub.Push(testMessage))
 
 		f.adapter.AssertExpectations(t)
@@ -247,16 +242,11 @@ func TestPublisher_Push(t *testing.T) {
 			uri:       uri,
 			log:       logger,
 			queueName: queueName,
-			err:       make(chan error),
+			err:       make(chan error, 1),
 		}
 
-		ok := make(chan bool)
-		go func() {
-			ok <- true
-			pub.err <- errors.New("dang, conn be broke")
-		}()
+		pub.err <- errors.New("dang, conn be broke")
 
-		<-ok
 		assert.NoError(t, pub.Push(testMessage))
 
 		f.adapter.AssertExpectations(t)
@@ -274,16 +264,11 @@ func TestPublisher_Push(t *testing.T) {
 			uri:       uri,
 			log:       logger,
 			queueName: queueName,
-			err:       make(chan error),
+			err:       make(chan error, 1),
 		}
 
-		ok := make(chan bool)
-		go func() {
-			ok <- true
-			pub.err <- errors.New("dang, conn be broke")
-		}()
+		pub.err <- errors.New("dang, conn be broke")
 
-		<-ok
 		assert.Error(t, pub.Push(testMessage))
 
 		f.adapter.AssertExpectations(t)
