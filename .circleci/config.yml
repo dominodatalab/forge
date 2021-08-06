@@ -18,6 +18,9 @@ commands:
             echo "export IMG=${IMG}" >> $BASH_ENV
             echo "export VERSION=${IMAGE_TAG}" >> $BASH_ENV
             echo "export BUILD_FLAGS=\"-ldflags='-X github.com/dominodatalab/forge/cmd.version=${VERSION}'\"" >> $BASH_ENV
+            echo "export GOOGLE_APPLICATION_CREDENTIALS='/tmp/gcp-${CIRCLE_BUILD_NUM}.json'" >> $BASH_ENV
+            echo ${CLOUDSDK_SERVICE_KEY} > "/tmp/gcp-${CIRCLE_BUILD_NUM}.json"
+
 jobs:
   build:
     executor: golang
