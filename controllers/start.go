@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -18,6 +19,7 @@ import (
 	"github.com/dominodatalab/forge/internal/cloud"
 	"github.com/dominodatalab/forge/internal/cloud/acr"
 	"github.com/dominodatalab/forge/internal/cloud/ecr"
+	"github.com/dominodatalab/forge/internal/cloud/gcr"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -49,6 +51,10 @@ func StartManager(cfg ControllerConfig) error {
 	}
 	if err := acr.Register(logger, registry); err != nil {
 		logger.Error(err, "failed to register ACR")
+		return err
+	}
+	if err := gcr.Register(context.TODO(), logger, registry); err != nil {
+		logger.Error(err, "failed to register GCR")
 		return err
 	}
 

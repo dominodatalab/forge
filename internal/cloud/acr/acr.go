@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/preview/containerregistry/runtime/2019-08-15-preview/containerregistry"
@@ -27,11 +26,6 @@ var (
 
 	noCredsErr = errors.New("no Azure Credentials")
 )
-
-type authDirective struct {
-	service string
-	realm   string
-}
 
 type acrProvider struct {
 	logger                logr.Logger
@@ -103,13 +97,13 @@ func (a *acrProvider) authenticate(ctx context.Context, server string) (*types.A
 
 	armAccessToken := a.servicePrincipalToken.OAuthToken()
 	loginServerURL := "https://" + loginServer
-	directive, err := a.challengeLoginServer(ctx, loginServerURL)
+	directive, err := cloud.ChallengeLoginServer(ctx, loginServerURL)
 	if err != nil {
 		return nil, err
 	}
 
 	refreshClient := containerregistry.NewRefreshTokensClient(loginServerURL)
-	refreshToken, err := refreshClient.GetFromExchange(ctx, "access_token", directive.service, a.tenantID, "", armAccessToken)
+	refreshToken, err := refreshClient.GetFromExchange(ctx, "access_token", directive.Service, a.tenantID, "", armAccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -117,55 +111,5 @@ func (a *acrProvider) authenticate(ctx context.Context, server string) (*types.A
 	return &types.AuthConfig{
 		Username: acrUserForRefreshToken,
 		Password: to.String(refreshToken.RefreshToken),
-	}, nil
-}
-
-func (a *acrProvider) challengeLoginServer(ctx context.Context, loginServerURL string) (*authDirective, error) {
-	v2Support := containerregistry.NewV2SupportClient(loginServerURL)
-	challenge, err := v2Support.Check(ctx)
-	// A 401 will also return an error so just check first
-	if !challenge.IsHTTPStatus(401) {
-		if err != nil {
-			return nil, err
-		}
-
-		defer challenge.Body.Close()
-		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
-	}
-
-	//Www-Authenticate: Bearer realm="https://xxx.azurecr.io/oauth2/token",service="xxx.azurecr.io"
-	authHeader, ok := challenge.Header["Www-Authenticate"]
-	if !ok {
-		return nil, fmt.Errorf("challenge response does not contain header 'Www-Authenticate'")
-	}
-
-	if len(authHeader) != 1 {
-		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, authenticate header [%s]",
-			strings.Join(authHeader, ", "))
-	}
-
-	authSections := strings.SplitN(authHeader[0], " ", 2)
-	if !strings.EqualFold("Bearer", authSections[0]) {
-		return nil, fmt.Errorf("Www-Authenticate: expected realm: Bearer, actual: %s", authSections[0])
-	}
-
-	authParams := map[string]string{}
-	params := strings.Split(authSections[1], ",")
-	for _, p := range params {
-		parts := strings.SplitN(strings.TrimSpace(p), "=", 2)
-		authParams[parts[0]] = strings.Trim(parts[1], `"`)
-	}
-
-	// verify headers
-	if authParams["service"] == "" {
-		return nil, fmt.Errorf("Www-Authenticate: missing header \"service\"")
-	}
-	if authParams["realm"] == "" {
-		return nil, fmt.Errorf("Www-Authenticate: missing header \"realm\"")
-	}
-
-	return &authDirective{
-		service: authParams["service"],
-		realm:   authParams["realm"],
 	}, nil
 }

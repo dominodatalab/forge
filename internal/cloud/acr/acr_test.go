@@ -31,9 +31,9 @@ func TestRegister(t *testing.T) {
 func TestRegisterNoSecret(t *testing.T) {
 	secret := os.Getenv(auth.ClientSecret)
 	os.Unsetenv(auth.ClientSecret)
-	defer func() {
+	t.Cleanup(func() {
 		os.Setenv(auth.ClientSecret, secret)
-	}()
+	})
 
 	registry := &cloud.Registry{}
 	err := Register(newLogger(t), registry)
