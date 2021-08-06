@@ -75,7 +75,7 @@ func TestAuthenticate(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%#v", err)
 				}
-				if auth.Username != "" || auth.Password != "" || auth.RegistryToken == "" {
+				if auth.Username == "" || auth.Password == "" || auth.RegistryToken == "" {
 					t.Fatalf("incorrect auth config: %v", auth)
 				}
 

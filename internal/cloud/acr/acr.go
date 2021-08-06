@@ -66,15 +66,11 @@ func newProvider(logger logr.Logger) (*acrProvider, error) {
 		}
 	} else {
 		ctx := context.Background()
-		for i := 0; i < 3; i++ {
-			if spt, err = settings.GetMSI().ServicePrincipalToken(); err == nil {
-				break
-			}
-			logger.Error(err, "retrying", "attempt", i+1)
-			if !autorest.DelayForBackoff(time.Second, i, ctx.Done()) {
-				return nil, ctx.Err()
-			}
-		}
+		err = retry(ctx, logger, 3, func() error {
+			spt, err = settings.GetMSI().ServicePrincipalToken()
+			return err
+		})
+
 		if err != nil {
 			// IMDS can take some time to setup, restart the process
 			return nil, fmt.Errorf("retreiving Service Principal Token from MSI failed: %w", err)
@@ -91,7 +87,10 @@ func (a *acrProvider) authenticate(ctx context.Context, server string) (*types.A
 	}
 
 	loginServer := match[0]
-	if err := a.servicePrincipalToken.EnsureFreshWithContext(ctx); err != nil {
+	err := retry(ctx, a.logger, 3, func() error {
+		return a.servicePrincipalToken.EnsureFreshWithContext(ctx)
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -112,4 +111,25 @@ func (a *acrProvider) authenticate(ctx context.Context, server string) (*types.A
 		Username: acrUserForRefreshToken,
 		Password: to.String(refreshToken.RefreshToken),
 	}, nil
+}
+
+func retry(ctx context.Context, logger logr.Logger, attempts int, f func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		err = f()
+		if err == nil {
+			return nil
+		}
+
+		if i == attempts {
+			break
+		}
+
+		logger.Error(err, "retrying", "attempt", i+1)
+		if !autorest.DelayForBackoff(time.Second, i, ctx.Done()) {
+			return ctx.Err()
+		}
+	}
+
+	return err
 }

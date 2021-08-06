@@ -126,7 +126,11 @@ func (g *gcrProvider) authenticate(ctx context.Context, server string) (*types.A
 		return nil, fmt.Errorf("no token in bearer response:\n%s", content)
 	}
 
+	// buildkit only supports username/password
 	return &types.AuthConfig{
+		Username: "oauth2accesstoken",
+		Password: token.AccessToken,
+
 		RegistryToken: response.Token,
 	}, nil
 }
