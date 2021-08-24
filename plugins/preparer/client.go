@@ -27,7 +27,7 @@ func (p *preparerClient) Prepare(contextPath string, pluginData map[string]strin
 		err = errors.New(errStr)
 	}
 
-	return errors.Wrapf(err, "failed to prepare %s with %v", contextPath, pluginData)
+	return errors.Wrapf(err, "failed to prepare %s", contextPath)
 }
 
 func (p *preparerClient) Cleanup() error {
