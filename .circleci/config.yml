@@ -2,7 +2,7 @@ version: 2.1
 executors:
   golang:
     docker:
-      - image: circleci/golang:1.16
+      - image: cimg/go:1.16
 orbs:
   azure-cli: circleci/azure-cli@1.2.0
 commands:
@@ -25,7 +25,6 @@ jobs:
   build:
     executor: golang
     environment:
-      KUBEBUILDER_VERSION: 2.2.0
       GOLANGCI_LINT_VERSION: v1.30.0
     steps:
       - checkout
@@ -49,23 +48,10 @@ jobs:
           root: /tmp/workspace
           paths:
             - acr_vars
-      - run:
-          name: fix up GOPATH
-          command: |
-            mkdir -p /go/src/github.com/dominodatalab
-            ln -s $PWD /go/src/github.com/dominodatalab/forge
       - load_env
       - run:
           name: pre-commit
           command: make precommit
-      - run:
-          name: Install Kubebuilder
-          command: |
-            os=$(go env GOOS)
-            arch=$(go env GOARCH)
-            curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/${os}/${arch} | tar -xz -C /tmp/
-            sudo mv /tmp/kubebuilder_${KUBEBUILDER_VERSION}_${os}_${arch} /usr/local/kubebuilder
-            echo 'export PATH="$PATH:/usr/local/kubebuilder/bin"' >> $BASH_ENV
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
