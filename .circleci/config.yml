@@ -40,10 +40,11 @@ jobs:
             echo "export ACR_RG=forge${CIRCLE_BUILD_NUM}" >> $ACR_VARS
             echo "export ACR_LOCATION=westus2" >> $ACR_VARS
             . $ACR_VARS
+            cat $ACR_VARS >> $BASH_ENV
+
             az group create -n ${ACR_RG} -l ${ACR_LOCATION}
             az acr create -n ${ACR_NAME} -g ${ACR_RG} -l ${ACR_LOCATION} --sku Basic
             echo "export ACR_REGISTRY=$(az acr show -n ${ACR_NAME} -g ${ACR_RG} --query loginServer)" >> $ACR_VARS
-            cat $ACR_VARS >> $BASH_ENV
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
