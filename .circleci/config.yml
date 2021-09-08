@@ -93,11 +93,11 @@ jobs:
             az group delete -y -n ${ACR_RG}
   test:
     machine:
-      image: ubuntu-2004:202104-01
+      image: ubuntu-2004:202107-02
     environment:
       KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
-      HELM_VERSION: "v3.6.2"
-      KUSTOMIZE_VERSION: "v4.2.0"
+      HELM_VERSION: "v3.6.3"
+      KUSTOMIZE_VERSION: "v4.3.0"
       K3S_KUBECONFIG_MODE: "644"
     steps:
       - checkout
@@ -136,27 +136,7 @@ jobs:
           command: |
             az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
             az group delete -y -n ${ACR_RG}
-  publish_release:
-    executor: golang
-    environment:
-      GHR_VERSION: v0.14.0
-    steps:
-      - run:
-          name: Install ghr
-          command: go install -v github.com/tcnksm/ghr@${GHR_VERSION}
-      - attach_workspace:
-          at: ./artifacts
-      - run:
-          name: Publish GitHub Release
-          command: |
-            ghr \
-              -token ${GITHUB_TOKEN} \
-              -owner ${CIRCLE_PROJECT_USERNAME} \
-              -repository ${CIRCLE_PROJECT_REPONAME} \
-              -commitish ${CIRCLE_SHA1} \
-              -prerelease \
-              $(./artifacts/forge version) \
-              artifacts/
+
 workflows:
   version: 2
   main:
@@ -171,13 +151,5 @@ workflows:
           requires:
             - build
           filters:
-            tags:
-              only: /v\d+(\.\d+)*(-.*)*/
-      - publish_release:
-          requires:
-            - test
-          filters:
-            branches:
-              ignore: /.*/
             tags:
               only: /v\d+(\.\d+)*(-.*)*/
