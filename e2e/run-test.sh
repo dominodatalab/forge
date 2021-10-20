@@ -136,7 +136,7 @@ if (( retries == 0 )); then
   exit 1
 fi
 
-set -e
+set -e -o pipefail
 
 info "Creating certificate for docker registry"
 cat <<EOH | kubectl apply -f -
@@ -167,6 +167,10 @@ helm install docker-registry-2 stable/docker-registry \
   --values e2e/helm_values/docker-registry-auth-only.yaml \
   --wait
 
+info "Creating generated CA bundle"
+cp /etc/ssl/certs/ca-certificates.crt ca-certificates.crt
+kubectl -n $namespace get secrets docker-registry-tls -o=jsonpath='{.data.ca\.crt}' | base64 -d >> ca-certificates.crt
+kubectl -n $namespace create cm domino-generated-ca --from-file=ca-certificates.crt
 
 info "Launching Forge controller: $image"
 pushd config/controller

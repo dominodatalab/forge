@@ -286,51 +286,29 @@ func (r *ContainerImageBuildReconciler) createJobForBuild(ctx context.Context, c
 	volumeMounts = append(volumeMounts, r.JobConfig.VolumeMounts...)
 	volumeMounts = append(volumeMounts, r.JobConfig.DynamicVolumeMounts...)
 
-	// optionally configure the custom CA init container w/ additional volumes/mounts
-	var initContainers []corev1.Container
-	if r.JobConfig.CustomCASecret != "" {
-		caTLSVol := corev1.Volume{
-			Name: "ca-tls",
+	// optionally configure the custom CA bundle w/ additional volumes/mounts
+	if r.JobConfig.CustomCAConfigMap != "" {
+		caBundleVol := corev1.Volume{
+			Name: "ca-bundle",
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: r.JobConfig.CustomCASecret,
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: r.JobConfig.CustomCAConfigMap,
+					},
 				},
 			},
 		}
-		sslCertsVol := corev1.Volume{
-			Name: "ssl-certs",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		}
-		volumes = append(volumes, caTLSVol, sslCertsVol)
+		volumes = append(volumes, caBundleVol)
 
-		caTLSVolMount := corev1.VolumeMount{
-			Name:      caTLSVol.Name,
-			MountPath: "/tmp/forge/ca-tls",
-		}
-		sslCertsVolMount := corev1.VolumeMount{
-			Name:      sslCertsVol.Name,
+		caBundleVolMount := corev1.VolumeMount{
+			Name:      caBundleVol.Name,
 			MountPath: "/etc/ssl/certs",
+			ReadOnly:  true,
 		}
-
-		initContainers = append(initContainers, corev1.Container{
-			Name:  "init-ca-certs",
-			Image: r.JobConfig.CAImage,
-			Env: []corev1.EnvVar{
-				{
-					Name:  "CERT_DIR",
-					Value: "/tmp/forge/ca-tls",
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{caTLSVolMount, sslCertsVolMount},
-		})
-
-		forgeBuildMount := sslCertsVolMount.DeepCopy()
-		forgeBuildMount.ReadOnly = true
-		volumeMounts = append(volumeMounts, *forgeBuildMount)
+		volumeMounts = append(volumeMounts, caBundleVolMount)
 	}
 
+	var initContainers []corev1.Container
 	// include any init containers provided in the custom resource
 	for _, initContainer := range cib.Spec.InitContainers {
 		initContainers = append(initContainers, corev1.Container{
