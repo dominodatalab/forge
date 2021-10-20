@@ -3,6 +3,7 @@
 package types
 
 import (
+	smithydocument "github.com/aws/smithy-go/document"
 	"time"
 )
 
@@ -16,6 +17,8 @@ type Attribute struct {
 
 	// The value assigned to the attribute key.
 	Value *string
+
+	noSmithyDocumentSerde
 }
 
 // An object representing authorization data for an Amazon ECR registry.
@@ -35,6 +38,8 @@ type AuthorizationData struct {
 	// https://aws_account_id.dkr.ecr.region.amazonaws.com. For example,
 	// https://012345678910.dkr.ecr.us-east-1.amazonaws.com..
 	ProxyEndpoint *string
+
+	noSmithyDocumentSerde
 }
 
 // An object representing a filter on a DescribeImages operation.
@@ -43,6 +48,8 @@ type DescribeImagesFilter struct {
 	// The tag status with which to filter your DescribeImages results. You can filter
 	// results based on whether they are TAGGED or UNTAGGED.
 	TagStatus TagStatus
+
+	noSmithyDocumentSerde
 }
 
 // The encryption configuration for the repository. This determines how the
@@ -51,37 +58,39 @@ type DescribeImagesFilter struct {
 // ECR uses server-side encryption with Amazon S3-managed encryption keys which
 // encrypts your data at rest using an AES-256 encryption algorithm. This does not
 // require any action on your part. For more control over the encryption of the
-// contents of your repository, you can use server-side encryption with customer
-// master keys (CMKs) stored in AWS Key Management Service (AWS KMS) to encrypt
-// your images. For more information, see Amazon ECR encryption at rest
+// contents of your repository, you can use server-side encryption with Key
+// Management Service key stored in Key Management Service (KMS) to encrypt your
+// images. For more information, see Amazon ECR encryption at rest
 // (https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html)
 // in the Amazon Elastic Container Registry User Guide.
 type EncryptionConfiguration struct {
 
 	// The encryption type to use. If you use the KMS encryption type, the contents of
-	// the repository will be encrypted using server-side encryption with customer
-	// master keys (CMKs) stored in AWS KMS. When you use AWS KMS to encrypt your data,
-	// you can either use the default AWS managed CMK for Amazon ECR, or specify your
-	// own CMK, which you already created. For more information, see Protecting Data
-	// Using Server-Side Encryption with CMKs Stored in AWS Key Management Service
-	// (SSE-KMS)
+	// the repository will be encrypted using server-side encryption with Key
+	// Management Service key stored in KMS. When you use KMS to encrypt your data, you
+	// can either use the default Amazon Web Services managed KMS key for Amazon ECR,
+	// or specify your own KMS key, which you already created. For more information,
+	// see Protecting data using server-side encryption with an KMS key stored in Key
+	// Management Service (SSE-KMS)
 	// (https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingKMSEncryption.html) in the
 	// Amazon Simple Storage Service Console Developer Guide.. If you use the AES256
 	// encryption type, Amazon ECR uses server-side encryption with Amazon S3-managed
 	// encryption keys which encrypts the images in the repository using an AES-256
-	// encryption algorithm. For more information, see Protecting Data Using
-	// Server-Side Encryption with Amazon S3-Managed Encryption Keys (SSE-S3)
+	// encryption algorithm. For more information, see Protecting data using
+	// server-side encryption with Amazon S3-managed encryption keys (SSE-S3)
 	// (https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html)
 	// in the Amazon Simple Storage Service Console Developer Guide..
 	//
 	// This member is required.
 	EncryptionType EncryptionType
 
-	// If you use the KMS encryption type, specify the CMK to use for encryption. The
-	// alias, key ID, or full ARN of the CMK can be specified. The key must exist in
-	// the same Region as the repository. If no key is specified, the default AWS
-	// managed CMK for Amazon ECR will be used.
+	// If you use the KMS encryption type, specify the KMS key to use for encryption.
+	// The alias, key ID, or full ARN of the KMS key can be specified. The key must
+	// exist in the same Region as the repository. If no key is specified, the default
+	// Amazon Web Services managed KMS key for Amazon ECR will be used.
 	KmsKey *string
+
+	noSmithyDocumentSerde
 }
 
 // An object representing an Amazon ECR image.
@@ -96,11 +105,14 @@ type Image struct {
 	// The manifest media type of the image.
 	ImageManifestMediaType *string
 
-	// The AWS account ID associated with the registry containing the image.
+	// The Amazon Web Services account ID associated with the registry containing the
+	// image.
 	RegistryId *string
 
 	// The name of the repository associated with the image.
 	RepositoryName *string
+
+	noSmithyDocumentSerde
 }
 
 // An object that describes an image returned by a DescribeImages operation.
@@ -136,11 +148,14 @@ type ImageDetail struct {
 	// The list of tags associated with this image.
 	ImageTags []string
 
-	// The AWS account ID associated with the registry to which this image belongs.
+	// The Amazon Web Services account ID associated with the registry to which this
+	// image belongs.
 	RegistryId *string
 
 	// The name of the repository to which this image belongs.
 	RepositoryName *string
+
+	noSmithyDocumentSerde
 }
 
 // An object representing an Amazon ECR image failure.
@@ -154,9 +169,11 @@ type ImageFailure struct {
 
 	// The image ID associated with the failure.
 	ImageId *ImageIdentifier
+
+	noSmithyDocumentSerde
 }
 
-// An object with identifying information for an Amazon ECR image.
+// An object with identifying information for an image in an Amazon ECR repository.
 type ImageIdentifier struct {
 
 	// The sha256 digest of the image manifest.
@@ -164,6 +181,26 @@ type ImageIdentifier struct {
 
 	// The tag used for the image.
 	ImageTag *string
+
+	noSmithyDocumentSerde
+}
+
+// The status of the replication process for an image.
+type ImageReplicationStatus struct {
+
+	// The failure code for a replication that has failed.
+	FailureCode *string
+
+	// The destination Region for the image replication.
+	Region *string
+
+	// The AWS account ID associated with the registry to which the image belongs.
+	RegistryId *string
+
+	// The image replication status.
+	Status ReplicationStatus
+
+	noSmithyDocumentSerde
 }
 
 // Contains information about an image scan finding.
@@ -183,6 +220,8 @@ type ImageScanFinding struct {
 
 	// A link containing additional details about the security vulnerability.
 	Uri *string
+
+	noSmithyDocumentSerde
 }
 
 // The details of an image scan.
@@ -199,6 +238,8 @@ type ImageScanFindings struct {
 
 	// The time when the vulnerability data was last scanned.
 	VulnerabilitySourceUpdatedAt *time.Time
+
+	noSmithyDocumentSerde
 }
 
 // A summary of the last completed image scan.
@@ -212,6 +253,8 @@ type ImageScanFindingsSummary struct {
 
 	// The time when the vulnerability data was last scanned.
 	VulnerabilitySourceUpdatedAt *time.Time
+
+	noSmithyDocumentSerde
 }
 
 // The image scanning configuration for a repository.
@@ -220,8 +263,12 @@ type ImageScanningConfiguration struct {
 	// The setting that determines whether images are scanned after being pushed to a
 	// repository. If set to true, images will be scanned after being pushed. If this
 	// parameter is not specified, it will default to false and images will not be
-	// scanned unless a scan is manually started with the StartImageScan API.
+	// scanned unless a scan is manually started with the API_StartImageScan
+	// (https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_StartImageScan.html)
+	// API.
 	ScanOnPush bool
+
+	noSmithyDocumentSerde
 }
 
 // The current status of an image scan.
@@ -232,6 +279,8 @@ type ImageScanStatus struct {
 
 	// The current state of an image scan.
 	Status ScanStatus
+
+	noSmithyDocumentSerde
 }
 
 // An object representing an Amazon ECR image layer.
@@ -250,6 +299,8 @@ type Layer struct {
 	// application/vnd.docker.image.rootfs.diff.tar.gzip or
 	// application/vnd.oci.image.layer.v1.tar+gzip.
 	MediaType *string
+
+	noSmithyDocumentSerde
 }
 
 // An object representing an Amazon ECR image layer failure.
@@ -263,6 +314,8 @@ type LayerFailure struct {
 
 	// The layer digest associated with the failure.
 	LayerDigest *string
+
+	noSmithyDocumentSerde
 }
 
 // The filter for the lifecycle policy preview.
@@ -270,6 +323,8 @@ type LifecyclePolicyPreviewFilter struct {
 
 	// The tag status of the image.
 	TagStatus TagStatus
+
+	noSmithyDocumentSerde
 }
 
 // The result of the lifecycle policy preview.
@@ -290,6 +345,8 @@ type LifecyclePolicyPreviewResult struct {
 
 	// The list of tags associated with this image.
 	ImageTags []string
+
+	noSmithyDocumentSerde
 }
 
 // The summary of the lifecycle policy preview request.
@@ -297,6 +354,8 @@ type LifecyclePolicyPreviewSummary struct {
 
 	// The number of expiring images.
 	ExpiringImageTotalCount *int32
+
+	noSmithyDocumentSerde
 }
 
 // The type of action to be taken.
@@ -304,6 +363,8 @@ type LifecyclePolicyRuleAction struct {
 
 	// The type of action to be taken.
 	Type ImageActionType
+
+	noSmithyDocumentSerde
 }
 
 // An object representing a filter on a ListImages operation.
@@ -312,42 +373,55 @@ type ListImagesFilter struct {
 	// The tag status with which to filter your ListImages results. You can filter
 	// results based on whether they are TAGGED or UNTAGGED.
 	TagStatus TagStatus
+
+	noSmithyDocumentSerde
 }
 
 // The replication configuration for a registry.
 type ReplicationConfiguration struct {
 
-	// An array of objects representing the replication rules for a replication
-	// configuration. A replication configuration may contain only one replication rule
-	// but the rule may contain one or more replication destinations.
+	// An array of objects representing the replication destinations and repository
+	// filters for a replication configuration.
 	//
 	// This member is required.
 	Rules []ReplicationRule
+
+	noSmithyDocumentSerde
 }
 
-// An array of objects representing the details of a replication destination.
+// An array of objects representing the destination for a replication rule.
 type ReplicationDestination struct {
 
-	// A Region to replicate to.
+	// The Region to replicate to.
 	//
 	// This member is required.
 	Region *string
 
-	// The account ID of the destination registry to replicate to.
+	// The Amazon Web Services account ID of the Amazon ECR private registry to
+	// replicate to. When configuring cross-Region replication within your own
+	// registry, specify your own account ID.
 	//
 	// This member is required.
 	RegistryId *string
+
+	noSmithyDocumentSerde
 }
 
-// An array of objects representing the replication destinations for a replication
-// configuration. A replication configuration may contain only one replication rule
-// but the rule may contain one or more replication destinations.
+// An array of objects representing the replication destinations and repository
+// filters for a replication configuration.
 type ReplicationRule struct {
 
-	// An array of objects representing the details of a replication destination.
+	// An array of objects representing the destination for a replication rule.
 	//
 	// This member is required.
 	Destinations []ReplicationDestination
+
+	// An array of objects representing the filters for a replication rule. Specifying
+	// a repository filter for a replication rule provides a method for controlling
+	// which repositories in a private registry are replicated.
+	RepositoryFilters []RepositoryFilter
+
+	noSmithyDocumentSerde
 }
 
 // An object representing a repository.
@@ -366,13 +440,14 @@ type Repository struct {
 	// The tag mutability setting for the repository.
 	ImageTagMutability ImageTagMutability
 
-	// The AWS account ID associated with the registry that contains the repository.
+	// The Amazon Web Services account ID associated with the registry that contains
+	// the repository.
 	RegistryId *string
 
 	// The Amazon Resource Name (ARN) that identifies the repository. The ARN contains
-	// the arn:aws:ecr namespace, followed by the region of the repository, AWS account
-	// ID of the repository owner, repository namespace, and repository name. For
-	// example, arn:aws:ecr:region:012345678910:repository/test.
+	// the arn:aws:ecr namespace, followed by the region of the repository, Amazon Web
+	// Services account ID of the repository owner, repository namespace, and
+	// repository name. For example, arn:aws:ecr:region:012345678910:repository/test.
 	RepositoryArn *string
 
 	// The name of the repository.
@@ -381,6 +456,30 @@ type Repository struct {
 	// The URI for the repository. You can use this URI for container image push and
 	// pull operations.
 	RepositoryUri *string
+
+	noSmithyDocumentSerde
+}
+
+// The filter settings used with image replication. Specifying a repository filter
+// to a replication rule provides a method for controlling which repositories in a
+// private registry are replicated. If no repository filter is specified, all
+// images in the repository are replicated.
+type RepositoryFilter struct {
+
+	// The repository filter details. When the PREFIX_MATCH filter type is specified,
+	// this value is required and should be the repository name prefix to configure
+	// replication for.
+	//
+	// This member is required.
+	Filter *string
+
+	// The repository filter type. The only supported value is PREFIX_MATCH, which is a
+	// repository name prefix specified with the filter parameter.
+	//
+	// This member is required.
+	FilterType RepositoryFilterType
+
+	noSmithyDocumentSerde
 }
 
 // The metadata that you apply to a resource to help you categorize and organize
@@ -396,4 +495,8 @@ type Tag struct {
 	// The optional part of a key-value pair that make up a tag. A value acts as a
 	// descriptor within a tag category (key).
 	Value *string
+
+	noSmithyDocumentSerde
 }
+
+type noSmithyDocumentSerde = smithydocument.NoSerde

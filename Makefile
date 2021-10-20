@@ -1,15 +1,13 @@
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/domino/forge:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "+crd"
 # Add extra build flags
 BUILD_FLAGS ?=
 
 PWD=$(shell pwd)
 
-CONTROLLER_GEN=go run sigs.k8s.io/controller-tools/cmd/controller-gen
-CLIENT_GEN=go run k8s.io/code-generator/cmd/client-gen
-GOLANGCI_LINT=go run github.com/golangci/golangci-lint/cmd/golangci-lint
+TOOLS_FLAGS=-mod=mod -modfile=tools/go.mod
 
 all: forge
 
@@ -46,9 +44,14 @@ uninstall: manifests
 deploy: manifests
 	kubectl apply -k config/controller
 
+install_tools:
+	go install $(TOOLS_FLAGS) sigs.k8s.io/controller-tools/cmd/controller-gen
+	go install $(TOOLS_FLAGS) k8s.io/code-generator/cmd/client-gen
+	go install $(TOOLS_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
+
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
+	GOOS=linux GOFLAGS=-mod=mod controller-gen $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt:
@@ -56,13 +59,13 @@ fmt:
 
 # Run project linters
 lint:
-	$(GOLANGCI_LINT) run --timeout=5m
+	golangci-lint run --timeout=5m
 
 # Generate code
 generate:
-	$(CLIENT_GEN) -o ./tmp --output-package="github.com/dominodatalab/forge/internal" --clientset-name="clientset" --input-base="github.com/dominodatalab/forge/api" --input="forge/v1alpha1" --go-header-file="./hack/boilerplate.go.txt"
+	client-gen -o ./tmp --output-package="github.com/dominodatalab/forge/internal" --clientset-name="clientset" --input-base="github.com/dominodatalab/forge/api" --input="forge/v1alpha1" --go-header-file="./hack/boilerplate.go.txt"
 	cp -r ./tmp/github.com/dominodatalab/forge/* .
-	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./api/..."
+	controller-gen object:headerFile=./hack/boilerplate.go.txt paths="./api/..."
 	rm -rf ./tmp
 
 # Build the docker image
@@ -76,8 +79,8 @@ docker-push:
 # Regenerate controller manifests and code using Docker (useful if on MacOS)
 controller-regen-docker:
 	docker run --rm -it -v ${PWD}:/go/src/github.com/dominodatalab/forge \
-		--workdir /go/src/github.com/dominodatalab/forge golang:1.16-buster \
-		sh -c "make manifests generate"
+		--workdir /go/src/github.com/dominodatalab/forge golang:1.17-buster \
+		sh -c "make install_tools manifests generate"
 
 outdated:
 	go list -mod=readonly -u -m -f '{{if and .Update (not .Indirect)}}{{.}}{{end}}' all

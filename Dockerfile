@@ -1,11 +1,11 @@
-# From https://github.com/moby/buildkit/blob/f4fcba58837c49433afaa0e23b710d3e73a66e37/Dockerfile
+# From https://github.com/moby/buildkit/blob/v0.9.1/Dockerfile
 ARG RUNC_VERSION=v1.0.0
 ARG ROOTLESSKIT_VERSION=v0.14.2
-ARG BUILDKIT_VERSION=v0.9.0
+ARG BUILDKIT_VERSION=v0.9.1
 ARG SHADOW_VERSION=4.8.1
 ARG ALPINE_VERSION=3.14
 
-FROM golang:1.16-alpine3.13 AS forge
+FROM golang:1.17-alpine3.14 AS forge
 RUN apk add --no-cache make build-base
 WORKDIR /forge
 COPY . .

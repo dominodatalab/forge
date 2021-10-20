@@ -1,3 +1,34 @@
+# v1.8.3 (2021-10-11)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.8.2 (2021-09-17)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.8.1 (2021-09-10)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.8.0 (2021-09-02)
+
+* **Feature**: Add support for S3 Multi-Region Access Point ARNs.
+
+# v1.7.0 (2021-08-27)
+
+* **Feature**: Updated `github.com/aws/smithy-go` to latest version
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.6.1 (2021-08-19)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.6.0 (2021-08-04)
+
+* **Feature**: adds error handling for defered close calls
+* **Dependency Update**: Updated `github.com/aws/smithy-go` to latest version.
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.5.0 (2021-07-15)
 
 * **Feature**: Support has been added for EC2 IPv6-enabled Instance Metadata Service Endpoints.
