@@ -58,7 +58,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // ForgeV1alpha1 retrieves the ForgeV1alpha1Client
 func (c *Clientset) ForgeV1alpha1() forgev1alpha1.ForgeV1alpha1Interface {

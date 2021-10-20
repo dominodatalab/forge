@@ -2,7 +2,7 @@ version: 2.1
 executors:
   golang:
     docker:
-      - image: cimg/go:1.16
+      - image: cimg/go:1.17
 orbs:
   azure-cli: circleci/azure-cli@1.2.0
 commands:
@@ -24,8 +24,6 @@ commands:
 jobs:
   build:
     executor: golang
-    environment:
-      GOLANGCI_LINT_VERSION: v1.30.0
     steps:
       - checkout
       - azure-cli/install
@@ -50,12 +48,12 @@ jobs:
           paths:
             - acr_vars
       - load_env
-      - run:
-          name: pre-commit
-          command: make precommit
       - restore_cache:
           keys:
             - go-modules-v1-{{ checksum "go.sum" }}
+      - run:
+          name: pre-commit
+          command: make install_tools precommit
       - run:
           name: Run Unit Tests
           command: make all test BUILD_FLAGS="${BUILD_FLAGS}"
@@ -67,7 +65,7 @@ jobs:
           paths:
             - "*"
       - setup_remote_docker:
-          version: "20.10.2"
+          version: "20.10.7"
       - run:
           name: Build Docker Image
           command: |
@@ -86,7 +84,7 @@ jobs:
       - save_cache:
           key: go-modules-v1-{{ checksum "go.sum" }}
           paths:
-            - /$GOPATH/pkg/mod
+            - /home/circleci/go/pkg/mod
       - run:
           name: Destroy ACR
           when: on_fail

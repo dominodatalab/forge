@@ -34,7 +34,7 @@ func (c *Client) DescribeImageScanFindings(ctx context.Context, params *Describe
 
 type DescribeImageScanFindingsInput struct {
 
-	// An object with identifying information for an Amazon ECR image.
+	// An object with identifying information for an image in an Amazon ECR repository.
 	//
 	// This member is required.
 	ImageId *types.ImageIdentifier
@@ -61,15 +61,17 @@ type DescribeImageScanFindingsInput struct {
 	// to return.
 	NextToken *string
 
-	// The AWS account ID associated with the registry that contains the repository in
-	// which to describe the image scan findings for. If you do not specify a registry,
-	// the default registry is assumed.
+	// The Amazon Web Services account ID associated with the registry that contains
+	// the repository in which to describe the image scan findings for. If you do not
+	// specify a registry, the default registry is assumed.
 	RegistryId *string
+
+	noSmithyDocumentSerde
 }
 
 type DescribeImageScanFindingsOutput struct {
 
-	// An object with identifying information for an Amazon ECR image.
+	// An object with identifying information for an image in an Amazon ECR repository.
 	ImageId *types.ImageIdentifier
 
 	// The information contained in the image scan findings.
@@ -92,6 +94,8 @@ type DescribeImageScanFindingsOutput struct {
 
 	// Metadata pertaining to the operation's result.
 	ResultMetadata middleware.Metadata
+
+	noSmithyDocumentSerde
 }
 
 func (c *Client) addOperationDescribeImageScanFindingsMiddlewares(stack *middleware.Stack, options Options) (err error) {

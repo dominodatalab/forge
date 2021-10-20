@@ -50,14 +50,16 @@ type DescribeRepositoriesInput struct {
 	// purposes.
 	NextToken *string
 
-	// The AWS account ID associated with the registry that contains the repositories
-	// to be described. If you do not specify a registry, the default registry is
-	// assumed.
+	// The Amazon Web Services account ID associated with the registry that contains
+	// the repositories to be described. If you do not specify a registry, the default
+	// registry is assumed.
 	RegistryId *string
 
 	// A list of repositories to describe. If this parameter is omitted, then all
 	// repositories in a registry are described.
 	RepositoryNames []string
+
+	noSmithyDocumentSerde
 }
 
 type DescribeRepositoriesOutput struct {
@@ -73,6 +75,8 @@ type DescribeRepositoriesOutput struct {
 
 	// Metadata pertaining to the operation's result.
 	ResultMetadata middleware.Metadata
+
+	noSmithyDocumentSerde
 }
 
 func (c *Client) addOperationDescribeRepositoriesMiddlewares(stack *middleware.Stack, options Options) (err error) {
