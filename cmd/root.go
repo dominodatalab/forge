@@ -51,8 +51,7 @@ forge --preparer-plugins-path /plugins/installed/here
 # Enable image build layer caching
 forge --enable-layer-caching`
 
-	defaultBuildJobCAImage = "quay.io/domino/forge-init-ca:v1.0.0"
-	defaultMessageQueue    = "forge-status-update"
+	defaultMessageQueue = "forge-status-update"
 )
 
 var (
@@ -62,13 +61,12 @@ var (
 	gcMaxKeepCount int
 
 	buildJobImage                      string
-	buildJobCAImage                    string
 	buildJobImagePullSecret            string
 	buildJobLabels                     map[string]string
 	buildJobAnnotations                map[string]string
 	buildJobNodeSelector               map[string]string
 	buildJobTolerationKey              string
-	buildJobCustomCASecret             string
+	buildJobCustomCAConfigMap          string
 	buildJobPodSecurityPolicy          string
 	buildJobSecurityContextConstraints string
 	buildJobGrantFullPrivilege         bool
@@ -104,9 +102,8 @@ var (
 
 				JobConfig: &controllers.BuildJobConfig{
 					Image:                      buildJobImage,
-					CAImage:                    buildJobCAImage,
 					ImagePullSecret:            buildJobImagePullSecret,
-					CustomCASecret:             buildJobCustomCASecret,
+					CustomCAConfigMap:          buildJobCustomCAConfigMap,
 					PreparerPluginPath:         preparerPluginsPath,
 					Labels:                     buildJobLabels,
 					TolerationKey:              buildJobTolerationKey,
@@ -181,13 +178,12 @@ func init() {
 	rootCmd.Flags().BoolVar(&enableLeaderElection, "enable-leader-election", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
 	rootCmd.Flags().StringVar(&buildJobImage, "build-job-image", buildJobImage, "Image used to launch build jobs. This typically should be the same as the controller.")
-	rootCmd.Flags().StringVar(&buildJobCAImage, "build-job-ca-image", defaultBuildJobCAImage, "Image used to initialize SSL certificates using a custom CA. You should not have to override this.")
 	rootCmd.Flags().StringVar(&buildJobImagePullSecret, "build-job-image-pull-secret", "", "Pull secret used to fetch build job images.")
 	rootCmd.Flags().StringToStringVar(&buildJobLabels, "build-job-labels", nil, "Additional labels added to build job pods")
 	rootCmd.Flags().StringToStringVar(&buildJobAnnotations, "build-job-annotations", nil, "Additional annotations added to build job pods")
 	rootCmd.Flags().StringVar(&buildJobTolerationKey, "build-job-toleration-key", "", "Toleration key added to build job pods with 'exists' operator")
 	rootCmd.Flags().StringToStringVar(&buildJobNodeSelector, "build-job-node-selector", nil, "Target specific nodes when launching build job pods")
-	rootCmd.Flags().StringVar(&buildJobCustomCASecret, "build-job-custom-ca", "", "Secret container custom CA certificates for distribution registries")
+	rootCmd.Flags().StringVar(&buildJobCustomCAConfigMap, "build-job-custom-ca", "", "Config map contains custom CA certificates for distribution registries")
 	rootCmd.Flags().StringVar(&buildJobPodSecurityPolicy, "build-job-pod-security-policy", "", "Run builds jobs using a specified PSP")
 	rootCmd.Flags().StringVar(&buildJobSecurityContextConstraints, "build-job-security-context-constraints", "", "Run builds jobs using a specified SCC")
 	rootCmd.Flags().BoolVar(&buildJobGrantFullPrivilege, "build-job-full-privilege", false, "Run builds jobs using a privileged root user")

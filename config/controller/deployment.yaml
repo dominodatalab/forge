@@ -29,7 +29,7 @@ spec:
             - --namespace
             - $(WATCH_NAMESPACE)
             - --build-job-custom-ca
-            - docker-registry-tls
+            - domino-generated-ca
             - --build-job-image=$(BUILD_JOB_IMAGE)
           env:
             - name: WATCH_NAMESPACE

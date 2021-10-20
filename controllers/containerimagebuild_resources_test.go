@@ -243,6 +243,33 @@ func TestContainerImageBuildReconciler_tolerations(t *testing.T) {
 	assert.Contains(t, job.Spec.Template.Spec.Tolerations, expected)
 }
 
+func TestContainerImageBuildReconciler_custom_ca_secret(t *testing.T) {
+	controller := makeController(t)
+	controller.JobConfig.CustomCAConfigMap = "cacerts"
+
+	cib := &forgev1alpha1.ContainerImageBuild{ObjectMeta: metav1.ObjectMeta{Name: "myimage"}}
+	require.NoError(t, controller.createJobForBuild(context.Background(), cib))
+
+	job := &batchv1.Job{}
+	require.NoError(t, controller.Client.Get(context.Background(), types.NamespacedName{Name: cib.Name}, job))
+
+	assert.Contains(t, job.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name:      "ca-bundle",
+		ReadOnly:  true,
+		MountPath: "/etc/ssl/certs",
+	})
+	assert.Contains(t, job.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: "ca-bundle",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "cacerts",
+				},
+			},
+		},
+	})
+}
+
 func TestContainerImageBuildReconciler_prepareJobArgs(t *testing.T) {
 	tests := []struct {
 		name      string
