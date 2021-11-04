@@ -32,7 +32,7 @@ RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap \
   && addgroup -S -g $ISTIO_GID istio \
   && mkdir -p /run/user/1000 /home/user \
   && chown -R user /run/user/1000 /home/user \
-  && echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid \
+  && echo user:150000:150000 | tee /etc/subuid | tee /etc/subgid \
   && echo user:$ISTIO_GID:1 >> /etc/subgid
 USER 1000
 ENV USER user
