@@ -51,7 +51,13 @@ Create Docker registry auth secret:
 kubectl apply -f config/samples/docker-registry-auth.yaml
 ```
 
-Prepare cluster for running Forge builds:
+Install local tools
+
+```
+make install_tools
+```
+
+Prepare cluster for running Forge builds by installing the CRD:
 
 ```
 make install
@@ -73,23 +79,34 @@ Connect the host's Docker client to minikube's Docker server so that the image t
 eval $(minikube docker-env)
 ```
 
-Build Forge image with a custom name:
+Build Forge image. This will default to building the image as `quay.io/domino/forge:latest`.
+
+```
+make docker-build
+```
+
+In a different terminal, run Forge's controller on the host, specifying the image from the previous step.
+Minikube will not pull this image because it will already be present in the cluster. If you're only changing
+the build job, then you can keep the controller running - the build job image will be replaced in place by
+the commands above.
+
+```
+go run ./cmd/forge --build-job-image quay.io/domino/forge:latest
+```
+
+If you need to change the image name for any reason, use the `IMG` environment variable.
+If you use two terminals, make sure  you use the same value in both.
 
 ```
 export IMG=test-forge:$(date +%s)
 make docker-build
-```
-
-Run Forge's controller on the host, using the image from the previous step for build jobs:
-
-```
 go run ./cmd/forge --build-job-image $IMG
 ```
 
 On a different terminal, create a CIB (container image build) resource to trigger a build:
 
 ```
-kubectl apply -f config/samples/init-container-sample.yaml
+kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
 ```
 
 Watch for build pods:
@@ -110,12 +127,15 @@ Confirm that the image was built and uploaded to the Docker registry:
 curl -u marge:simpson $(minikube ip):32002/v2/_catalog
 ```
 
-To try again with the same CIB resource name, first delete the old resource so that the Forge controller will destroy
+To repeat the build with the same CIB resource name, first delete the old resource so that the Forge controller will destroy
 the job and pod, and then create it again:
 
 ```
+kubectl delete -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+# OR
 kubectl delete cib example-build
 
+# Reapply
 kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
 ```
 
