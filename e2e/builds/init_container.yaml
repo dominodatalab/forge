@@ -10,7 +10,7 @@ type: Opaque
 apiVersion: forge.dominodatalab.com/v1alpha1
 kind: ContainerImageBuild
 metadata:
-  name: test-init-container
+  name: ${TEST_RESOURCE_NAME}
 spec:
   imageName: init-container-files
   context: https://forge-builder-test.s3-us-west-2.amazonaws.com/test-init-container.tar.gz

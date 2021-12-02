@@ -13,3 +13,5 @@
 
 # Ignore compiled binaries
 bin/
+
+.idea/
