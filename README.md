@@ -48,7 +48,7 @@ helm upgrade -i docker-registry stable/docker-registry \
 Create Docker registry auth secret:
 
 ```
-kubectl apply -f config/samples/docker-registry-auth.yaml
+kubectl apply -f config/samples/secrets/docker-registry-auth.yaml
 ```
 
 Install local tools
@@ -106,7 +106,7 @@ go run ./cmd/forge --build-job-image $IMG
 On a different terminal, create a CIB (container image build) resource to trigger a build:
 
 ```
-kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+kubectl apply -f config/samples/cib/forge_v1alpha1_containerimagebuild.yaml
 ```
 
 Watch for build pods:
@@ -131,12 +131,12 @@ To repeat the build with the same CIB resource name, first delete the old resour
 the job and pod, and then create it again:
 
 ```
-kubectl delete -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+kubectl delete -f config/samples/cib/forge_v1alpha1_containerimagebuild.yaml
 # OR
 kubectl delete cib example-build
 
 # Reapply
-kubectl apply -f config/samples/forge_v1alpha1_containerimagebuild.yaml
+kubectl apply -f config/samples/cib/forge_v1alpha1_containerimagebuild.yaml
 ```
 
 ### Inspecting generated images
