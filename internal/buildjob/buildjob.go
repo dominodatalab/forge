@@ -218,28 +218,39 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 		case apiReg.BasicAuth.IsSecret():
 			fetchConfigs = func() (configs []config.Registry, err error) {
-				configs = []config.Registry{}
-
 				authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
 				if err != nil {
 					return nil, err
 				}
 
-				// validate that the specified host exists in the secret
-				_, _, err = j.getBasicAuthForHost(authConfigs, apiReg.Server)
+				username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
 				if err != nil {
 					return nil, err
 				}
 
-				// if target host present, load *all* hosts in the secret
+				configs = []config.Registry{
+					{
+						Host:     apiReg.Server,
+						NonSSL:   apiReg.NonSSL,
+						Username: username,
+						Password: password,
+					},
+				}
+
+				// load *all* hosts in the secret
 				for host, authConfig := range authConfigs {
+					if host == apiReg.Server {
+						continue
+					}
 					logNewHostConfig(
 						host,
 						fmt.Sprintf("secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
 
+					// Assume SSL. To configure NonSSL auth, user must manually specify
+					// the specific host in the custom resource.
 					configs = append(configs, config.Registry{
 						Host:     host,
-						NonSSL:   apiReg.NonSSL,
+						NonSSL:   false,
 						Username: authConfig.Username,
 						Password: authConfig.Password,
 					})

@@ -20,7 +20,8 @@ function run_test {
   local namespace="$4"
 
   info "Running test case: $test_name"
-  kubectl apply -f "$yaml_file" -n "$namespace"
+  export TEST_NS=$namespace
+  cat "$yaml_file" | envsubst '${TEST_NS}' | kubectl apply -n "$namespace" -f -
 
   local counter=0
   while true; do
@@ -172,6 +173,9 @@ cp /etc/ssl/certs/ca-certificates.crt ca-certificates.crt
 kubectl -n $namespace get secrets docker-registry-tls -o=jsonpath='{.data.ca\.crt}' | base64 -d >> ca-certificates.crt
 kubectl -n $namespace create cm domino-generated-ca --from-file=ca-certificates.crt
 
+info "Adding docker auth secret"
+kubectl create -n $namespace -f e2e/secrets/docker-registry-auth-two-registries.yaml
+
 info "Launching Forge controller: $image"
 pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"
@@ -204,6 +208,13 @@ run_test "Build should run custom init container" \
           test-init-container \
           "$namespace"
 verify_image "$registry/init-container-files" /app $BASE_DIR/e2e/testdata/expected/init-container
+
+run_test "Build should configure all auth entries from specified secret" \
+          e2e/builds/all_registries_from_secret.yaml \
+          test-all-registries-from-secret \
+          "$namespace"
+
+verify_image "$registry/all-registries-from-secret-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 if [ -n "$ACR_REGISTRY" ]; then
 
