@@ -187,8 +187,13 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerI
 }
 
 // uses api registry directives to generate a list of registry configurations for image building
-func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (allConfigs []config.Registry, err error) {
-	allConfigs = []config.Registry{}
+func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (allRegistryConfigs []config.Registry, err error) {
+	allRegistryConfigs = []config.Registry{}
+	explicitlyConfiguredRegistries := map[string]bool{}
+
+	logNewHostConfig := func(host string, source string) {
+		j.log.Info("configured auth for host", "Host", host, "Source", source)
+	}
 
 	for _, apiReg := range apiRegs {
 		// NOTE: move BasicAuth validation into an admission webhook at a later time
@@ -196,8 +201,11 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
-		logNewHostConfig := func(host string, source string) {
-			j.log.Info("configured auth for host", "Host", host, "Source", source)
+		explicitlyConfiguredRegistries[apiReg.Server] = true
+
+		registryConfig := config.Registry{
+			Host:   apiReg.Server,
+			NonSSL: apiReg.NonSSL,
 		}
 
 		var fetchConfigs func() ([]config.Registry, error)
@@ -206,18 +214,13 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 		case apiReg.BasicAuth.IsInline():
 			fetchConfigs = func() ([]config.Registry, error) {
 				logNewHostConfig(apiReg.Server, "inline BasicAuth entry")
-				return []config.Registry{
-					{
-						Host:     apiReg.Server,
-						NonSSL:   apiReg.NonSSL,
-						Username: apiReg.BasicAuth.Username,
-						Password: apiReg.BasicAuth.Password,
-					},
-				}, nil
+				registryConfig.Username = apiReg.BasicAuth.Username
+				registryConfig.Password = apiReg.BasicAuth.Password
+				return []config.Registry{registryConfig}, nil
 			}
 
 		case apiReg.BasicAuth.IsSecret():
-			fetchConfigs = func() (configs []config.Registry, err error) {
+			fetchConfigs = func() ([]config.Registry, error) {
 				authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
 				if err != nil {
 					return nil, err
@@ -228,20 +231,17 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 					return nil, err
 				}
 
-				configs = []config.Registry{
-					{
-						Host:     apiReg.Server,
-						NonSSL:   apiReg.NonSSL,
-						Username: username,
-						Password: password,
-					},
-				}
+				registryConfig.Username = username
+				registryConfig.Password = password
 
-				// load *all* hosts in the secret
+				configs := []config.Registry{registryConfig}
+
+				// load *all* hosts in the secret that are not already explicitly configured
 				for host, authConfig := range authConfigs {
-					if host == apiReg.Server {
+					if _, hostConfigured := explicitlyConfiguredRegistries[host]; hostConfigured {
 						continue
 					}
+
 					logNewHostConfig(
 						host,
 						fmt.Sprintf("secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
@@ -271,27 +271,18 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 					return nil, err
 				}
 
+				registryConfig.Username = username
+				registryConfig.Password = password
+
 				logNewHostConfig(apiReg.Server, "dynamic cloud credentials")
-				return []config.Registry{
-					{
-						Host:     apiReg.Server,
-						NonSSL:   apiReg.NonSSL,
-						Username: username,
-						Password: password,
-					},
-				}, nil
+				return []config.Registry{registryConfig}, nil
 			}
 
 		default:
 			// If no recognizable auth config is present, configure host without authentication.
 			fetchConfigs = func() ([]config.Registry, error) {
 				logNewHostConfig(apiReg.Server, "no source, configured without auth")
-				return []config.Registry{
-					{
-						Host:   apiReg.Server,
-						NonSSL: apiReg.NonSSL,
-					},
-				}, nil
+				return []config.Registry{registryConfig}, nil
 			}
 
 		}
@@ -301,10 +292,10 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			return nil, err
 		}
 
-		allConfigs = append(allConfigs, registryConfigs...)
+		allRegistryConfigs = append(allRegistryConfigs, registryConfigs...)
 	}
 
-	return allConfigs, nil
+	return allRegistryConfigs, nil
 }
 
 func (j *Job) getDockerAuthsFromFS(host string) (credentials.AuthConfigs, error) {
