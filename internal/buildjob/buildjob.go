@@ -188,7 +188,7 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerI
 
 // uses api registry directives to generate a list of registry configurations for image building
 func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (registryConfigs []config.Registry, err error) {
-	configuredRegistries := map[string]*config.Registry{}
+	configuredRegistries := map[string]config.Registry{}
 
 	logNewRegistryConfig := func(host string, source string) {
 		j.log.Info("configured auth for registry", "Host", host, "Source", source)
@@ -200,23 +200,20 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
-		registryConfig := config.Registry{
-			Host:   apiReg.Server,
-			NonSSL: apiReg.NonSSL,
-		}
-
 		// If this registry was already configured, log that the new entry is overriding it.
 		if _, registryConfigured := configuredRegistries[apiReg.Server]; registryConfigured {
 			j.log.Info("auth entry for registry overrides existing configuration", "Host", apiReg.Server)
 		}
 
-		configuredRegistries[apiReg.Server] = &registryConfig
-
 		switch {
 		case apiReg.BasicAuth.IsInline():
 			logNewRegistryConfig(apiReg.Server, "from inline details")
-			registryConfig.Username = apiReg.BasicAuth.Username
-			registryConfig.Password = apiReg.BasicAuth.Password
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: apiReg.BasicAuth.Username,
+				Password: apiReg.BasicAuth.Password,
+			}
 
 		case apiReg.BasicAuth.IsSecret():
 			authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
@@ -229,19 +226,16 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 				return nil, err
 			}
 
-			logNewRegistryConfig(
-				apiReg.Server,
-				fmt.Sprintf(
-					"from secret (%s) in namespace (%s)",
-					apiReg.BasicAuth.SecretName,
-					apiReg.BasicAuth.SecretNamespace))
-			registryConfig.Username = username
-			registryConfig.Password = password
+			logNewRegistryConfig(apiReg.Server, fmt.Sprintf("from secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: username,
+				Password: password,
+			}
 
 			// load all registries in the secret that are not already configured
 			for host, authConfig := range authConfigs {
-				j.log.Info(fmt.Sprintf("host value %+v", host))
-				j.log.Info(fmt.Sprintf("authConfig value %+v", authConfig))
 				// If this host was already explicitly configured, do not load.
 				// If it is explicitly configured later, it will override this config
 				// IE, explicit auth entries from the CR take strict precendence.
@@ -258,7 +252,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 				// Assume SSL. To configure NonSSL auth, user must manually specify
 				// the specific host in the custom resource.
-				configuredRegistries[host] = &config.Registry{
+				configuredRegistries[host] = config.Registry{
 					Host:     host,
 					NonSSL:   false,
 					Username: authConfig.Username,
@@ -278,23 +272,27 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			}
 
 			logNewRegistryConfig(apiReg.Server, "dynamic cloud credentials")
-			registryConfig.Username = username
-			registryConfig.Password = password
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: username,
+				Password: password,
+			}
 
 		default:
 			// If no recognizable auth config is present, configure registry without authentication.
 			logNewRegistryConfig(apiReg.Server, "no source, configured without auth")
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:   apiReg.Server,
+				NonSSL: apiReg.NonSSL,
+			}
 		}
 	}
 
 	registryConfigs = []config.Registry{}
 	for _, v := range configuredRegistries {
-		registryConfigs = append(registryConfigs, *v)
+		registryConfigs = append(registryConfigs, v)
 	}
-
-	j.log.Info(fmt.Sprintf("all registries %+v", registryConfigs))
-	j.log.Info(fmt.Sprintf("all registries %+v", len(registryConfigs)))
-	j.log.Info(fmt.Sprintf("all configs %+v", configuredRegistries))
 
 	return registryConfigs, nil
 }

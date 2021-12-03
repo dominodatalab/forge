@@ -195,7 +195,8 @@ run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
           test-tls-with-basic-auth \
           "$namespace"
-# verify_image "$registry/simple-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
+# NOTE: can't verify image for test above because extra-cluster access is configured
+# only for the non-tls registry (docker-registry-2)
 
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
