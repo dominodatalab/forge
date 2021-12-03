@@ -191,8 +191,8 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 	allRegistryConfigs = []config.Registry{}
 	explicitlyConfiguredRegistries := map[string]bool{}
 
-	logNewHostConfig := func(host string, source string) {
-		j.log.Info("configured auth for host", "Host", host, "Source", source)
+	logNewRegistryConfig := func(host string, source string) {
+		j.log.Info("configured auth for registry", "Host", host, "Source", source)
 	}
 
 	for _, apiReg := range apiRegs {
@@ -209,11 +209,10 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 		}
 
 		var fetchConfigs func() ([]config.Registry, error)
-
 		switch {
 		case apiReg.BasicAuth.IsInline():
 			fetchConfigs = func() ([]config.Registry, error) {
-				logNewHostConfig(apiReg.Server, "inline BasicAuth entry")
+				logNewRegistryConfig(apiReg.Server, "inline BasicAuth entry")
 				registryConfig.Username = apiReg.BasicAuth.Username
 				registryConfig.Password = apiReg.BasicAuth.Password
 				return []config.Registry{registryConfig}, nil
@@ -236,13 +235,16 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 				configs := []config.Registry{registryConfig}
 
-				// load *all* hosts in the secret that are not already explicitly configured
+				// load all registries in the secret that are not already explicitly configured
 				for host, authConfig := range authConfigs {
-					if _, hostConfigured := explicitlyConfiguredRegistries[host]; hostConfigured {
+
+					// If this host was already explicit configured, do not load.
+					// If it is explicitly configured later, it will override this earlier config
+					if _, registryConfigured := explicitlyConfiguredRegistries[host]; registryConfigured {
 						continue
 					}
 
-					logNewHostConfig(
+					logNewRegistryConfig(
 						host,
 						fmt.Sprintf("secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
 
@@ -261,7 +263,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 		case apiReg.DynamicCloudCredentials:
 			fetchConfigs = func() ([]config.Registry, error) {
-				authConfigs, err := j.getDockerAuthsFromFS(apiReg.Server)
+				authConfigs, err := j.getDockerAuthsFromFS()
 				if err != nil {
 					return nil, err
 				}
@@ -274,14 +276,14 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 				registryConfig.Username = username
 				registryConfig.Password = password
 
-				logNewHostConfig(apiReg.Server, "dynamic cloud credentials")
+				logNewRegistryConfig(apiReg.Server, "dynamic cloud credentials")
 				return []config.Registry{registryConfig}, nil
 			}
 
 		default:
-			// If no recognizable auth config is present, configure host without authentication.
+			// If no recognizable auth config is present, configure registry without authentication.
 			fetchConfigs = func() ([]config.Registry, error) {
-				logNewHostConfig(apiReg.Server, "no source, configured without auth")
+				logNewRegistryConfig(apiReg.Server, "no source, configured without auth")
 				return []config.Registry{registryConfig}, nil
 			}
 
@@ -298,7 +300,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 	return allRegistryConfigs, nil
 }
 
-func (j *Job) getDockerAuthsFromFS(host string) (credentials.AuthConfigs, error) {
+func (j *Job) getDockerAuthsFromFS() (credentials.AuthConfigs, error) {
 	if _, err := os.Stat(config.DynamicCredentialsFilepath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "filesystem docker credentials missing")
 	}

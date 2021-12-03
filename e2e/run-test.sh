@@ -176,9 +176,6 @@ cp /etc/ssl/certs/ca-certificates.crt ca-certificates.crt
 kubectl -n $namespace get secrets docker-registry-tls -o=jsonpath='{.data.ca\.crt}' | base64 -d >> ca-certificates.crt
 kubectl -n $namespace create cm domino-generated-ca --from-file=ca-certificates.crt
 
-#info "Adding docker auth secret"
-#kubectl create -n $namespace -f e2e/secrets/docker-registry-auth-two-registries.yaml
-
 info "Launching Forge controller: $image"
 pushd config/controller
 kustomize edit set image quay.io/domino/forge="$image"
@@ -198,12 +195,12 @@ run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
           test-tls-with-basic-auth \
           "$namespace"
+verify_image "$registry/simple-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
           test-private-base-image \
           "$namespace"
-
 verify_image "$registry/variable-base-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 run_test "Build should run custom init container" \
@@ -212,11 +209,10 @@ run_test "Build should run custom init container" \
           "$namespace"
 verify_image "$registry/init-container-files" /app $BASE_DIR/e2e/testdata/expected/init-container
 
-run_test "Build should configure all auth entries from specified secret" \
+run_test "Build pull base from registry in secret but not explicitly configured" \
           e2e/builds/all_registries_from_secret.yaml \
           test-all-registries-from-secret \
           "$namespace"
-
 verify_image "$registry/all-registries-from-secret-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 if [ -n "$ACR_REGISTRY" ]; then
