@@ -188,7 +188,7 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerI
 
 // uses api registry directives to generate a list of registry configurations for image building
 func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (registryConfigs []config.Registry, err error) {
-	configuredRegistries := map[string]config.Registry{}
+	configuredRegistries := map[string]*config.Registry{}
 
 	logNewRegistryConfig := func(host string, source string) {
 		j.log.Info("configured auth for registry", "Host", host, "Source", source)
@@ -210,7 +210,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			j.log.Info("auth entry for registry overrides existing configuration", "Host", apiReg.Server)
 		}
 
-		configuredRegistries[apiReg.Server] = registryConfig
+		configuredRegistries[apiReg.Server] = &registryConfig
 
 		switch {
 		case apiReg.BasicAuth.IsInline():
@@ -240,7 +240,8 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 			// load all registries in the secret that are not already configured
 			for host, authConfig := range authConfigs {
-
+				j.log.Info(fmt.Sprintf("host value %+v", host))
+				j.log.Info(fmt.Sprintf("authConfig value %+v", authConfig))
 				// If this host was already explicitly configured, do not load.
 				// If it is explicitly configured later, it will override this config
 				// IE, explicit auth entries from the CR take strict precendence.
@@ -257,7 +258,7 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 				// Assume SSL. To configure NonSSL auth, user must manually specify
 				// the specific host in the custom resource.
-				configuredRegistries[host] = config.Registry{
+				configuredRegistries[host] = &config.Registry{
 					Host:     host,
 					NonSSL:   false,
 					Username: authConfig.Username,
@@ -286,10 +287,14 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 		}
 	}
 
-	registryConfigs = make([]config.Registry, len(configuredRegistries))
+	registryConfigs = []config.Registry{}
 	for _, v := range configuredRegistries {
-		registryConfigs = append(registryConfigs, v)
+		registryConfigs = append(registryConfigs, *v)
 	}
+
+	j.log.Info(fmt.Sprintf("all registries %+v", registryConfigs))
+	j.log.Info(fmt.Sprintf("all registries %+v", len(registryConfigs)))
+	j.log.Info(fmt.Sprintf("all configs %+v", configuredRegistries))
 
 	return registryConfigs, nil
 }
