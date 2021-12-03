@@ -20,8 +20,11 @@ function run_test {
   local namespace="$4"
 
   info "Running test case: $test_name"
-  export TEST_NS=$namespace
-  cat "$yaml_file" | envsubst '${TEST_NS}' | kubectl apply -n "$namespace" -f -
+
+  cat "$yaml_file" | \
+    TEST_NAMESPACE=$namespace TEST_RESOURCE_NAME=$resource_name \
+    envsubst '${TEST_NAMESPACE} ${TEST_RESOURCE_NAME}' | \
+    kubectl apply -n "$namespace" -f -
 
   local counter=0
   while true; do
@@ -173,8 +176,8 @@ cp /etc/ssl/certs/ca-certificates.crt ca-certificates.crt
 kubectl -n $namespace get secrets docker-registry-tls -o=jsonpath='{.data.ca\.crt}' | base64 -d >> ca-certificates.crt
 kubectl -n $namespace create cm domino-generated-ca --from-file=ca-certificates.crt
 
-info "Adding docker auth secret"
-kubectl create -n $namespace -f e2e/secrets/docker-registry-auth-two-registries.yaml
+#info "Adding docker auth secret"
+#kubectl create -n $namespace -f e2e/secrets/docker-registry-auth-two-registries.yaml
 
 info "Launching Forge controller: $image"
 pushd config/controller
