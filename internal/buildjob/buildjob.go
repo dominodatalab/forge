@@ -187,9 +187,8 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerI
 }
 
 // uses api registry directives to generate a list of registry configurations for image building
-func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (allRegistryConfigs []config.Registry, err error) {
-	allRegistryConfigs = []config.Registry{}
-	explicitlyConfiguredRegistries := map[string]bool{}
+func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (registryConfigs []config.Registry, err error) {
+	configuredRegistries := map[string]config.Registry{}
 
 	logNewRegistryConfig := func(host string, source string) {
 		j.log.Info("configured auth for registry", "Host", host, "Source", source)
@@ -201,103 +200,98 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
-		explicitlyConfiguredRegistries[apiReg.Server] = true
-
 		registryConfig := config.Registry{
 			Host:   apiReg.Server,
 			NonSSL: apiReg.NonSSL,
 		}
 
-		var fetchConfigs func() ([]config.Registry, error)
+		// If this registry was already configured, log that the new entry is overriding it.
+		if _, registryConfigured := configuredRegistries[apiReg.Server]; registryConfigured {
+			j.log.Info("auth entry for registry overrides existing configuration", "Host", apiReg.Server)
+		}
+
+		configuredRegistries[apiReg.Server] = registryConfig
+
 		switch {
 		case apiReg.BasicAuth.IsInline():
-			fetchConfigs = func() ([]config.Registry, error) {
-				logNewRegistryConfig(apiReg.Server, "inline BasicAuth entry")
-				registryConfig.Username = apiReg.BasicAuth.Username
-				registryConfig.Password = apiReg.BasicAuth.Password
-				return []config.Registry{registryConfig}, nil
-			}
+			logNewRegistryConfig(apiReg.Server, "from inline details")
+			registryConfig.Username = apiReg.BasicAuth.Username
+			registryConfig.Password = apiReg.BasicAuth.Password
 
 		case apiReg.BasicAuth.IsSecret():
-			fetchConfigs = func() ([]config.Registry, error) {
-				authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
-				if err != nil {
-					return nil, err
+			authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
+			if err != nil {
+				return nil, err
+			}
+
+			username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
+			if err != nil {
+				return nil, err
+			}
+
+			logNewRegistryConfig(
+				apiReg.Server,
+				fmt.Sprintf(
+					"from secret (%s) in namespace (%s)",
+					apiReg.BasicAuth.SecretName,
+					apiReg.BasicAuth.SecretNamespace))
+			registryConfig.Username = username
+			registryConfig.Password = password
+
+			// load all registries in the secret that are not already configured
+			for host, authConfig := range authConfigs {
+
+				// If this host was already explicitly configured, do not load.
+				// If it is explicitly configured later, it will override this config
+				// IE, explicit auth entries from the CR take strict precendence.
+				if _, registryConfigured := configuredRegistries[host]; registryConfigured {
+					continue
 				}
 
-				username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
-				if err != nil {
-					return nil, err
+				logNewRegistryConfig(
+					host,
+					fmt.Sprintf(
+						"implicit from secret (%s) in namespace (%s)",
+						apiReg.BasicAuth.SecretName,
+						apiReg.BasicAuth.SecretNamespace))
+
+				// Assume SSL. To configure NonSSL auth, user must manually specify
+				// the specific host in the custom resource.
+				configuredRegistries[host] = config.Registry{
+					Host:     host,
+					NonSSL:   false,
+					Username: authConfig.Username,
+					Password: authConfig.Password,
 				}
-
-				registryConfig.Username = username
-				registryConfig.Password = password
-
-				configs := []config.Registry{registryConfig}
-
-				// load all registries in the secret that are not already explicitly configured
-				for host, authConfig := range authConfigs {
-
-					// If this host was already explicit configured, do not load.
-					// If it is explicitly configured later, it will override this earlier config
-					if _, registryConfigured := explicitlyConfiguredRegistries[host]; registryConfigured {
-						continue
-					}
-
-					logNewRegistryConfig(
-						host,
-						fmt.Sprintf("secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
-
-					// Assume SSL. To configure NonSSL auth, user must manually specify
-					// the specific host in the custom resource.
-					configs = append(configs, config.Registry{
-						Host:     host,
-						NonSSL:   false,
-						Username: authConfig.Username,
-						Password: authConfig.Password,
-					})
-				}
-
-				return configs, nil
 			}
 
 		case apiReg.DynamicCloudCredentials:
-			fetchConfigs = func() ([]config.Registry, error) {
-				authConfigs, err := j.getDockerAuthsFromFS()
-				if err != nil {
-					return nil, err
-				}
-
-				username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
-				if err != nil {
-					return nil, err
-				}
-
-				registryConfig.Username = username
-				registryConfig.Password = password
-
-				logNewRegistryConfig(apiReg.Server, "dynamic cloud credentials")
-				return []config.Registry{registryConfig}, nil
+			authConfigs, err := j.getDockerAuthsFromFS()
+			if err != nil {
+				return nil, err
 			}
+
+			username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
+			if err != nil {
+				return nil, err
+			}
+
+			logNewRegistryConfig(apiReg.Server, "dynamic cloud credentials")
+			registryConfig.Username = username
+			registryConfig.Password = password
 
 		default:
 			// If no recognizable auth config is present, configure registry without authentication.
-			fetchConfigs = func() ([]config.Registry, error) {
-				logNewRegistryConfig(apiReg.Server, "no source, configured without auth")
-				return []config.Registry{registryConfig}, nil
-			}
-
+			logNewRegistryConfig(apiReg.Server, "no source, configured without auth")
 		}
-
-		registryConfigs, err := fetchConfigs()
-		if err != nil {
-			return nil, err
-		}
-
-		allRegistryConfigs = append(allRegistryConfigs, registryConfigs...)
 	}
 
-	return allRegistryConfigs, nil
+	registryConfigs = make([]config.Registry, len(configuredRegistries))
+	for _, v := range configuredRegistries {
+		registryConfigs = append(registryConfigs, v)
+	}
+
+	return registryConfigs, nil
 }
 
 func (j *Job) getDockerAuthsFromFS() (credentials.AuthConfigs, error) {
