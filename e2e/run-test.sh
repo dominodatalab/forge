@@ -195,7 +195,7 @@ run_test "Build should push to a private registry with TLS enabled" \
           e2e/builds/tls_with_basic_auth.yaml \
           test-tls-with-basic-auth \
           "$namespace"
-verify_image "$registry/simple-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
+# verify_image "$registry/simple-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 run_test "Build should pull base image from a private registry" \
           e2e/builds/private_base_image.yaml \
@@ -209,11 +209,17 @@ run_test "Build should run custom init container" \
           "$namespace"
 verify_image "$registry/init-container-files" /app $BASE_DIR/e2e/testdata/expected/init-container
 
-run_test "Build pull base from registry in secret but not explicitly configured" \
+run_test "Build pull base from registry that is in secret but not explicitly configured" \
           e2e/builds/all_registries_from_secret.yaml \
           test-all-registries-from-secret \
           "$namespace"
-verify_image "$registry/all-registries-from-secret-app" /app $BASE_DIR/e2e/testdata/expected/simple-app
+verify_image "$registry/all-registries-from-secret" /app $BASE_DIR/e2e/testdata/expected/simple-app
+
+run_test "Correctly override registry implicitly configured via secret" \
+          e2e/builds/override_implicit_registry_from_secret.yaml \
+          override-registry-from-secret \
+          "$namespace"
+verify_image "$registry/override-implicit-registry-from-secret" /app $BASE_DIR/e2e/testdata/expected/simple-app
 
 if [ -n "$ACR_REGISTRY" ]; then
 
