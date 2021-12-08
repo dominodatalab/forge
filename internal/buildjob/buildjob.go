@@ -299,17 +299,17 @@ func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Regis
 
 func (j *Job) getDockerAuthsFromFS() (credentials.AuthConfigs, error) {
 	if _, err := os.Stat(config.DynamicCredentialsFilepath); os.IsNotExist(err) {
-		return nil, errors.Wrap(err, "filesystem docker credentials missing")
+		return nil, errors.Wrap(err, "cannot find dynamic cloud credentials in the filesystem")
 	}
 
 	input, err := ioutil.ReadFile(config.DynamicCredentialsFilepath)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot read docker credentials")
+		return nil, errors.Wrap(err, "cannot read dynamic cloud credentials from the filesystem")
 	}
 
 	authConfigs, err := credentials.ExtractAuthConfigs(input)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read docker auth from filesystem")
+		return nil, errors.Wrapf(err, "cannot extract dynamic cloud credentials from provided data")
 	}
 
 	return authConfigs, nil
@@ -318,10 +318,10 @@ func (j *Job) getDockerAuthsFromFS() (credentials.AuthConfigs, error) {
 func (j *Job) getDockerAuthsFromSecret(ctx context.Context, secretName string, secretNamespace string) (credentials.AuthConfigs, error) {
 	secret, err := j.clientk8s.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot find registry auth secret")
+		return nil, errors.Wrap(err, "failed to fetch registry auth secret")
 	}
 	if secret.Type != corev1.SecretTypeDockerConfigJson {
-		return nil, fmt.Errorf("registry auth secret must be %v, not %v", corev1.SecretTypeDockerConfigJson, secret.Type)
+		return nil, fmt.Errorf("cannot read registry auth secret. Secret must be type %v, not %v", corev1.SecretTypeDockerConfigJson, secret.Type)
 	}
 
 	authConfigs, err := credentials.ExtractAuthConfigs(secret.Data[corev1.DockerConfigJsonKey])
@@ -335,7 +335,7 @@ func (j *Job) getDockerAuthsFromSecret(ctx context.Context, secretName string, s
 func (j *Job) getBasicAuthForHost(authConfigs credentials.AuthConfigs, host string) (string, string, error) {
 	username, password, err := credentials.ExtractBasicAuthForHost(authConfigs, host)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "Failed to extract docker auth for specified host (%q)", host)
+		return "", "", errors.Wrapf(err, "did not find docker auth for specified host (%q) in the supplied secret", host)
 	}
 
 	return username, password, nil

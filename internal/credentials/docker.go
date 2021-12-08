@@ -3,6 +3,7 @@ package credentials
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types"
 )
@@ -36,15 +37,14 @@ func ExtractAuthConfigs(input []byte) (authConfigs AuthConfigs, err error) {
 
 // ExtractBasicAuthForHost will extract the basic auth info for a registry host from an AuthConfigs instance
 func ExtractBasicAuthForHost(authConfigs AuthConfigs, host string) (string, string, error) {
-	ac, ok := authConfigs[host]
-	if !ok {
-		var servers []string
-		for url := range authConfigs {
-			servers = append(servers, url)
-		}
-
-		return "", "", fmt.Errorf("registry %q is not in list of registries for this auth source %v", host, servers)
+	if ac, ok := authConfigs[host]; ok {
+		return ac.Username, ac.Password, nil
 	}
 
-	return ac.Username, ac.Password, nil
+	var servers []string
+	for url := range authConfigs {
+		servers = append(servers, url)
+	}
+
+	return "", "", fmt.Errorf("registry %q is not in list of registries for this auth source %v", host, servers)
 }
