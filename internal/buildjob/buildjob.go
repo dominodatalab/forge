@@ -187,78 +187,155 @@ func (j *Job) generateBuildOptions(ctx context.Context, cib *v1alpha1.ContainerI
 }
 
 // uses api registry directives to generate a list of registry configurations for image building
-func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (configs []config.Registry, err error) {
-	for _, apiReg := range apiRegs {
-		conf := config.Registry{
-			Host:   apiReg.Server,
-			NonSSL: apiReg.NonSSL,
-		}
+func (j *Job) buildRegistryConfigs(ctx context.Context, apiRegs []v1alpha1.Registry) (registryConfigs []config.Registry, err error) {
+	configuredRegistries := map[string]config.Registry{}
 
+	logNewRegistryConfig := func(host string, source string) {
+		j.log.Info("configured auth for registry", "Host", host, "Source", source)
+	}
+
+	for _, apiReg := range apiRegs {
 		// NOTE: move BasicAuth validation into an admission webhook at a later time
 		if err := apiReg.BasicAuth.Validate(); err != nil {
 			return nil, errors.Wrap(err, "basic auth validation failed")
 		}
 
-		var fetchAuth func() (username, password string, err error)
-		switch {
-		case apiReg.BasicAuth.IsInline():
-			fetchAuth = func() (string, string, error) {
-				return apiReg.BasicAuth.Username, apiReg.BasicAuth.Password, nil
-			}
-		case apiReg.BasicAuth.IsSecret():
-			fetchAuth = func() (string, string, error) {
-				return j.getDockerAuthFromSecret(ctx, apiReg.Server, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
-			}
-		case apiReg.DynamicCloudCredentials:
-			fetchAuth = func() (string, string, error) {
-				return j.getDockerAuthFromFS(apiReg.Server)
-			}
+		// If this registry was already configured, log that the new entry is overriding it.
+		if _, registryConfigured := configuredRegistries[apiReg.Server]; registryConfigured {
+			j.log.Info("auth entry for registry overrides existing configuration", "Host", apiReg.Server)
 		}
 
-		if fetchAuth != nil {
-			var err error
-			conf.Username, conf.Password, err = fetchAuth()
+		switch {
+		case apiReg.BasicAuth.IsInline():
+			logNewRegistryConfig(apiReg.Server, "from inline details")
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: apiReg.BasicAuth.Username,
+				Password: apiReg.BasicAuth.Password,
+			}
+
+		case apiReg.BasicAuth.IsSecret():
+			authConfigs, err := j.getDockerAuthsFromSecret(ctx, apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace)
 			if err != nil {
 				return nil, err
 			}
-		}
 
-		configs = append(configs, conf)
+			username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
+			if err != nil {
+				return nil, err
+			}
+
+			logNewRegistryConfig(apiReg.Server, fmt.Sprintf("from secret (%s) in namespace (%s)", apiReg.BasicAuth.SecretName, apiReg.BasicAuth.SecretNamespace))
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: username,
+				Password: password,
+			}
+
+			// load all registries in the secret that are not already configured
+			for host, authConfig := range authConfigs {
+				// If this host was already explicitly configured, do not load.
+				// If it is explicitly configured later, it will override this config
+				// IE, explicit auth entries from the CR take strict precendence.
+				if _, registryConfigured := configuredRegistries[host]; registryConfigured {
+					continue
+				}
+
+				logNewRegistryConfig(
+					host,
+					fmt.Sprintf(
+						"implicit from secret (%s) in namespace (%s)",
+						apiReg.BasicAuth.SecretName,
+						apiReg.BasicAuth.SecretNamespace))
+
+				// Assume SSL. To configure NonSSL auth, user must manually specify
+				// the specific host in the custom resource.
+				configuredRegistries[host] = config.Registry{
+					Host:     host,
+					NonSSL:   false,
+					Username: authConfig.Username,
+					Password: authConfig.Password,
+				}
+			}
+
+		case apiReg.DynamicCloudCredentials:
+			authConfigs, err := j.getDockerAuthsFromFS()
+			if err != nil {
+				return nil, err
+			}
+
+			username, password, err := j.getBasicAuthForHost(authConfigs, apiReg.Server)
+			if err != nil {
+				return nil, err
+			}
+
+			logNewRegistryConfig(apiReg.Server, "dynamic cloud credentials")
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:     apiReg.Server,
+				NonSSL:   apiReg.NonSSL,
+				Username: username,
+				Password: password,
+			}
+
+		default:
+			// If no recognizable auth config is present, configure registry without authentication.
+			logNewRegistryConfig(apiReg.Server, "no source, configured without auth")
+			configuredRegistries[apiReg.Server] = config.Registry{
+				Host:   apiReg.Server,
+				NonSSL: apiReg.NonSSL,
+			}
+		}
 	}
 
-	return configs, nil
+	registryConfigs = []config.Registry{}
+	for _, v := range configuredRegistries {
+		registryConfigs = append(registryConfigs, v)
+	}
+
+	return registryConfigs, nil
 }
 
-func (j *Job) getDockerAuthFromFS(host string) (string, string, error) {
+func (j *Job) getDockerAuthsFromFS() (credentials.AuthConfigs, error) {
 	if _, err := os.Stat(config.DynamicCredentialsFilepath); os.IsNotExist(err) {
-		return "", "", errors.Wrap(err, "filesystem docker credentials missing")
+		return nil, errors.Wrap(err, "cannot find dynamic cloud credentials in the filesystem")
 	}
 
 	input, err := ioutil.ReadFile(config.DynamicCredentialsFilepath)
 	if err != nil {
-		return "", "", errors.Wrap(err, "cannot read docker credentials")
+		return nil, errors.Wrap(err, "cannot read dynamic cloud credentials from the filesystem")
 	}
 
-	username, password, err := credentials.ExtractDockerAuth(input, host)
+	authConfigs, err := credentials.ExtractAuthConfigs(input)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "cannot process filesystem docker auth for host %q", host)
+		return nil, errors.Wrapf(err, "cannot extract dynamic cloud credentials from provided data")
 	}
 
-	return username, password, nil
+	return authConfigs, nil
 }
 
-func (j *Job) getDockerAuthFromSecret(ctx context.Context, host, name, namespace string) (string, string, error) {
-	secret, err := j.clientk8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+func (j *Job) getDockerAuthsFromSecret(ctx context.Context, secretName string, secretNamespace string) (credentials.AuthConfigs, error) {
+	secret, err := j.clientk8s.CoreV1().Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		return "", "", errors.Wrap(err, "cannot find registry auth secret")
+		return nil, errors.Wrap(err, "failed to fetch registry auth secret")
 	}
 	if secret.Type != corev1.SecretTypeDockerConfigJson {
-		return "", "", fmt.Errorf("registry auth secret must be %v, not %v", corev1.SecretTypeDockerConfigJson, secret.Type)
+		return nil, fmt.Errorf("cannot read registry auth secret. Secret must be type %v, not %v", corev1.SecretTypeDockerConfigJson, secret.Type)
 	}
 
-	username, password, err := credentials.ExtractDockerAuth(secret.Data[corev1.DockerConfigJsonKey], host)
+	authConfigs, err := credentials.ExtractAuthConfigs(secret.Data[corev1.DockerConfigJsonKey])
 	if err != nil {
-		return "", "", errors.Wrap(err, "cannot process docker auth from secret")
+		return nil, errors.Wrap(err, "Failed to read docker auth from secret")
+	}
+
+	return authConfigs, nil
+}
+
+func (j *Job) getBasicAuthForHost(authConfigs credentials.AuthConfigs, host string) (string, string, error) {
+	username, password, err := credentials.ExtractBasicAuthForHost(authConfigs, host)
+	if err != nil {
+		return "", "", errors.Wrapf(err, "did not find docker auth for specified host (%q) in the supplied secret", host)
 	}
 
 	return username, password, nil

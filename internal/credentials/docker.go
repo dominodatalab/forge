@@ -16,24 +16,35 @@ type DockerConfigJSON struct {
 	Auths AuthConfigs `json:"auths"`
 }
 
-// ExtractDockerAuth will return a username/password combination from a JSON-representation of a Docker config file.
-func ExtractDockerAuth(input []byte, host string) (string, string, error) {
+// ExtractAuthConfigs will return the Docker AuthConfigs from a JSON-representation of a Docker config file.
+func ExtractAuthConfigs(input []byte) (authConfigs AuthConfigs, err error) {
+	authConfigs = AuthConfigs{}
+
 	r := bytes.NewReader(input)
 
 	cf := configfile.New("")
 	if err := cf.LoadFromReader(r); err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	ac, ok := cf.GetAuthConfigs()[host]
-	if !ok {
-		var servers []string
-		for url := range cf.GetAuthConfigs() {
-			servers = append(servers, url)
-		}
-
-		return "", "", fmt.Errorf("registry %q is not in server list %v", host, servers)
+	// convert from the CLI type to the API type
+	for host, conf := range cf.GetAuthConfigs() {
+		authConfigs[host] = types.AuthConfig(conf)
 	}
 
-	return ac.Username, ac.Password, nil
+	return authConfigs, nil
+}
+
+// ExtractBasicAuthForHost will extract the basic auth info for a registry host from an AuthConfigs instance
+func ExtractBasicAuthForHost(authConfigs AuthConfigs, host string) (string, string, error) {
+	if ac, ok := authConfigs[host]; ok {
+		return ac.Username, ac.Password, nil
+	}
+
+	var servers []string
+	for url := range authConfigs {
+		servers = append(servers, url)
+	}
+
+	return "", "", fmt.Errorf("registry %q is not in list of registries for this auth source %v", host, servers)
 }
