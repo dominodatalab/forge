@@ -5,7 +5,7 @@ ARG BUILDKIT_VERSION=v0.9.1
 ARG SHADOW_VERSION=4.8.1
 ARG ALPINE_VERSION=3.14
 
-FROM golang:1.17-alpine3.14 AS forge
+FROM golang:1.17-alpine${ALPINE_VERSION} AS forge
 RUN apk add --no-cache make build-base
 WORKDIR /forge
 COPY . .
