@@ -65,7 +65,7 @@ jobs:
           paths:
             - "*"
       - setup_remote_docker:
-          version: "20.10.7"
+          version: "20.10.11"
       - run:
           name: Build Docker Image
           command: |
