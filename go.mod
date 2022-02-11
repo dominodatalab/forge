@@ -22,7 +22,7 @@ require (
 	github.com/containerd/containerd v1.5.7
 	github.com/containerd/fuse-overlayfs-snapshotter v1.0.3
 	github.com/docker/cli v20.10.7+incompatible
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.0+incompatible
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/go-logr/logr v0.4.0
 	github.com/go-logr/zapr v0.4.0
