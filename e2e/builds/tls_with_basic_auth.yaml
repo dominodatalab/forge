@@ -4,7 +4,7 @@ metadata:
   name: ${TEST_RESOURCE_NAME}
 spec:
   imageName: simple-app
-  context: https://forge-builder-test.s3-us-west-2.amazonaws.com/simple-app.tgz
+  context: https://raw.githubusercontent.com/dominodatalab/forge/master/test/data/simple-app.tgz
   pushTo:
     - docker-registry:5000
   registries:

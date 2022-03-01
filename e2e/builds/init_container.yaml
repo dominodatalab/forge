@@ -13,7 +13,7 @@ metadata:
   name: ${TEST_RESOURCE_NAME}
 spec:
   imageName: init-container-files
-  context: https://forge-builder-test.s3-us-west-2.amazonaws.com/test-init-container.tar.gz
+  context: https://raw.githubusercontent.com/dominodatalab/forge/master/test/data/test-init-container.tar.gz
   disableBuildCache: true
   pushTo:
     - docker-registry-2:5000
