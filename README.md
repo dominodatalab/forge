@@ -1,3 +1,7 @@
+**Note: Forge is unmaintained. Please see [dominodatalab/hephaestus](https://github.com/dominodatalab/hephaestus) for its successor.**
+
+---
+
 # Forge
 
 [![CircleCI](https://circleci.com/gh/dominodatalab/forge.svg?style=shield)](https://app.circleci.com/pipelines/github/dominodatalab/forge)
